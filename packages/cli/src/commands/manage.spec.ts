@@ -1,4 +1,12 @@
-import { applyAssignment, connection, proxy, providerLocal, trigger, limit } from './manage';
+import {
+  applyAssignment,
+  connection,
+  hopsToLines,
+  proxy,
+  providerLocal,
+  trigger,
+  limit,
+} from './manage';
 import { resolveCommand } from '../index';
 import { fetchStub, makeIo } from '../../test/helpers';
 
@@ -89,6 +97,36 @@ describe('proxy assign set', () => {
     expect(calls[1].method).toBe('PUT');
     expect(calls[1].url).toBe(`${HOST}/api/v1/proxy-assignments/connection/c1`);
     expect(JSON.parse(calls[1].body!)).toEqual({ mode: 'profile', profile_id: 'p1' });
+  });
+});
+
+describe('proxy profile create', () => {
+  it('sends each --hop as a line, balanced lines with their options', async () => {
+    const { io, calls } = setup([{ status: 201, body: {} }]);
+    await proxy['profile create'](io, [
+      '--name',
+      'Balance-Dual',
+      '--hop',
+      'affinity:x1,x3?no_session=agent',
+      '--hop',
+      'request:x2, x4?on_failure=next_line',
+      '--hop',
+      'direct',
+    ]);
+    expect(JSON.parse(calls[0].body!)).toEqual({
+      name: 'Balance-Dual',
+      lines: [
+        { mode: 'affinity', proxies: ['x1', 'x3'], no_session: 'agent' },
+        { mode: 'request', proxies: ['x2', 'x4'], on_failure: 'next_line' },
+        { mode: 'direct' },
+      ],
+    });
+  });
+
+  it('keeps plain proxy hops and refuses unknown options', () => {
+    expect(hopsToLines(['x1'])).toEqual([{ mode: 'proxy', proxies: ['x1'] }]);
+    expect(hopsToLines(undefined)).toBeUndefined();
+    expect(() => hopsToLines(['request:a,b?weight=2'])).toThrow('Unknown --hop option');
   });
 });
 

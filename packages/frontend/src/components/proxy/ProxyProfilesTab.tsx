@@ -14,12 +14,37 @@ import { toast } from '../../services/toast-store.js';
 import ErrorState from '../ErrorState.js';
 import { Badge, Button, EmptyState, Field, IconButton, Modal } from '../ui.js';
 import { chainText } from './OutboundProxyPanel.js';
-import ProxyChainEditor from './ProxyChainEditor.js';
-import { DIRECT, validateChain } from './proxy-chain.js';
+import ProxyChainEditor, { LineModeIcon } from './ProxyChainEditor.js';
+import { groupChain, profileLines, validateLines } from './proxy-chain.js';
 import { sourceTypeLabel } from './ProxyParts.js';
 
-const chainIds = (profile: ProxyProfile) =>
-  profile.chain.map((item) => (item.kind === 'direct' ? DIRECT : (item.proxy_id ?? '')));
+/** Profile lines in a row: balanced lines carry their mode icon. */
+function LinesSummary({ profile }: { profile: ProxyProfile }) {
+  const groups = groupChain(profile.chain);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      {groups.map((items, i) => {
+        const mode = items[0]?.mode;
+        const balanced = mode === 'affinity' || mode === 'request';
+        return (
+          <span key={i} className="inline-flex items-center gap-1.5">
+            {i > 0 ? (
+              <span className="text-faint" aria-hidden="true">
+                →
+              </span>
+            ) : null}
+            {balanced ? (
+              <span title={t(`proxies.lines.modes.${mode}`)} className="inline-flex">
+                <LineModeIcon mode={mode} className="size-3.5 shrink-0 text-accent" />
+              </span>
+            ) : null}
+            <span>{chainText(items)}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 /** Outbound profiles: named, ordered chains of proxy servers and Direct. */
 export default function ProxyProfilesTab() {
@@ -84,7 +109,7 @@ export default function ProxyProfilesTab() {
                     </span>
                   </td>
                   <td className="text-sm text-dim">
-                    {profile.chain.length ? chainText(profile.chain) : '—'}
+                    {profile.chain.length ? <LinesSummary profile={profile} /> : '—'}
                     {profile.chain.some((i) => i.kind === 'proxy' && !i.enabled) ? (
                       <>
                         {' '}
@@ -178,15 +203,15 @@ function ProfileModal({
   onSaved: () => void;
 }) {
   const [name, setName] = useState(profile?.name ?? '');
-  const [chain, setChain] = useState<string[]>(profile ? chainIds(profile) : []);
+  const [lines, setLines] = useState(() => (profile ? profileLines(profile) : []));
   const [saving, setSaving] = useState(false);
-  const rule = chain.length === 0 ? 'emptyProfile' : validateChain(chain);
+  const rule = lines.length === 0 ? 'emptyProfile' : validateLines(lines);
   const error = rule ? t(`proxies.binding.errors.${rule}`) : null;
 
   const save = async () => {
     setSaving(true);
     try {
-      const data = { name: name.trim(), chain };
+      const data = { name: name.trim(), lines };
       if (profile) await updateProxyProfile(profile.id, data);
       else await createProxyProfile(data);
       toast.success(t('proxies.profiles.saved'));
@@ -218,9 +243,9 @@ function ProfileModal({
         <div>
           <span className="label">{t('proxies.profiles.chain')}</span>
           <p className="hint mt-0">{t('proxies.profiles.chainHint')}</p>
-          <ProxyChainEditor value={chain} onChange={setChain} proxies={proxies} />
+          <ProxyChainEditor value={lines} onChange={setLines} proxies={proxies} />
         </div>
-        {error && chain.length > 0 ? (
+        {error && lines.length > 0 ? (
           <p className="hint m-0" style={{ color: 'var(--danger)' }}>
             {error}
           </p>

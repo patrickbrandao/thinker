@@ -8,6 +8,7 @@ import {
   type ProxyStatus,
 } from '../../services/api/proxies.js';
 import { Badge, cx } from '../ui.js';
+import { LineModeIcon } from './ProxyChainEditor.js';
 
 export const endpointOf = (p: { scheme: string; host: string; port: number }) =>
   `${p.scheme}://${p.host.includes(':') ? `[${p.host}]` : p.host}:${p.port}`;
@@ -76,12 +77,24 @@ export function EgressHops({ hops, className }: { hops: EgressHop[]; className?:
               hop.error ?? (hop.ms != null ? t('proxies.common.ms', { ms: hop.ms }) : undefined)
             }
           >
+            {hop.mode ? (
+              <span
+                className="inline-flex"
+                title={t('proxies.lines.hopTitle', {
+                  n: hop.position,
+                  mode: t(`proxies.lines.modes.${hop.mode}`),
+                  attempt: hop.attempt ?? 1,
+                })}
+              >
+                <LineModeIcon mode={hop.mode} className="size-3.5 shrink-0 text-muted" />
+              </span>
+            ) : null}
             <EgressName egress={hop} />
             <Badge
               tone={
                 hop.result === 'ok'
                   ? 'ok'
-                  : hop.result === 'skipped_disabled'
+                  : hop.result === 'skipped_disabled' || hop.result === 'skipped_quarantine'
                     ? 'neutral'
                     : 'danger'
               }

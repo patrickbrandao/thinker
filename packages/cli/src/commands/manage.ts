@@ -80,6 +80,37 @@ export function applyAssignment(target: Record<string, unknown>, raw: string): v
 }
 
 /**
+ * `--hop` values of an outbound profile, one line each: `<proxy-id>`, `direct`,
+ * or a balanced line `affinity:<id>,<id>` / `request:<id>,<id>` with optional
+ * `?on_failure=next_member|next_line&no_session=request|agent|first`.
+ */
+export function hopsToLines(
+  hops: string[] | undefined,
+): Array<Record<string, unknown>> | undefined {
+  if (!hops) return undefined;
+  return hops.map((hop) => {
+    const value = hop.trim();
+    if (value === 'direct') return { mode: 'direct' };
+    const match = /^(affinity|request):([^?]+)(?:\?(.*))?$/.exec(value);
+    if (!match) return { mode: 'proxy', proxies: [value] };
+    const line: Record<string, unknown> = {
+      mode: match[1],
+      proxies: match[2]!
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    };
+    for (const [key, option] of new URLSearchParams(match[3] ?? '')) {
+      if (key !== 'on_failure' && key !== 'no_session') {
+        throw new CliError('invalid_flag', `Unknown --hop option ${key} (on_failure, no_session)`);
+      }
+      line[key] = option;
+    }
+    return line;
+  });
+}
+
+/**
  * The request body: `--data`/`--data-file`/`--data-stdin` (one JSON object),
  * then the typed flags, then each `--set` on top.
  */
@@ -464,7 +495,10 @@ export const proxy: Record<string, Handler> = {
       argv,
       withBody({ strings: ['name'], repeatables: ['hop'], maxPositionals: 0 }),
     );
-    const body = await readBody(io, args, { name: args.strings['name'], chain: args.lists['hop'] });
+    const body = await readBody(io, args, {
+      name: args.strings['name'],
+      lines: hopsToLines(args.lists['hop']),
+    });
     const { client } = clientFromFlags(io, args);
     printJson(io, await client.request('POST', '/proxy-profiles', { body }));
   },
@@ -474,7 +508,10 @@ export const proxy: Record<string, Handler> = {
       withBody({ strings: ['name'], repeatables: ['hop'], maxPositionals: 1 }),
     );
     const id = await proxyProfileId(io, args);
-    const body = await readBody(io, args, { name: args.strings['name'], chain: args.lists['hop'] });
+    const body = await readBody(io, args, {
+      name: args.strings['name'],
+      lines: hopsToLines(args.lists['hop']),
+    });
     requireNonEmpty(body, 'Pass --name, --hop, --data or --set');
     const { client } = clientFromFlags(io, args);
     printJson(io, await client.request('PATCH', `/proxy-profiles/${enc(id)}`, { body }));

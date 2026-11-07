@@ -60,6 +60,7 @@ import {
   ProxyBinding,
   ProxyLog,
   ProxyProfile,
+  ProxyProfileLine,
   ProxyServer,
   ProxyUsageDaily,
 } from '../src/entities/proxy-server.entity';
@@ -116,6 +117,7 @@ const entities = [
   ProxyServer,
   ProxyBinding,
   ProxyProfile,
+  ProxyProfileLine,
   ProxyAssignment,
   ProxyLog,
   ProxyUsageDaily,

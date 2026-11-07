@@ -61,7 +61,7 @@ describe('ProxyProfilesTab', () => {
     });
     renderTab();
     const row = (await screen.findByText('Primary route')).closest('tr')!;
-    expect(within(row).getByText('Alpha → Direct')).toBeTruthy();
+    expect(row.querySelector('td.text-sm')!.textContent).toBe('Alpha→Direct');
     expect(within(row).queryByText('Disabled')).toBeNull();
     const backup = screen.getByText('Backup').closest('tr')!;
     expect(within(backup).getByText('Disabled')).toBeTruthy();
@@ -99,15 +99,21 @@ describe('ProxyProfilesTab', () => {
     // Name alone is not enough: the chain is empty.
     expect(save.disabled).toBe(true);
 
-    fireEvent.change(within(dialog).getByLabelText('Proxy to add'), { target: { value: 'p2' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-    fireEvent.change(within(dialog).getByLabelText('Proxy to add'), { target: { value: 'direct' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add line' }));
+    fireEvent.change(within(dialog).getByLabelText('Proxy of line 1'), { target: { value: 'p2' } });
+    fireEvent.change(within(dialog).getByLabelText('Line to add'), { target: { value: 'direct' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add line' }));
     expect(save.disabled).toBe(false);
 
     fireEvent.click(save);
     await waitFor(() => expect(api.createProxyProfile).toHaveBeenCalledTimes(1));
-    expect(api.createProxyProfile).toHaveBeenCalledWith({ name: 'Edge route', chain: ['p2', 'direct'] });
+    expect(api.createProxyProfile).toHaveBeenCalledWith({
+      name: 'Edge route',
+      lines: [
+        { mode: 'proxy', proxies: ['p2'], on_failure: 'next_member', no_session: 'request' },
+        { mode: 'direct', proxies: [], on_failure: 'next_member', no_session: 'request' },
+      ],
+    });
     expect(api.updateProxyProfile).not.toHaveBeenCalled();
     expect(toastMock.success).toHaveBeenCalledWith('Outbound profile saved');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -121,10 +127,9 @@ describe('ProxyProfilesTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New profile' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'x' } });
-    fireEvent.change(within(dialog).getByLabelText('Proxy to add'), { target: { value: 'p1' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-    fireEvent.change(within(dialog).getByLabelText('Proxy to add'), { target: { value: 'direct' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add line' }));
+    fireEvent.change(within(dialog).getByLabelText('Line to add'), { target: { value: 'direct' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add line' }));
     const save = within(dialog).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
     expect(save.disabled).toBe(false);
 
@@ -146,8 +151,7 @@ describe('ProxyProfilesTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New profile' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'dup' } });
-    fireEvent.change(within(dialog).getByLabelText('Proxy to add'), { target: { value: 'p1' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add line' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.createProxyProfile).toHaveBeenCalled());
     expect(screen.getByRole('dialog')).toBeTruthy();
@@ -155,7 +159,9 @@ describe('ProxyProfilesTab', () => {
     expect(api.listProxyProfiles).toHaveBeenCalledTimes(1);
     // The button is usable again.
     await waitFor(() =>
-      expect((within(dialog).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false),
+      expect(
+        (within(dialog).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled,
+      ).toBe(false),
     );
   });
 
@@ -168,18 +174,91 @@ describe('ProxyProfilesTab', () => {
     expect(within(dialog).getAllByRole('listitem')).toHaveLength(2);
 
     fireEvent.change(name, { target: { value: 'Renamed' } });
-    fireEvent.click(within(dialog).getByLabelText('Remove Direct'));
+    fireEvent.click(within(dialog).getByLabelText('Remove line 2'));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.updateProxyProfile).toHaveBeenCalledTimes(1));
-    expect(api.updateProxyProfile).toHaveBeenCalledWith('pr1', { name: 'Renamed', chain: ['p1'] });
+    expect(api.updateProxyProfile).toHaveBeenCalledWith('pr1', {
+      name: 'Renamed',
+      lines: [{ mode: 'proxy', proxies: ['p1'], on_failure: 'next_member', no_session: 'request' }],
+    });
     expect(api.createProxyProfile).not.toHaveBeenCalled();
+  });
+
+  it('creates a balanced line: session affinity over two proxies, then Direct', async () => {
+    renderTab();
+    await screen.findByText('Primary route');
+    fireEvent.click(screen.getByRole('button', { name: 'New profile' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Balance-First' } });
+    fireEvent.change(within(dialog).getByLabelText('Line to add'), {
+      target: { value: 'affinity' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add line' }));
+    fireEvent.change(within(dialog).getByLabelText('Add a proxy to line 1'), {
+      target: { value: 'p2' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Without session'), {
+      target: { value: 'agent' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Line to add'), { target: { value: 'direct' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add line' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.createProxyProfile).toHaveBeenCalledTimes(1));
+    expect(api.createProxyProfile).toHaveBeenCalledWith({
+      name: 'Balance-First',
+      lines: [
+        { mode: 'affinity', proxies: ['p1', 'p2'], on_failure: 'next_member', no_session: 'agent' },
+        { mode: 'direct', proxies: [], on_failure: 'next_member', no_session: 'request' },
+      ],
+    });
+  });
+
+  it('shows balanced lines in the list with their mode', async () => {
+    api.listProxyProfiles.mockResolvedValue({
+      profiles: [
+        profile({
+          chain: [
+            {
+              kind: 'proxy',
+              proxy_id: 'p1',
+              name: 'Alpha',
+              enabled: true,
+              line: 1,
+              mode: 'request',
+            },
+            {
+              kind: 'proxy',
+              proxy_id: 'p2',
+              name: 'Beta',
+              enabled: true,
+              line: 1,
+              mode: 'request',
+            },
+            {
+              kind: 'direct',
+              proxy_id: null,
+              name: 'Direct',
+              enabled: true,
+              line: 2,
+              mode: 'direct',
+            },
+          ],
+        }),
+      ],
+    });
+    renderTab();
+    const row = (await screen.findByText('Primary route')).closest('tr')!;
+    expect(within(row).getByText('Alpha | Beta (per request)')).toBeTruthy();
+    expect(within(row).getByTitle('Per request')).toBeTruthy();
   });
 
   it('cancels the dialog without saving (button and Escape)', async () => {
     renderTab();
     await screen.findByText('Primary route');
     fireEvent.click(screen.getByRole('button', { name: 'New profile' }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }),
+    );
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'New profile' }));
     await screen.findByRole('dialog');
@@ -227,7 +306,9 @@ describe('ProxyProfilesTab', () => {
     api.deleteProxyProfile.mockRejectedValue(new Error('nope'));
     renderTab();
     fireEvent.click(await screen.findByRole('button', { name: 'Delete Primary route' }));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
     await waitFor(() => expect(api.deleteProxyProfile).toHaveBeenCalled());
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(toastMock.success).not.toHaveBeenCalled();

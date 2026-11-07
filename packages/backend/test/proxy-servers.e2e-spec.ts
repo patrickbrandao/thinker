@@ -457,15 +457,62 @@ describe('proxy profiles', () => {
       .expect(200);
   });
 
+  it('creates a balanced profile and reads its lines back', async () => {
+    const res = await asAdmin(api().post('/api/v1/proxy-profiles'))
+      .send({
+        name: 'Balance-First',
+        lines: [
+          { mode: 'affinity', proxies: [a.id, b.id], no_session: 'agent' },
+          { mode: 'direct' },
+        ],
+      })
+      .expect(201);
+    expect(
+      res.body.lines.map(
+        (l: { line: number; mode: string; no_session: string; members: unknown[] }) => [
+          l.line,
+          l.mode,
+          l.no_session,
+          l.members.length,
+        ],
+      ),
+    ).toEqual([
+      [1, 'affinity', 'agent', 2],
+      [2, 'direct', 'request', 1],
+    ]);
+    const stored = await ds.query(
+      `SELECT line, mode, on_failure, no_session FROM proxy_profile_lines WHERE profile_id = $1 ORDER BY line`,
+      [res.body.id],
+    );
+    expect(stored).toEqual([
+      { line: 1, mode: 'affinity', on_failure: 'next_member', no_session: 'agent' },
+      { line: 2, mode: 'direct', on_failure: 'next_member', no_session: 'request' },
+    ]);
+    await asAdmin(api().post('/api/v1/proxy-profiles'))
+      .send({
+        name: 'Repeat',
+        lines: [
+          { mode: 'request', proxies: [a.id, b.id] },
+          { mode: 'proxy', proxies: [a.id] },
+        ],
+      })
+      .expect(400);
+    await asAdmin(api().delete(`/api/v1/proxy-profiles/${res.body.id}`)).expect(200);
+    const left = await ds.query(`SELECT 1 FROM proxy_profile_lines WHERE profile_id = $1`, [
+      res.body.id,
+    ]);
+    expect(left).toEqual([]);
+  });
+
   it('creates a profile whose chain has a Direct item and a disabled server', async () => {
     const res = await asAdmin(api().post('/api/v1/proxy-profiles'))
       .send({ name: 'Chain', chain: [a.id, b.id, 'direct'] })
       .expect(201);
     expect(res.body).toMatchObject({ name: 'Chain', used_by: [] });
     expect(res.body.chain).toEqual([
-      { kind: 'proxy', proxy_id: a.id, name: 'Profile A', enabled: true },
-      { kind: 'proxy', proxy_id: b.id, name: 'Profile B', enabled: false },
-      { kind: 'direct', proxy_id: null, name: 'Direct', enabled: true },
+      { kind: 'proxy', proxy_id: a.id, name: 'Profile A', enabled: true, line: 1, mode: 'proxy' },
+      { kind: 'proxy', proxy_id: b.id, name: 'Profile B', enabled: false, line: 2, mode: 'proxy' },
+      { kind: 'direct', proxy_id: null, name: 'Direct', enabled: true, line: 3, mode: 'direct' },
     ]);
     const bindings = await ds.query(
       `SELECT position, proxy_id FROM proxy_bindings WHERE target_type = 'profile' AND target_id = $1 ORDER BY position`,
