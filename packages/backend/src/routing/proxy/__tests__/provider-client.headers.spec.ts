@@ -9,6 +9,7 @@
 // fails loudly.
 
 import { ProviderClient } from '../provider-client';
+import { buildEndpointOverride } from '../provider-endpoints';
 import { CodexSessionAffinity } from '../codex-session-affinity';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -480,6 +481,47 @@ describe('ProviderClient — anthropic-beta merge', () => {
     });
 
     expect(sentBeta()).toBe('structured-outputs-2025-11-13');
+  });
+
+  it("forwards through the Anthropic connection's own base URL (a proxy or simulator)", async () => {
+    // Without the flags, Claude Code's beta-only fields (role "system" turns
+    // with output_config, per-turn-control) are refused upstream.
+    const customEndpoint = {
+      ...buildEndpointOverride('http://wwz:8000/anthropic', 'anthropic'),
+      requiresSsrfRevalidation: false,
+    };
+    customEndpoint.anthropicAccountOverride = true;
+    await client.forward({
+      provider: 'anthropic',
+      apiKey: 'sk-ant-key',
+      model: 'claude-sonnet-4-20250514',
+      body,
+      stream: false,
+      apiMode: 'messages',
+      clientAnthropicBeta: 'per-turn-control-2026-07-01',
+      customEndpoint,
+    });
+
+    expect(mockFetch.mock.calls[0][0]).toBe('http://wwz:8000/anthropic/v1/messages');
+    expect(sentBeta()).toBe('per-turn-control-2026-07-01');
+  });
+
+  it('does not forward beta flags to an Anthropic-format override of another provider', async () => {
+    await client.forward({
+      provider: 'minimax',
+      apiKey: 'k',
+      model: 'MiniMax-M2',
+      body,
+      stream: false,
+      apiMode: 'messages',
+      clientAnthropicBeta: 'per-turn-control-2026-07-01',
+      customEndpoint: {
+        ...buildEndpointOverride('http://proxy:8000', 'anthropic'),
+        requiresSsrfRevalidation: false,
+      },
+    });
+
+    expect(mockFetch.mock.calls[0][1].headers).not.toHaveProperty('anthropic-beta');
   });
 
   it('does not forward beta flags on a translated (non-Messages) request', async () => {

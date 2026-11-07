@@ -366,6 +366,23 @@ describe('resolveForwardEndpoint', () => {
     expect(or.forwardModel).toBe('white-wizard/wwz-fast');
   });
 
+  it('marks the Anthropic connection override so caller beta flags still reach it', () => {
+    const out = resolveForwardEndpoint({
+      provider: 'anthropic',
+      authType: 'api_key',
+      model: 'claude-sonnet-5-5',
+      providerBaseUrl: 'http://wwz:8000/anthropic',
+    });
+    expect(out.customEndpoint?.anthropicAccountOverride).toBe(true);
+    const openai = resolveForwardEndpoint({
+      provider: 'openai',
+      authType: 'api_key',
+      model: 'gpt-4o',
+      providerBaseUrl: 'http://wwz:8000/openai',
+    });
+    expect(openai.customEndpoint?.anthropicAccountOverride).toBeUndefined();
+  });
+
   it('sets no override for a custom provider whose row is missing', () => {
     const out = resolveForwardEndpoint({
       provider: 'custom:gone',

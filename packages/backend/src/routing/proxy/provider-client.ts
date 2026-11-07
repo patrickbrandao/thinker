@@ -854,7 +854,11 @@ export class ProviderClient {
           // type would have its output silently dropped on the way back, which
           // is worse than the 400 we are fixing. Native Messages responses pass
           // through byte-for-byte, so unknown blocks survive there.
-          ctx.apiMode === 'messages' && isAnthropicHost(endpoint.baseUrl)
+          // The Anthropic connection's own base URL counts too: the operator
+          // pointed the Anthropic provider there (a proxy, a simulator), and
+          // without the flags Claude Code's beta-only fields are refused.
+          ctx.apiMode === 'messages' &&
+            (isAnthropicHost(endpoint.baseUrl) || endpoint.anthropicAccountOverride === true)
             ? ctx.clientAnthropicBeta
             : undefined,
         ),

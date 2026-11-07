@@ -168,6 +168,7 @@ export function resolveForwardEndpoint(
     // exactly as the native endpoint would have.
     forwardModel = stripModelPrefix(forwardModel, overrideKey);
     customEndpoint.allowPrivateDestination = allowsPrivateDestination(providerBaseUrlAllowsPrivate);
+    if (overrideKey === 'anthropic') customEndpoint.anthropicAccountOverride = true;
   } else if (resolveEndpointKey(provider) === 'bedrock' && isBedrockRegion(providerRegion)) {
     const bedrockEndpointKey = resolveBedrockEndpointKey(model, apiMode);
     customEndpoint = buildEndpointOverride(
