@@ -314,6 +314,22 @@ describe('SetupService', () => {
       expect(updateCall?.[1]).toEqual(['founder@example.com']);
     });
 
+    it('matches the lowercased email Better Auth stores, so a mixed-case email still becomes the verified instance admin', async () => {
+      mockHappyPath();
+      (auth.api.signUpEmail as jest.Mock).mockResolvedValueOnce({});
+
+      await service.createFirstAdmin({ ...dto, email: ' Founder@Example.COM ' });
+
+      const writes = runnerQuery.mock.calls.filter(
+        (c) => typeof c[0] === 'string' && /UPDATE "user"|INSERT INTO user_profiles/.test(c[0]),
+      );
+      expect(writes).toHaveLength(2);
+      for (const [sql, params] of writes) {
+        expect(sql).toContain('lower(email) = $1');
+        expect(params).toEqual(['founder@example.com']);
+      }
+    });
+
     it('throws ConflictException when a user already exists and is verified', async () => {
       runnerQuery
         .mockResolvedValueOnce(undefined) // lock
