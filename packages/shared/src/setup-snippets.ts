@@ -117,12 +117,12 @@ model_context_window = ${SNIPPET_CONTEXT_WINDOW}
 [model_providers.thinker]
 name = "Thinker"
 base_url = "${baseUrl}"
-env_key = "THINKER_API_KEY"
+env_key = "THINKER_AGENT_KEY"
 wire_api = "responses"`;
 }
 
 export function getCodexKeyExportSnippet(apiKey: string): string {
-  return `export THINKER_API_KEY="${apiKey}"`;
+  return `export THINKER_AGENT_KEY="${apiKey}"`;
 }
 
 /** CLI-facing combined Codex setup (config block + key export). */
@@ -260,7 +260,7 @@ export function getDeepSeekHarnessNativeSnippet(
   name: '@deepseek-ai/dsh-llm-deepseek-api-key'
   config:
     baseURL: ${stripV1Suffix(baseUrl)}
-    apiKeyEnv: THINKER_API_KEY
+    apiKeyEnv: THINKER_AGENT_KEY
     models:
 ${yamlModels(virtualModels, '      ')}`;
 }
@@ -281,7 +281,7 @@ export function getDeepSeekHarnessPiAiSnippet(
         displayName: Thinker
         api: openai-completions
         baseURL: ${baseUrl}
-        apiKeyEnv: THINKER_API_KEY
+        apiKeyEnv: THINKER_AGENT_KEY
         models:
 ${yamlModels(virtualModels, '          ')}`;
 }

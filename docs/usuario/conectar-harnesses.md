@@ -45,14 +45,14 @@ model_context_window = 128000
 [model_providers.thinker]
 name = "Thinker"
 base_url = "http://localhost:2099/v1"
-env_key = "THINKER_API_KEY"
+env_key = "THINKER_AGENT_KEY"
 wire_api = "responses"
 ```
 
 No terminal que inicia o Codex:
 
 ```bash
-export THINKER_API_KEY="thk_SUA_CHAVE"
+export THINKER_AGENT_KEY="thk_SUA_CHAVE"
 ```
 
 O Codex não lê `GET /v1/models` de um provedor customizado. Para `auto` e para os modelos virtuais ele usa metadados de fallback (janela de 272 mil tokens e o aviso "Model metadata ... not found") e, sem `model_context_window`, compacta tarde demais quando a rota cai num modelo de contexto menor, e o provedor responde `context_length_exceeded`. O trecho fixa 128000, um valor seguro; troque pela menor janela de contexto por trás do modelo, que aparece na aba **Modelos** do harness. A chave fica no topo do arquivo, antes da tabela `[model_providers.thinker]`.
@@ -167,7 +167,7 @@ Reinicie o CLI e rode `copilot --model thinker/auto` (ou `/model`). A URL base l
 
 ## DeepSeek Harness
 
-O DeepSeek Harness (`dsh`) chega ao Thinker por duas rotas. Nas duas, a chave vem da variável `THINKER_API_KEY` no ambiente que inicia o dsh (`export THINKER_API_KEY="thk_SUA_CHAVE"`), e os modelos são declarados à mão, porque com URL base personalizada o dsh não lista modelos.
+O DeepSeek Harness (`dsh`) chega ao Thinker por duas rotas. Nas duas, a chave vem da variável `THINKER_AGENT_KEY` no ambiente que inicia o dsh (`export THINKER_AGENT_KEY="thk_SUA_CHAVE"`), e os modelos são declarados à mão, porque com URL base personalizada o dsh não lista modelos.
 
 **Rota nativa** (Anthropic Messages; manda o id da sessão em `x-deepseek-harness-session-id`, que o Thinker lê). Em `$DSH_HOME/profiles/<perfil>/cordis.patch.yml` (o perfil da Web UI é `web`):
 
@@ -176,7 +176,7 @@ O DeepSeek Harness (`dsh`) chega ao Thinker por duas rotas. Nas duas, a chave ve
   name: '@deepseek-ai/dsh-llm-deepseek-api-key'
   config:
     baseURL: http://localhost:2099
-    apiKeyEnv: THINKER_API_KEY
+    apiKeyEnv: THINKER_AGENT_KEY
     models:
       - id: "auto"
         contextWindow: 128000
@@ -196,7 +196,7 @@ A URL base vai **sem** `/v1`: o dsh acrescenta `/v1/messages`.
         displayName: Thinker
         api: openai-completions
         baseURL: http://localhost:2099/v1
-        apiKeyEnv: THINKER_API_KEY
+        apiKeyEnv: THINKER_AGENT_KEY
         models:
           - id: "auto"
             contextWindow: 128000

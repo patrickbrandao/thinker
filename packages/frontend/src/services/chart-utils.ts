@@ -172,18 +172,19 @@ export function fillDailyGaps<T extends Record<string, unknown>>(
 ): T[] {
   const hours = RANGE_HOURS[range];
   if (hours) {
-    // Use local time to match the backend, which stores timestamps in the
-    // Node process's local timezone via the pg driver.
+    // Backend buckets are UTC (#58: every timestamp is UTC, and
+    // `sqlHourBucket` prints them without an offset), so the keys are UTC
+    // too; parseTimestamps turns them into instants shown in local time.
     const now = new Date();
-    now.setMinutes(0, 0, 0);
+    now.setUTCMinutes(0, 0, 0);
 
     const hourMap = new Map<string, T>();
     for (let i = hours; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 3600000);
-      const y = d.getFullYear();
-      const mo = String(d.getMonth() + 1).padStart(2, '0');
-      const da = String(d.getDate()).padStart(2, '0');
-      const hh = String(d.getHours()).padStart(2, '0');
+      const y = d.getUTCFullYear();
+      const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const da = String(d.getUTCDate()).padStart(2, '0');
+      const hh = String(d.getUTCHours()).padStart(2, '0');
       const key = `${y}-${mo}-${da}T${hh}:00:00`;
       hourMap.set(key, zeroEntry(key));
     }
@@ -201,17 +202,18 @@ export function fillDailyGaps<T extends Record<string, unknown>>(
   const days = RANGE_DAYS[range];
   if (!days) return data;
 
-  // Use local midnight so date labels match the user's calendar
+  // Daily buckets are UTC dates (`::date` on UTC timestamps): key by the UTC
+  // calendar so today's bucket is never dropped late in a negative-offset day.
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   const dateMap = new Map<string, T>();
   for (let i = days; i >= 0; i--) {
     const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const da = String(d.getDate()).padStart(2, '0');
+    d.setUTCDate(today.getUTCDate() - i);
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const da = String(d.getUTCDate()).padStart(2, '0');
     const key = `${y}-${mo}-${da}`;
     dateMap.set(key, zeroEntry(key));
   }
@@ -302,11 +304,10 @@ export function parseTimestamps(
 ): number[] {
   return data.map((d) => {
     if (d.hour) {
-      // Hour strings from the backend are in local time (the pg driver
-      // serialises JS Dates using the Node process's local timezone).
-      // Parse without appending 'Z' so they stay in local time.
+      // Hour buckets from the backend are UTC without an offset (#58):
+      // parse them as UTC so the axis shows the viewer's local time.
       const iso = d.hour.replace(' ', 'T');
-      return new Date(iso).getTime() / 1000;
+      return new Date(/(?:Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`).getTime() / 1000;
     }
     const dateStr = (d.date as string) ?? '';
     const [y, m, day] = dateStr.split('-').map(Number);

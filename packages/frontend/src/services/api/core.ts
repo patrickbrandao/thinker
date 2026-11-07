@@ -67,8 +67,7 @@ async function doFetchJson<T>(url: string, loginRedirect = true): Promise<T> {
     // user-scoped credential when called with a shared API key) shouldn't
     // log the user out.
     const body = await res.text().catch(() => '');
-    const looksLikeSessionExpiry =
-      !body || /session|cookie|unauthenticated|not authenticated/i.test(body);
+    const looksLikeSessionExpiry = isSessionExpiryBody(body);
     if (looksLikeSessionExpiry) {
       if (loginRedirect && window.location.pathname !== '/login') {
         window.location.href = '/login';
@@ -87,6 +86,18 @@ async function doFetchJson<T>(url: string, loginRedirect = true): Promise<T> {
     );
   }
   return res.json() as Promise<T>;
+}
+
+/**
+ * A 401 means the session is gone when the backend says no credential came
+ * at all (`code: unauthenticated`, from ApiKeyGuard) or the text names the
+ * session. Per-endpoint 401s keep the user signed in.
+ */
+function isSessionExpiryBody(body: string): boolean {
+  if (!body) return true;
+  const parsed = safeParse(body) as { code?: unknown } | null;
+  if (parsed && typeof parsed === 'object' && parsed.code === 'unauthenticated') return true;
+  return /session|cookie|unauthenticated|not authenticated/i.test(body);
 }
 
 function safeParse(text: string): unknown {
@@ -153,6 +164,16 @@ export async function fetchMutate<T = void>(
       if (isPasswordChangeRequiredBody(body)) {
         markPasswordChangeRequired();
         throw new ApiError('Password change required', 403, 'password_change_required');
+      }
+    }
+    if (res.status === 401 && typeof res.clone === 'function') {
+      const body = await res
+        .clone()
+        .text()
+        .catch(() => '');
+      if (isSessionExpiryBody(body)) {
+        if (window.location.pathname !== '/login') window.location.href = '/login';
+        throw new ApiError(t('ui.errors.sessionExpired'), 401, 'unauthenticated');
       }
     }
     const message = await parseErrorMessage(res);

@@ -16,7 +16,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { outboundFetch } from '../../common/outbound/outbound-proxy';
+import { outboundFetch, runWithOutboundScope } from '../../common/outbound/outbound-proxy';
 import { estimateRequestTokens } from './context-window-fit';
 import { applyParamPolicy } from './param-policy';
 import {
@@ -80,7 +80,7 @@ import { redactInlineImageDataUrls } from './inline-image-redaction';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
 import { openAiModelCapabilities, type OpenAiModelCapabilities } from './openai-model-capabilities';
 import { publishedContextWindow } from '../virtual-models/published-context';
-import { StreamFailure } from './stream-writer';
+import { StreamFailure, partialUsageOf } from './stream-writer';
 import { AgentRecordingConfigService } from '../../common/services/agent-recording-config.service';
 import { AttemptRecordingService } from './attempt-recording.service';
 import { safeJsonStringify } from '../../common/utils/safe-json';
@@ -195,6 +195,31 @@ function toAnthropicModelList(data: OpenAiModelObject[]) {
     has_more: false,
     first_id: models[0]?.id ?? null,
     last_id: models[models.length - 1]?.id ?? null,
+  };
+}
+
+/** Upper bound for a passthrough call (embeddings, transcription, count_tokens). */
+export const PASSTHROUGH_TIMEOUT_MS = 300_000;
+
+/**
+ * Abort signal for a passthrough call: fires when the client disconnects or
+ * after PASSTHROUGH_TIMEOUT_MS, so an abandoned request never pins the
+ * upstream connection.
+ */
+function passthroughAbort(res: ExpressResponse): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const onClose = () => {
+    if (!res.writableFinished) controller.abort();
+  };
+  res.once('close', onClose);
+  const timer = setTimeout(() => controller.abort(), PASSTHROUGH_TIMEOUT_MS);
+  timer.unref?.();
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      clearTimeout(timer);
+      res.off('close', onClose);
+    },
   };
 }
 
@@ -398,12 +423,16 @@ export class ProxyController {
       format: target.endpoint.format,
       model: target.model,
     });
+    const abort = passthroughAbort(res);
     try {
-      const upstream = await outboundFetch(url, {
-        method: 'POST',
-        headers: target.endpoint.buildHeaders(credentials.apiKey, credentials.authType),
-        body: JSON.stringify(upstreamBody),
-      });
+      const upstream = await runWithOutboundScope(credentials.egressScope, () =>
+        outboundFetch(url, {
+          method: 'POST',
+          headers: target.endpoint.buildHeaders(credentials.apiKey, credentials.authType),
+          body: JSON.stringify(upstreamBody),
+          signal: abort.signal,
+        }),
+      );
       if (!upstream.ok) {
         // An estimate beats a failed count: clients use it to plan compaction.
         res.json({ input_tokens: estimateRequestTokens(body) });
@@ -414,7 +443,11 @@ export class ProxyController {
         .type('application/json')
         .send(await upstream.text());
     } catch {
-      res.json({ input_tokens: estimateRequestTokens(body) });
+      if (!res.headersSent && !res.writableEnded) {
+        res.json({ input_tokens: estimateRequestTokens(body) });
+      }
+    } finally {
+      abort.dispose();
     }
   }
 
@@ -449,6 +482,10 @@ export class ProxyController {
       return;
     }
     const { agentId, tenantId } = req.ingestionContext;
+    // Embeddings and transcriptions cost money like chat: same per-tenant,
+    // per-IP and concurrency limits (M201/M202/M203, rendered by the filter).
+    this.rateLimiter.checkLimit(tenantId);
+    this.rateLimiter.checkIpLimit(req.ip ?? '');
     const credentials = await this.proxyService.resolvePassthroughCredentials(
       agentId,
       tenantId,
@@ -470,8 +507,12 @@ export class ProxyController {
         if (key.toLowerCase() === 'content-type') delete headers[key];
       }
     }
+    this.rateLimiter.acquireSlot(tenantId);
+    const abort = passthroughAbort(res);
     try {
-      const upstream = await outboundFetch(url, { method: 'POST', headers, body });
+      const upstream = await runWithOutboundScope(credentials.egressScope, () =>
+        outboundFetch(url, { method: 'POST', headers, body, signal: abort.signal }),
+      );
       const contentType = upstream.headers.get('content-type') ?? 'application/json';
       res
         .status(upstream.status)
@@ -479,7 +520,12 @@ export class ProxyController {
         .send(Buffer.from(await upstream.arrayBuffer()));
     } catch (err) {
       this.logger.warn(`Passthrough ${kind} to ${target.provider} failed: ${String(err)}`);
-      res.status(502).json(passthroughError(`Provider ${target.provider} did not answer.`, 502));
+      if (!res.headersSent && !res.writableEnded) {
+        res.status(502).json(passthroughError(`Provider ${target.provider} did not answer.`, 502));
+      }
+    } finally {
+      abort.dispose();
+      this.rateLimiter.releaseSlot(tenantId);
     }
   }
 
@@ -926,6 +972,7 @@ export class ProxyController {
           requestDurationMs: startTime == null ? undefined : Date.now() - startTime,
           traceId,
           apiMode,
+          usage: partialUsageOf(err),
         })
         .catch((e) => this.logger.warn(`Failed to record cancelled Request: ${e}`));
       if (!res.writableEnded) res.end();

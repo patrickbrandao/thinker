@@ -453,6 +453,16 @@ describe('OrganizationsService.removeMember', () => {
     expect(ctx.tenantCache.invalidate).toHaveBeenCalledWith('target');
   });
 
+  it('frees owner_user_id when the removed member created the organization', async () => {
+    const ctx = build({ roles: { [CALLER]: 'admin' } });
+    ctx.ds.query.mockResolvedValue([memberRow('target', 'member')]);
+    await ctx.service.removeMember(CALLER, ORG, 'target');
+    expect(ctx.tenantRepo.update).toHaveBeenCalledWith(
+      { id: ORG, owner_user_id: 'target' },
+      { owner_user_id: null },
+    );
+  });
+
   it('stops an admin from removing an owner', async () => {
     const ctx = build({ roles: { [CALLER]: 'admin' } });
     ctx.ds.query.mockResolvedValue([memberRow('target', 'owner')]);

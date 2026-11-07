@@ -14,7 +14,7 @@ Parameters:
     ConstraintDescription: Use up to 40 lowercase letters, numbers, and hyphens, starting with a letter.
   ImageUrl:
     Type: String
-    Default: docker.io/tmsoftbrasil/thinker:0.1
+    Default: docker.io/tmsoftbrasil/thinker:0.31
     Description: Thinker container image to deploy.
   ContainerPort:
     Type: Number

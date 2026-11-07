@@ -9,6 +9,7 @@ import {
   parseStreamIdleTimeoutMs,
   extractUsageFromSse,
   parseUsageObject,
+  partialUsageOf,
 } from '../stream-writer';
 import { createSsePayloadParser } from '../sse-parser';
 
@@ -357,6 +358,31 @@ describe('pipeStream', () => {
       }),
     ).rejects.toBeInstanceOf(UpstreamStreamError);
     expect(res.end).not.toHaveBeenCalled();
+  });
+
+  it('carries the usage seen before an interrupted stream on the thrown error', async () => {
+    const { res } = mockResponse();
+    const encoder = new TextEncoder();
+    let sent = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!sent) {
+          sent = true;
+          controller.enqueue(
+            encoder.encode(
+              'data: {"choices":[{"delta":{"content":"hi"}}],"usage":{"prompt_tokens":12,"completion_tokens":3}}\n\n',
+            ),
+          );
+          return;
+        }
+        controller.error(new Error('aborted'));
+      },
+    });
+
+    const error = await pipeStream(stream, res as never, undefined, undefined, undefined, {
+      protocol: 'openai_chat_completions',
+    }).catch((e: unknown) => e);
+    expect(partialUsageOf(error)).toMatchObject({ prompt_tokens: 12, completion_tokens: 3 });
   });
 
   function createReadableStream(chunks: string[]): ReadableStream<Uint8Array> {

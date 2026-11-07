@@ -1,8 +1,9 @@
 /**
- * ADR 0003: the public model and price catalogs (openrouter.ai, models.dev and
- * the OpenCode Go doc on raw.githubusercontent.com) are the only outbound
- * destinations Thinker may reach on its own. `THINKER_CATALOG_SYNC=false`
- * turns all three off; the bundled data is then the only source.
+ * ADR 0003 (amended by ADR 0009): the public model and price catalogs
+ * (openrouter.ai and models.dev) are the only outbound destinations Thinker
+ * may reach on its own. `THINKER_CATALOG_SYNC=false` turns both off, and also
+ * the OpenCode catalog fetch on models.opencode.ai (provider traffic, made
+ * only with an OpenCode connection); the bundled data is then the only source.
  *
  * Read at call time, not cached, so the value an operator sets is the value
  * every boot hook, cron and refresh endpoint sees.

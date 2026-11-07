@@ -37,7 +37,7 @@ const localDayStart = (iso: string) => {
 };
 const localHourStart = (iso: string | Date) => {
   const d = new Date(iso);
-  return fmtLocal(new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() - 1));
+  return fmtLocal(new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()));
 };
 
 describe('NotificationCronService — edge cases', () => {
@@ -148,7 +148,7 @@ describe('NotificationCronService — edge cases', () => {
       mockGetAllActiveRules.mockResolvedValue([hourRule]);
 
       // Advance the clock past the hour boundary before evaluateRule() runs its own
-      // computePeriodBoundaries(). After advance, "previous hour" rolls forward,
+      // computePeriodBoundaries(). After advance, the current hour rolls forward,
       // so periodStart shifts to the new hour.
       mockGetConsumption.mockImplementation(async () => {
         jest.setSystemTime(afterBoundary);

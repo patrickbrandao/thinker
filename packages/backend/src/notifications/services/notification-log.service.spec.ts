@@ -18,12 +18,19 @@ describe('NotificationLogService', () => {
   describe('hasAlreadySent', () => {
     it('returns false when no rows found', async () => {
       mockQuery.mockResolvedValue([]);
-      expect(await service.hasAlreadySent('rule-1', '2026-01-01')).toBe(false);
+      expect(await service.hasAlreadySent('rule-1', '2026-01-01', 'soft')).toBe(false);
+    });
+
+    it('dedupes soft alerts and block notices apart (a `both` rule sends each)', async () => {
+      await service.hasAlreadySent('rule-1', '2026-01-01', 'hard');
+      const [sql, params] = mockQuery.mock.calls[0];
+      expect(sql).toContain('alert_type = $3');
+      expect(params).toEqual(['rule-1', '2026-01-01', 'hard']);
     });
 
     it('returns true when row exists', async () => {
       mockQuery.mockResolvedValue([{ 1: 1 }]);
-      expect(await service.hasAlreadySent('rule-1', '2026-01-01')).toBe(true);
+      expect(await service.hasAlreadySent('rule-1', '2026-01-01', 'soft')).toBe(true);
     });
   });
 
@@ -31,6 +38,7 @@ describe('NotificationLogService', () => {
     it('inserts a notification log record', async () => {
       await service.insertLog({
         ruleId: 'r1',
+        alertType: 'hard',
         periodStart: '2026-01-01',
         periodEnd: '2026-01-02',
         actualValue: 60000,
@@ -47,6 +55,7 @@ describe('NotificationLogService', () => {
       expect(params[4]).toBe(60000);
       expect(params[5]).toBe(50000);
       expect(params[7]).toBe('my-agent');
+      expect(params[9]).toBe('hard');
     });
   });
 

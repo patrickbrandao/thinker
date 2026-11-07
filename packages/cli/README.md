@@ -74,7 +74,7 @@ printf '%s' "$MY_KEY" | thinker login --token-stdin
 thinker login --token-env MY_KEY
 ```
 
-The CLI stores login credentials for each gateway host in `~/.config/thinker/config.json` with file mode `0600`. A stored credential is only sent to the host where it was saved. `THINKER_API_KEY` overrides the stored credential for the selected host.
+The CLI stores login credentials for each gateway host in `~/.config/thinker/config.json` with file mode `0600`. A stored credential is only sent to the host where it was saved. `THINKER_API_KEY` overrides the stored credential for the selected host. With the server's `THINKER_ENCRYPTION_KEY` in the environment (inside the container), the CLI mints a short-lived root token, only for a loopback origin (`THINKER_ROOT_REMOTE=1` allows another host), and targets `http://localhost:$PORT` by default. `thinker run --agent <name> -- <command>` gives the child only the agent key (`THINKER_AGENT_KEY`, plus `THINKER_AGENT_URL`): it strips `THINKER_API_KEY`, the server's `THINKER_ENCRYPTION_KEY`/`THINKER_ENCRYPTION_KEY_PREVIOUS` and `THINKER_ROOT_USER` from the inherited environment. The Codex and DeepSeek Harness snippets read the key from `THINKER_AGENT_KEY`, so they work under `thinker run` as is.
 
 Agent keys are separate from management credentials. The CLI stores a newly created agent key in its local keystore and does not print it in `thinker agent setup` unless you pass `--reveal`. Use `thinker agent env my-app` to get the key and URL for your application; its output contains the key, so handle it as a secret.
 

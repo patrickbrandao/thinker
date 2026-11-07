@@ -54,6 +54,7 @@ import {
   type ModelModality,
 } from 'thinker-shared';
 import { outboundFetch } from '../common/outbound/outbound-proxy';
+import { ssrfSafeFetch } from '../common/utils/ssrf-safe-fetch';
 
 const FETCH_TIMEOUT_MS = 5000;
 const ANTHROPIC_DEFAULT_CONTEXT = 200000;
@@ -1366,7 +1367,15 @@ export class ProviderModelFetcherService {
       return this.fetchLmStudioModels(config, url, apiKey, providerId);
     }
 
-    return this.fetchModelList(url, headers, config, apiKey, providerId, configKey);
+    return this.fetchModelList(
+      url,
+      headers,
+      config,
+      apiKey,
+      providerId,
+      configKey,
+      !!options?.accountBaseUrl,
+    );
   }
 
   private async fetchModelList(
@@ -1376,8 +1385,9 @@ export class ProviderModelFetcherService {
     apiKey: string,
     providerId: string,
     configKey: string,
+    userBaseUrl = false,
   ): Promise<DiscoveredModel[]> {
-    const body = await this.requestModelsJson(url, headers, apiKey, providerId);
+    const body = await this.requestModelsJson(url, headers, apiKey, providerId, userBaseUrl);
     if (body === undefined) return [];
     return filterNonChatModels(config.parse(body, providerId), configKey);
   }
@@ -1388,15 +1398,19 @@ export class ProviderModelFetcherService {
     headers: Record<string, string>,
     apiKey: string,
     providerId: string,
+    userBaseUrl = false,
   ): Promise<unknown> {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      const res = await outboundFetch(url, {
-        headers,
-        signal: controller.signal,
-      });
+      // A base URL the user typed gets the proxy's SSRF guard: the connection
+      // is pinned to the validated address (cloud metadata refused at connect
+      // time) and redirects are refused, like provider-client does.
+      const init: RequestInit = { headers, signal: controller.signal };
+      const res = userBaseUrl
+        ? await ssrfSafeFetch(url, { ...init, redirect: 'error' })
+        : await outboundFetch(url, init);
       clearTimeout(timeout);
 
       if (!res.ok) {

@@ -136,6 +136,22 @@ describe('core api helpers', () => {
       expect(location.href).toBe('/login');
     });
 
+    it('treats the backend 401 for a missing credential (code unauthenticated) as session expiry', async () => {
+      const body = JSON.stringify({
+        message: 'X-API-Key header required',
+        error: 'Unauthorized',
+        statusCode: 401,
+        code: 'unauthenticated',
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(makeResponse({ ok: false, status: 401, text: body })),
+      );
+
+      await expect(fetchJson('/anything')).rejects.toThrow('Session expired');
+      expect(location.href).toBe('/login');
+    });
+
     it('throws Unauthorized without redirect on a 401 with non-session body', async () => {
       const fetchMock = vi
         .fn()

@@ -48,8 +48,8 @@ describe('setup snippets', () => {
     expect(config).toContain(`base_url = "${URL}"`);
     expect(config).toContain('model_provider = "thinker"');
     expect(config).toContain('[model_providers.thinker]');
-    expect(config).toContain('env_key = "THINKER_API_KEY"');
-    expect(getCodexKeyExportSnippet(KEY)).toBe(`export THINKER_API_KEY="${KEY}"`);
+    expect(config).toContain('env_key = "THINKER_AGENT_KEY"');
+    expect(getCodexKeyExportSnippet(KEY)).toBe(`export THINKER_AGENT_KEY="${KEY}"`);
   });
 
   it('codex config declares the context window before the provider table', () => {

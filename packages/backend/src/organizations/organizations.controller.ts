@@ -222,12 +222,21 @@ export class AdminUsersController {
       role?: string;
     },
   ) {
+    // Validate the membership first: the temporary password is shown once,
+    // so a bad organization or role must fail before the account exists.
+    if (body?.organizationId) {
+      await this.organizations.assertCanAddMember(
+        requireUser(ctx),
+        body.organizationId,
+        body.role ?? 'member',
+      );
+    }
     const { account, temporaryPassword } = await this.accounts.createAccount(
       body?.email ?? '',
       body?.name ?? '',
       body?.isInstanceAdmin === true,
     );
-    if (body.organizationId) {
+    if (body?.organizationId) {
       await this.organizations.addExistingMember(
         requireUser(ctx),
         body.organizationId,

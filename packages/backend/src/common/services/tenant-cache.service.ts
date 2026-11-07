@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Tenant } from '../../entities/tenant.entity';
 import { OrganizationMember, OrganizationRole } from '../../entities/organization-member.entity';
@@ -114,6 +114,18 @@ export class TenantCacheService {
       // Unique index on owner_user_id: a concurrent request created it first.
       const raced = await this.tenantRepo.findOne({ where: { owner_user_id: userId } });
       if (!raced) throw err;
+      // Only a real race may be joined: a fresh personal organization has no
+      // members other than this user. An existing one with other members (or
+      // a deactivated one) is not theirs to reclaim after being removed.
+      const others = await this.memberRepo.count({
+        where: { tenant_id: raced.id, user_id: Not(userId) },
+      });
+      if (!raced.is_active || others > 0) {
+        throw new ForbiddenException({
+          message: 'You are not a member of this organization.',
+          code: 'not_a_member',
+        });
+      }
       tenantId = raced.id;
     }
     await this.addMember(tenantId, userId, 'owner');

@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -120,6 +120,14 @@ export class ApiKeyAuthService {
       throw new UnauthorizedException('API key has no owning user');
     }
     const access = await this.tenantCache.resolveAccess(found.created_by_user_id, found.tenant_id);
+    // Same rule as the session (ADR 0006): until a temporary password is
+    // changed, the account's keys do nothing.
+    if (access.mustChangePassword) {
+      throw new ForbiddenException({
+        message: 'Change your temporary password before using this key.',
+        code: 'password_change_required',
+      });
+    }
     // CLI login tokens slide up to their absolute ceiling; admin keys keep
     // the fixed expiry chosen at creation.
     const sliding = found.expires_at !== null && !raw.startsWith(ADMIN_KEY_PREFIX);

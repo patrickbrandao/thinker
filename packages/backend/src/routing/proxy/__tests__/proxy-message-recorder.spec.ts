@@ -229,6 +229,34 @@ describe('ProxyMessageRecorder', () => {
       expect(emitMock).toHaveBeenCalledWith('tenant-1', 'message', 'user-1');
     });
 
+    it('keeps the partial usage of a cancelled stream instead of recording it as free', async () => {
+      const attempt: ProviderAttemptRef = {
+        id: 'attempt-partial',
+        attemptNumber: 1,
+        startedAtMs: 1_000,
+        startedAt: '1970-01-01T00:00:01.000Z',
+        completedAtMs: 1_125,
+        pendingWrite: Promise.resolve(true),
+      };
+
+      await recorder.recordCancelledRequest(ctx, {
+        requestId: 'request-partial',
+        attempt,
+        attemptStart: { provider: 'anthropic', model: 'claude-sonnet-4-5', authType: 'api_key' },
+        usage: { prompt_tokens: 1200, completion_tokens: 40, cache_read_tokens: 300 },
+      });
+
+      expect(updateMock).toHaveBeenCalledWith(
+        { id: 'attempt-partial' },
+        expect.objectContaining({
+          status: 'cancelled',
+          input_tokens: 1200,
+          output_tokens: 40,
+          cache_read_tokens: 300,
+        }),
+      );
+    });
+
     it('cancels only still-pending Attempts whose pending row was written', async () => {
       const written: ProviderAttemptRef = {
         id: 'attempt-left-pending',

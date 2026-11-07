@@ -74,7 +74,14 @@ export class ApiKeyGuard implements CanActivate {
 
     if (!apiKey || typeof apiKey !== 'string') {
       this.logger.warn(`Rejected request without API key from ${clientIpLogFields(request)}`);
-      throw new UnauthorizedException('X-API-Key header required');
+      // `code: unauthenticated` is what the dashboard keys on to send an
+      // expired session back to /login (services/api/core.ts).
+      throw new UnauthorizedException({
+        message: 'X-API-Key header required',
+        error: 'Unauthorized',
+        statusCode: 401,
+        code: 'unauthenticated',
+      });
     }
 
     const header = request.headers[ORGANIZATION_HEADER];

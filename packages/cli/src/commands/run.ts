@@ -7,8 +7,20 @@ import { resolveAgentKey } from './agent';
 
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** Credentials that must never be inherited from the parent shell into a child. */
-const RESERVED_CREDENTIAL_VARS = new Set(['THINKER_API_KEY', 'THINKER_AGENT_KEY']);
+/**
+ * Credentials that must never be inherited from the parent shell into a child.
+ * THINKER_ENCRYPTION_KEY (and its previous value) is the server's master key:
+ * it decrypts every stored secret and mints root tokens, so a child holding
+ * it would be instance owner. THINKER_ROOT_USER only names the root account
+ * but has no use outside the server either.
+ */
+const RESERVED_CREDENTIAL_VARS = new Set([
+  'THINKER_API_KEY',
+  'THINKER_AGENT_KEY',
+  'THINKER_ENCRYPTION_KEY',
+  'THINKER_ENCRYPTION_KEY_PREVIOUS',
+  'THINKER_ROOT_USER',
+]);
 
 /** Spawn with inherited stdio; the child owns the terminal until it exits. */
 export function defaultSpawn(
@@ -72,14 +84,15 @@ export async function runCmd(io: CliIo, argv: string[]): Promise<number> {
     throw new CliError(
       'invalid_env_name',
       `Not a valid --env name: ${envVar}`,
-      'THINKER_AGENT_URL, THINKER_AGENT_KEY, and THINKER_API_KEY are reserved',
+      'THINKER_AGENT_URL, THINKER_AGENT_KEY, THINKER_API_KEY and the server keys (THINKER_ENCRYPTION_KEY*, THINKER_ROOT_USER) are reserved',
     );
   }
 
   const resolved = await resolveAgentKey(io, args, agentName);
   // The child gets the agent key, not the management credential: io.env may
-  // carry THINKER_API_KEY (a full-workspace PAT) or a stale THINKER_AGENT_KEY
-  // from the parent shell, and either would let tools call the wrong agent.
+  // carry THINKER_API_KEY (a full-workspace PAT), the server's
+  // THINKER_ENCRYPTION_KEY (root) or a stale THINKER_AGENT_KEY from the parent
+  // shell, and any of them would hand tools more than the agent key.
   // Env names are case-insensitive on Windows, so compare upper-cased.
   const childEnv: Record<string, string | undefined> = {
     ...Object.fromEntries(

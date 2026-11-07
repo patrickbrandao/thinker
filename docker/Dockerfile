@@ -98,27 +98,31 @@ ENV PORT=2099
 # healthchecks (and anything else invoked with a bare command name) resolves.
 ENV PATH=/app/cli-bin:/nodejs/bin:$PATH
 
-COPY --from=prod-deps --chown=nonroot:nonroot /app/node_modules node_modules
-COPY --from=prod-deps --chown=nonroot:nonroot /app/packages/backend/node_modules packages/backend/node_modules
+# Application code stays owned by root (read-only for the nonroot runtime
+# user), so a write bug in the app cannot rewrite node_modules, dist or the
+# CLI launcher even outside the read-only compose; only the data directory
+# below belongs to nonroot.
+COPY --from=prod-deps /app/node_modules node_modules
+COPY --from=prod-deps /app/packages/backend/node_modules packages/backend/node_modules
 COPY --from=prod-deps --chown=nonroot:nonroot /app/request-recordings /data/request-recordings
-COPY --from=prod-deps --chown=nonroot:nonroot /app/package.json package.json
-COPY --from=build --chown=nonroot:nonroot /app/packages/shared/dist packages/shared/dist
-COPY --from=build --chown=nonroot:nonroot /app/packages/backend/dist packages/backend/dist
-COPY --from=build --chown=nonroot:nonroot /app/packages/frontend/dist packages/frontend/dist
-COPY --chown=nonroot:nonroot packages/shared/package.json packages/shared/
-COPY --chown=nonroot:nonroot packages/backend/package.json packages/backend/
-COPY --chown=nonroot:nonroot packages/thinker/package.json packages/thinker/
-COPY --from=build --chown=nonroot:nonroot /app/packages/cli/bin packages/cli/bin
-COPY --from=build --chown=nonroot:nonroot /app/packages/cli/dist packages/cli/dist
-COPY --from=build --chown=nonroot:nonroot /app/packages/cli/package.json packages/cli/
-COPY --from=build --chown=nonroot:nonroot /app/cli-bin cli-bin
+COPY --from=prod-deps /app/package.json package.json
+COPY --from=build /app/packages/shared/dist packages/shared/dist
+COPY --from=build /app/packages/backend/dist packages/backend/dist
+COPY --from=build /app/packages/frontend/dist packages/frontend/dist
+COPY packages/shared/package.json packages/shared/
+COPY packages/backend/package.json packages/backend/
+COPY packages/thinker/package.json packages/thinker/
+COPY --from=build /app/packages/cli/bin packages/cli/bin
+COPY --from=build /app/packages/cli/dist packages/cli/dist
+COPY --from=build /app/packages/cli/package.json packages/cli/
+COPY --from=build /app/cli-bin cli-bin
 # `docker run tmsoftbrasil/thinker thinker <command>`: the entrypoint is node,
 # so "thinker" resolves to this file (the same launcher; node skips the shebang).
-COPY --from=build --chown=nonroot:nonroot /app/cli-bin/thinker thinker
+COPY --from=build /app/cli-bin/thinker thinker
 # Thinker's license (it keeps the upstream copyright notice) and the
 # notices of every bundled third-party package.
-COPY --chown=nonroot:nonroot LICENSE LICENSE
-COPY --from=prod-deps --chown=nonroot:nonroot /app/THIRD_PARTY_NOTICES THIRD_PARTY_NOTICES
+COPY LICENSE LICENSE
+COPY --from=prod-deps /app/THIRD_PARTY_NOTICES THIRD_PARTY_NOTICES
 
 EXPOSE 2099
 

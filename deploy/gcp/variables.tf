@@ -23,7 +23,7 @@ variable "service_name" {
 variable "image_url" {
   description = "Thinker container image to deploy."
   type        = string
-  default     = "docker.io/tmsoftbrasil/thinker:0.1"
+  default     = "docker.io/tmsoftbrasil/thinker:0.31"
 }
 
 variable "database_tier" {

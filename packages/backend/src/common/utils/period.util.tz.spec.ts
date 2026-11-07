@@ -100,7 +100,7 @@ const CASES: ZoneCase[] = [
     tz: 'UTC',
     localNow: '2026-07-01 01:30:00.250',
     dayStart: '2026-07-01 00:00:00',
-    hourStart: '2026-07-01 00:00:00',
+    hourStart: '2026-07-01 01:00:00',
     monthStart: '2026-07-01 00:00:00',
     resetDay: '2026-07-02 00:00:00',
     resetHour: '2026-07-01 02:00:00',
@@ -111,7 +111,7 @@ const CASES: ZoneCase[] = [
     tz: 'America/Sao_Paulo',
     localNow: '2026-06-30 22:30:00.250',
     dayStart: '2026-06-30 00:00:00',
-    hourStart: '2026-06-30 21:00:00',
+    hourStart: '2026-06-30 22:00:00',
     monthStart: '2026-06-01 00:00:00',
     resetDay: '2026-07-01 00:00:00',
     resetHour: '2026-06-30 23:00:00',
@@ -122,7 +122,7 @@ const CASES: ZoneCase[] = [
     tz: 'America/Chicago',
     localNow: '2026-06-30 20:30:00.250',
     dayStart: '2026-06-30 00:00:00',
-    hourStart: '2026-06-30 19:00:00',
+    hourStart: '2026-06-30 20:00:00',
     monthStart: '2026-06-01 00:00:00',
     resetDay: '2026-07-01 00:00:00',
     resetHour: '2026-06-30 21:00:00',
@@ -133,7 +133,7 @@ const CASES: ZoneCase[] = [
     tz: 'Asia/Kolkata',
     localNow: '2026-07-01 07:00:00.250',
     dayStart: '2026-07-01 00:00:00',
-    hourStart: '2026-07-01 06:00:00',
+    hourStart: '2026-07-01 07:00:00',
     monthStart: '2026-07-01 00:00:00',
     resetDay: '2026-07-02 00:00:00',
     resetHour: '2026-07-01 08:00:00',
@@ -144,7 +144,7 @@ const CASES: ZoneCase[] = [
     tz: 'Pacific/Auckland',
     localNow: '2026-07-01 13:30:00.250',
     dayStart: '2026-07-01 00:00:00',
-    hourStart: '2026-07-01 12:00:00',
+    hourStart: '2026-07-01 13:00:00',
     monthStart: '2026-07-01 00:00:00',
     resetDay: '2026-07-02 00:00:00',
     resetHour: '2026-07-01 14:00:00',
@@ -170,7 +170,7 @@ describe.each(CASES)('period.util under TZ=$tz', (c) => {
     expect(result.endRoundTripsToInstant).toBe(true);
   });
 
-  it('hour window starts at the previous local hour', () => {
+  it('hour window starts at the current local hour', () => {
     expect(result.hour.periodStart).toBe(c.hourStart);
   });
 

@@ -21,6 +21,14 @@ bump=${2:-patch}
 cd "$(git rev-parse --show-toplevel)"
 
 branch=$(git rev-parse --abbrev-ref HEAD)
+# Everything the publish step needs is checked before anything is pushed: a
+# Docker or buildx failure after the tag would leave a release with no image.
+builder=${THINKER_BUILDER:-desktop-linux}
+for tool in docker jq gh; do
+  command -v "$tool" >/dev/null || { echo "ship.sh needs $tool on PATH" >&2; exit 1; }
+done
+docker buildx inspect "$builder" >/dev/null 2>&1 \
+  || { echo "buildx builder '$builder' is not available: start Docker before shipping" >&2; exit 1; }
 git fetch -q origin main --tags
 
 if [ -n "$(git status --porcelain)" ]; then
@@ -32,6 +40,8 @@ git rebase -q origin/main
 last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' origin/main 2>/dev/null || true)
 npm version "$bump" --no-git-tag-version --workspace packages/thinker >/dev/null
 ver=$(node -p "require('./packages/thinker/package.json').version")
+# The one-click deploy templates follow the minor tag this release publishes.
+scripts/pin-deploy-image.sh "${ver%.*}"
 
 notes="docs/releases/$ver.md"
 {
@@ -84,7 +94,7 @@ git worktree add -q --detach "$src" "v$ver"
 trap 'git worktree remove --force "$src"' EXIT
 
 echo "Building $image:$ver for linux/amd64,linux/arm64 locally..."
-docker buildx build --builder "${THINKER_BUILDER:-desktop-linux}" \
+docker buildx build --builder "$builder" \
   --platform linux/amd64,linux/arm64 --pull --no-cache \
   -f "$src/docker/Dockerfile" \
   -t "$image:$ver" -t "$image:${ver%.*}" -t "$image:latest" -t "$image:sha-${landed:0:7}" \
