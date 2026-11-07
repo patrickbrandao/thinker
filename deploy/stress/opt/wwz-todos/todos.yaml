@@ -1,0 +1,62 @@
+# /opt/wwz-todos/todos.yaml
+# White Wizard com os seis drivers por prefixo. Modelo renderizado com envsubst:
+# ${WWZ_KEY_1..4} (chaves) e ${WWZ_ERROS}/${WWZ_LATENCIA} (perfil desta instancia).
+server:
+  listen: ":8000"
+  auth: keys
+  reuseport: true
+  concurrency: 1000000
+  trusted_proxies: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+
+admin:
+  listen: ":9000"
+
+store:
+  event_stream: true
+
+usage:
+  extended: true
+
+drivers:
+  - {name: openai, prefix: /openai}
+  - {name: anthropic, prefix: /anthropic}
+  - {name: openrouter, prefix: /openrouter}
+  # gratuitos: 200 requisicoes por dia por padrao, como no real
+  - {name: opencode, prefix: /opencode, options: {free_requests_per_day: 1000000000}}
+  - {name: gemini, prefix: /gemini}
+  - {name: azure, prefix: /azure}
+
+accounts:
+  - {id: conta-stress}
+
+keys:
+  - {key: ${WWZ_KEY_1}, label: stress-1, account: conta-stress}
+  - {key: ${WWZ_KEY_2}, label: stress-2, account: conta-stress}
+  - {key: ${WWZ_KEY_3}, label: stress-3, account: conta-stress}
+  - {key: ${WWZ_KEY_4}, label: stress-4, account: conta-stress}
+
+profiles:
+  latency:
+    rapida: {ttft: 0ms, itl: 0ms}
+    realista: {queue: {dist: lognormal, median: 20ms, p99: 300ms}, ttft: {dist: normal, mean: 450ms, stddev: 120ms}, itl: {dist: normal, mean: 18ms, stddev: 4ms}}
+    cauda: {queue: {dist: lognormal, median: 50ms, p99: 8s}, ttft: {dist: lognormal, median: 800ms, p99: 20s}, itl: {dist: normal, mean: 30ms, stddev: 15ms}}
+  errors:
+    sem-erro: {rate: 0}
+    falhas-20: {rate: 20, types: [rate_limit, server_error, overloaded, bad_gateway, gateway_timeout, connection_reset], mid_stream_rate: 6, mid_stream_types: [stream_truncated, stream_error_event]}
+    instavel:
+      rate: 2
+      types: [server_error]
+      outages:
+        - {schedule: "0 */10 * * * *", duration: 2m, type: overloaded}
+
+models:
+  - {id: wwz-fast, owned_by: white-wizard, protocols: ["*"], context_window: 128000, capabilities: {tools: true, reasoning: true, json_schema: true}, latency: "${WWZ_LATENCIA}", errors: "${WWZ_ERROS}", generation: default}
+  - {id: wwz-realistic, owned_by: white-wizard, protocols: ["*"], context_window: 128000, capabilities: {tools: true, reasoning: true}, latency: realista, errors: "${WWZ_ERROS}", generation: default}
+  # ids que os clientes Anthropic e o Claude Code pedem
+  - {id: claude-sonnet-5-5, owned_by: anthropic, drivers: [anthropic], protocols: [anthropic], context_window: 1000000, max_output: 128000, capabilities: {tools: true, reasoning: true, json_schema: true}, pricing: {input_per_m: 2, output_per_m: 10}, latency: "${WWZ_LATENCIA}", errors: "${WWZ_ERROS}", generation: default}
+  - {id: claude-haiku-5-5, owned_by: anthropic, drivers: [anthropic], protocols: [anthropic], context_window: 1000000, max_output: 128000, capabilities: {tools: true, reasoning: true, json_schema: true}, pricing: {input_per_m: 0.1, output_per_m: 0.5}, latency: "${WWZ_LATENCIA}", errors: "${WWZ_ERROS}", generation: default}
+  # ids do catalogo real do OpenCode: o Thinker descobre os modelos do OpenCode
+  # pelo catalogo dele, nao pelo /v1/models da base configurada
+  - {id: glm-5.3, owned_by: zhipu, drivers: [opencode], protocols: [openai], catalogs: {opencode-go: {}}, latency: "${WWZ_LATENCIA}", errors: "${WWZ_ERROS}", generation: default}
+  - {id: kimi-k3, owned_by: moonshot, drivers: [opencode], protocols: [openai], catalogs: {opencode-go: {}}, latency: "${WWZ_LATENCIA}", errors: "${WWZ_ERROS}", generation: default}
+  - {id: big-pickle, owned_by: opencode, drivers: [opencode], protocols: [openai], catalogs: {opencode: {pricing: {input_per_m: 0, output_per_m: 0}}}, latency: "${WWZ_LATENCIA}", errors: "${WWZ_ERROS}", generation: default}
