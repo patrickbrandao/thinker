@@ -103,7 +103,9 @@ export function resolveTarget(
   env: Env,
   config: CliConfig,
 ): ResolvedTarget {
-  const origin = normalizeOrigin(flagUrl ?? env['THINKER_URL'] ?? config.activeHost ?? DEFAULT_URL);
+  const origin = normalizeOrigin(
+    flagUrl ?? env['THINKER_URL'] ?? config.activeHost ?? serverLocalUrl(env) ?? DEFAULT_URL,
+  );
   const envKey = env['THINKER_API_KEY'];
   if (envKey) {
     return { origin, apiKey: envKey, source: 'env' };
@@ -115,8 +117,11 @@ export function resolveTarget(
   // Running with the server's own environment (inside the container, or a
   // `docker run` with the same env file): THINKER_ENCRYPTION_KEY proves root,
   // so mint a short-lived root token instead of asking for a login.
+  // The token is never minted for another host: it carries no audience, so a
+  // remote server (or anyone on a plain-HTTP path) could replay it against
+  // this instance for its whole 5-minute window. THINKER_ROOT_REMOTE=1 opts in.
   const rootSecret = env['THINKER_ENCRYPTION_KEY'];
-  if (rootSecret) {
+  if (rootSecret && (isLoopbackOrigin(origin) || env['THINKER_ROOT_REMOTE'] === '1')) {
     return {
       origin,
       apiKey: signRootToken(rootSecret, env['THINKER_ROOT_USER'] ?? ''),
@@ -124,4 +129,31 @@ export function resolveTarget(
     };
   }
   return { origin, apiKey: null, source: null };
+}
+
+/**
+ * Inside the server's own environment (THINKER_ENCRYPTION_KEY is set), the
+ * gateway listens on PORT, which the image and compose let operators change.
+ */
+function serverLocalUrl(env: Env): string | undefined {
+  const port = env['PORT'];
+  if (!env['THINKER_ENCRYPTION_KEY'] || !port || !/^\d{1,5}$/.test(port)) return undefined;
+  return `http://localhost:${port}`;
+}
+
+/** True for this machine: localhost, *.localhost, 127.0.0.0/8 and ::1. */
+export function isLoopbackOrigin(origin: string): boolean {
+  let host: string;
+  try {
+    host = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    /^127(?:\.\d{1,3}){3}$/.test(host) ||
+    host === '[::1]' ||
+    host === '::1'
+  );
 }
