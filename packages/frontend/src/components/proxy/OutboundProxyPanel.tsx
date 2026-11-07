@@ -16,10 +16,20 @@ import {
 import { toast } from '../../services/toast-store.js';
 import { Badge, Button, Panel } from '../ui.js';
 import OutboundSelect, { baseOutboundOptions } from './OutboundSelect.js';
+import { groupChain } from './proxy-chain.js';
 
+/** "A → B | C (session affinity) → Direct": balanced lines joined by "|". */
 export function chainText(chain: ChainItem[]): string {
-  return chain
-    .map((item) => (item.kind === 'direct' ? t('proxies.egress.direct') : item.name))
+  return groupChain(chain)
+    .map((items) => {
+      const names = items
+        .map((item) => (item.kind === 'direct' ? t('proxies.egress.direct') : item.name))
+        .join(' | ');
+      const mode = items[0]?.mode;
+      return mode === 'affinity' || mode === 'request'
+        ? `${names} (${t(`proxies.lines.short.${mode}`)})`
+        : names;
+    })
     .join(' → ');
 }
 

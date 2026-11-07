@@ -12,6 +12,7 @@ import {
   type OutboundProxy,
   type OutboundScope,
 } from '../common/outbound/outbound-proxy';
+import { groupLines, type ProfileLine } from './profile-lines';
 
 export const PROXY_TARGET_TYPES = ['provider', 'connection', 'trigger', 'email_config'] as const;
 export type ProxyTargetType = (typeof PROXY_TARGET_TYPES)[number];
@@ -74,8 +75,8 @@ interface Assignment {
 
 interface Snapshot {
   proxies: Map<string, OutboundProxy>;
-  /** Profile id → ordered proxy ids (null = Direct). */
-  profiles: Map<string, Array<string | null>>;
+  /** Profile id → ordered lines. */
+  profiles: Map<string, ProfileLine[]>;
   /** `${target_type}:${target_id}` → how the object leaves. */
   assignments: Map<string, Assignment>;
   connections: Map<string, ConnectionMeta>;
@@ -185,8 +186,12 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
     const [proxies, bindings, assignments, connections, locals] = await Promise.all([
       this.ds.query(`SELECT * FROM proxy_servers WHERE tenant_id = $1`, [tenantId]),
       this.ds.query(
-        `SELECT target_id, position, proxy_id FROM proxy_bindings
-          WHERE tenant_id = $1 AND target_type = 'profile' ORDER BY target_id, position`,
+        `SELECT b.target_id, b.line, b.position, b.proxy_id, l.mode, l.on_failure, l.no_session
+           FROM proxy_bindings b
+           LEFT JOIN proxy_profile_lines l
+             ON l.tenant_id = b.tenant_id AND l.profile_id = b.target_id AND l.line = b.line
+          WHERE b.tenant_id = $1 AND b.target_type = 'profile'
+          ORDER BY b.target_id, b.position`,
         [tenantId],
       ),
       this.ds.query(
@@ -212,11 +217,15 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
     };
     for (const row of unwrap<ProxyServerRow>(proxies))
       snap.proxies.set(row.id, toOutboundProxy(row));
-    for (const row of unwrap<{ target_id: string; proxy_id: string | null }>(bindings)) {
-      const list = snap.profiles.get(row.target_id) ?? [];
-      list.push(row.proxy_id);
-      snap.profiles.set(row.target_id, list);
+    const rowsByProfile = new Map<string, Array<Parameters<typeof groupLines>[0][number]>>();
+    for (const row of unwrap<Parameters<typeof groupLines>[0][number] & { target_id: string }>(
+      bindings,
+    )) {
+      const list = rowsByProfile.get(row.target_id) ?? [];
+      list.push(row);
+      rowsByProfile.set(row.target_id, list);
     }
+    for (const [id, rows] of rowsByProfile) snap.profiles.set(id, groupLines(rows));
     for (const row of unwrap<Assignment & { target_type: string; target_id: string }>(
       assignments,
     )) {
@@ -234,25 +243,45 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
     return snap;
   }
 
-  private items(snap: Snapshot, ids: Array<string | null> | undefined): EgressItem[] | null {
-    if (!ids || ids.length === 0) return null;
+  private items(
+    tenantId: string,
+    snap: Snapshot,
+    profileId: string,
+    lines: ProfileLine[] | undefined,
+  ): EgressItem[] | null {
+    if (!lines || lines.length === 0) return null;
     const items: EgressItem[] = [];
-    for (const id of ids) {
-      if (id === null) {
+    lines.forEach((line, index) => {
+      if (line.mode === 'direct') {
         items.push({ kind: 'direct' });
-        continue;
+        return;
       }
-      const proxy = snap.proxies.get(id);
-      if (proxy) items.push({ kind: 'proxy', proxy });
-    }
+      const members = line.proxies
+        .map((id) => snap.proxies.get(id))
+        .filter((p): p is OutboundProxy => !!p);
+      if (members.length === 0) return;
+      if ((line.mode === 'affinity' || line.mode === 'request') && members.length > 1) {
+        items.push({
+          kind: 'group',
+          key: `${tenantId}:${profileId}:${index + 1}`,
+          mode: line.mode,
+          members,
+          onFailure: line.on_failure,
+          noSession: line.no_session,
+        });
+        return;
+      }
+      items.push({ kind: 'proxy', proxy: members[0]! });
+    });
     return items.length > 0 ? items : null;
   }
 
   /** Chain of an assignment: null for global (or an empty profile), [Direct] for direct. */
-  private resolve(snap: Snapshot, assignment: Assignment): EgressItem[] | null {
+  private resolve(tenantId: string, snap: Snapshot, assignment: Assignment): EgressItem[] | null {
     if (assignment.mode === 'direct') return [{ kind: 'direct' }];
     if (assignment.mode === 'profile' && assignment.profile_id) {
-      return this.items(snap, snap.profiles.get(assignment.profile_id));
+      const id = assignment.profile_id;
+      return this.items(tenantId, snap, id, snap.profiles.get(id));
     }
     return null;
   }
@@ -264,7 +293,7 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
   ): Promise<EgressItem[] | null> {
     const snap = await this.snapshot(tenantId);
     const assignment = snap.assignments.get(`${targetType}:${targetId}`);
-    return assignment ? this.resolve(snap, assignment) : null;
+    return assignment ? this.resolve(tenantId, snap, assignment) : null;
   }
 
   /**
@@ -308,7 +337,7 @@ export class ProxyEgressService implements OnModuleInit, OnModuleDestroy {
         sourceType: connectionId ? 'connection' : 'provider',
         sourceId: connectionId ?? name,
         sourceLabel: label,
-        chain: assignment ? this.resolve(snap, assignment) : null,
+        chain: assignment ? this.resolve(tenantId, snap, assignment) : null,
         hops: [],
       };
     } catch (err) {

@@ -48,6 +48,7 @@ import { requestReceivedAtMs } from '../../common/utils/request-received';
 import { buildRequestTimeline, type TimelineAttempt } from './request-timeline';
 import { recordedRequestHeaders } from './request-headers';
 import { detectHarnessSession, stripHarnessPrivateFields } from './harness-session';
+import { EgressAffinityInterceptor } from '../../proxy-servers/egress-affinity.interceptor';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
   buildMetaHeaders,
@@ -200,6 +201,7 @@ function toAnthropicModelList(data: OpenAiModelObject[]) {
 @Controller('v1')
 @Public()
 @UseGuards(AgentKeyAuthGuard)
+@UseInterceptors(EgressAffinityInterceptor)
 @UseFilters(ProxyExceptionFilter)
 @SkipThrottle()
 export class ProxyController {

@@ -185,7 +185,9 @@ Outbound proxies
   thinker proxy server create --name <n> --scheme <s> --host <h> --port <p> [--username <u>] [--password-stdin|--password-env <e>]
       [--enabled true|false] [--connect-timeout-ms <ms>] [--debug off|1h|24h|7d|forever] [--log-retention-days <n>] [body flags]
   thinker proxy server update <id|name> [same flags] [--no-auth] | thinker proxy server delete <id|name> --yes [--mode <m>] [--replace-with <id>]
-  thinker proxy profile list | create --name <n> --hop <proxy-id|direct> ... | update <id|name> [...] | delete <id|name> --yes
+  thinker proxy profile list | create --name <n> --hop <line> ... | update <id|name> [...] | delete <id|name> --yes
+    (each --hop is one line, at most 6: <proxy-id>, direct, or balanced affinity:<id>,<id> / request:<id>,<id>
+     with ?on_failure=next_member|next_line&no_session=request|agent|first; a proxy appears once per profile)
   thinker proxy assign list [--target-type <t>] | get <target-type> <target-id>
   thinker proxy assign set <target-type> <target-id> --mode inherit|global|direct|profile [--profile <id|name>]
 

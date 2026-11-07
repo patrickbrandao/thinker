@@ -159,6 +159,29 @@ export interface ChainItem {
   proxy_id: string | null;
   name: string;
   enabled: boolean;
+  /** Profile line the item belongs to, and that line's mode. */
+  line?: number;
+  mode?: LineMode;
+}
+
+/** Profile line: one proxy, Direct, or proxies balanced by session affinity or per request. */
+export type LineMode = 'proxy' | 'direct' | 'affinity' | 'request';
+export type LineOnFailure = 'next_member' | 'next_line';
+export type LineNoSession = 'request' | 'agent' | 'first';
+
+export interface ProfileLineInput {
+  mode: LineMode;
+  proxies: string[];
+  on_failure: LineOnFailure;
+  no_session: LineNoSession;
+}
+
+export interface ProfileLineView {
+  line: number;
+  mode: LineMode;
+  on_failure: LineOnFailure;
+  no_session: LineNoSession;
+  members: ChainItem[];
 }
 
 export type ProxyMode = 'global' | 'direct' | 'profile';
@@ -176,6 +199,7 @@ export interface ProxyProfile {
   id: string;
   name: string;
   chain: ChainItem[];
+  lines?: ProfileLineView[];
   used_by: ProfileUse[];
   created_at: string;
   updated_at: string;
@@ -221,7 +245,11 @@ export interface Egress {
 }
 
 export interface EgressHop extends Egress {
+  /** Profile line (1-based). */
   position: number;
+  /** Balanced line: how it balances and the try inside the line. */
+  mode?: 'affinity' | 'request';
+  attempt?: number;
   result: string;
   ms: number | null;
   tunnel_ms: number | null;
@@ -315,8 +343,7 @@ export function listProxyProfiles() {
   return fetchJson<{ profiles: ProxyProfile[] }>('/proxy-profiles', undefined, { cache: false });
 }
 
-/** `chain` is proxy ids and 'direct'. */
-export function createProxyProfile(data: { name: string; chain: string[] }) {
+export function createProxyProfile(data: { name: string; lines: ProfileLineInput[] }) {
   return fetchMutate<ProxyProfile>('/proxy-profiles', {
     method: 'POST',
     headers: JSON_HEADERS,
@@ -324,7 +351,10 @@ export function createProxyProfile(data: { name: string; chain: string[] }) {
   });
 }
 
-export function updateProxyProfile(profileId: string, data: { name: string; chain: string[] }) {
+export function updateProxyProfile(
+  profileId: string,
+  data: { name: string; lines: ProfileLineInput[] },
+) {
   return fetchMutate<ProxyProfile>(`/proxy-profiles/${id(profileId)}`, {
     method: 'PATCH',
     headers: JSON_HEADERS,

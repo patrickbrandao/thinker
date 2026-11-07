@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
-import { ProxyServersService, validateProxyHost, MAX_CHAIN_ITEMS } from './proxy-servers.service';
+import { ProxyServersService, validateProxyHost } from './proxy-servers.service';
 import { decryptProxyPassword } from './proxy-egress.service';
 import {
   clearProxyAgentCache,
@@ -32,6 +32,7 @@ function createFakeDb() {
     servers: [] as Row[],
     profiles: [] as Row[],
     bindings: [] as Row[],
+    lines: [] as Row[],
     assignments: [] as Row[],
     connections: [] as Row[],
     customProviders: [] as Row[],
@@ -120,19 +121,21 @@ function createFakeDb() {
       }
       return [...counts].map(([proxy_id, set]) => ({ proxy_id, count: set.size }));
     }
-    if (sql.includes('FROM proxy_bindings b LEFT JOIN proxy_servers p')) {
-      const [t, profileId] = params;
-      return db.bindings
-        .filter(
-          (b) => b.tenant_id === t && b.target_type === 'profile' && b.target_id === profileId,
-        )
-        .sort((a, b) => a.position - b.position)
-        .map((b) => {
-          const p = db.servers.find((s) => s.id === b.proxy_id);
-          return { proxy_id: b.proxy_id, name: p?.name ?? null, enabled: p?.enabled ?? null };
-        });
-    }
-    if (sql.includes('FROM proxy_bindings b WHERE b.tenant_id = $1')) {
+    const withLine = (b: Row) => {
+      const l = db.lines.find(
+        (x) => x.tenant_id === b.tenant_id && x.profile_id === b.target_id && x.line === b.line,
+      );
+      return {
+        ...b,
+        mode: l?.mode ?? null,
+        on_failure: l?.on_failure ?? null,
+        no_session: l?.no_session ?? null,
+      };
+    };
+    if (
+      sql.includes('FROM proxy_bindings b LEFT JOIN proxy_profile_lines l') &&
+      sql.includes('b.target_id IN')
+    ) {
       const [t, proxyId] = params;
       const ids = new Set(
         db.bindings
@@ -141,22 +144,49 @@ function createFakeDb() {
       );
       return db.bindings
         .filter((b) => b.tenant_id === t && b.target_type === 'profile' && ids.has(b.target_id))
-        .sort((a, b) => a.target_id.localeCompare(b.target_id) || a.position - b.position);
+        .sort((a, b) => a.target_id.localeCompare(b.target_id) || a.position - b.position)
+        .map(withLine);
+    }
+    if (sql.includes('FROM proxy_bindings b LEFT JOIN proxy_profile_lines l')) {
+      const [t, profileId] = params;
+      return db.bindings
+        .filter(
+          (b) => b.tenant_id === t && b.target_type === 'profile' && b.target_id === profileId,
+        )
+        .sort((a, b) => a.position - b.position)
+        .map(withLine);
+    }
+    if (
+      sql.startsWith(
+        'SELECT id, name, enabled FROM proxy_servers WHERE tenant_id = $1 AND id = ANY($2)',
+      )
+    ) {
+      return db.servers.filter((x) => x.tenant_id === params[0] && params[1].includes(x.id));
     }
     if (sql.startsWith('DELETE FROM proxy_bindings')) {
       db.bindings = db.bindings.filter(
         (b) =>
-          !(b.tenant_id === params[0] && b.target_type === params[1] && b.target_id === params[2]),
+          !(b.tenant_id === params[0] && b.target_type === 'profile' && b.target_id === params[1]),
       );
+      return [];
+    }
+    if (sql.startsWith('DELETE FROM proxy_profile_lines')) {
+      db.lines = db.lines.filter((l) => !(l.tenant_id === params[0] && l.profile_id === params[1]));
+      return [];
+    }
+    if (sql.startsWith('INSERT INTO proxy_profile_lines')) {
+      const [tenant_id, profile_id, line, mode, on_failure, no_session] = params;
+      db.lines.push({ tenant_id, profile_id, line, mode, on_failure, no_session });
       return [];
     }
     if (sql.startsWith('INSERT INTO proxy_bindings')) {
       db.bindings.push({
         tenant_id: params[0],
-        target_type: params[1],
-        target_id: params[2],
-        position: params[3],
-        proxy_id: params[4],
+        target_type: 'profile',
+        target_id: params[1],
+        position: params[2],
+        proxy_id: params[3],
+        line: params[4],
       });
       return [];
     }
@@ -1030,11 +1060,35 @@ describe('ProxyServersService profiles', () => {
     });
     expect(created).toMatchObject({ name: 'Office', used_by: [] });
     expect(created!.chain).toEqual([
-      { kind: 'proxy', proxy_id: a.id, name: 'a', enabled: true },
-      { kind: 'proxy', proxy_id: b.id, name: 'b', enabled: false },
-      { kind: 'direct', proxy_id: null, name: 'Direct', enabled: true },
+      { kind: 'proxy', proxy_id: a.id, name: 'a', enabled: true, line: 1, mode: 'proxy' },
+      { kind: 'proxy', proxy_id: b.id, name: 'b', enabled: false, line: 2, mode: 'proxy' },
+      { kind: 'direct', proxy_id: null, name: 'Direct', enabled: true, line: 3, mode: 'direct' },
     ]);
     expect(egress.invalidate).toHaveBeenCalledWith(T1);
+  });
+
+  it('stores balanced lines with their options and shows them grouped', async () => {
+    const { service, db, a, b, addServer } = withServers();
+    const c = addServer({ name: 'c' });
+    const created = await service.createProfile(T1, {
+      name: 'Balance-First',
+      lines: [
+        { mode: 'affinity', proxies: [a.id, c.id], no_session: 'agent' },
+        { mode: 'request', proxies: [b.id] },
+        { mode: 'direct' },
+      ],
+    });
+    expect(db.bindings.map((x) => [x.line, x.position, x.proxy_id])).toEqual([
+      [1, 1, a.id],
+      [1, 2, c.id],
+      [2, 3, b.id],
+      [3, 4, null],
+    ]);
+    expect(created!.lines.map((l) => [l.line, l.mode, l.no_session, l.members.length])).toEqual([
+      [1, 'affinity', 'agent', 2],
+      [2, 'proxy', 'request', 1],
+      [3, 'direct', 'request', 1],
+    ]);
   });
 
   it('stores Direct as a NULL proxy at its position', async () => {
@@ -1060,10 +1114,7 @@ describe('ProxyServersService profiles', () => {
     ['a repeated proxy', { name: 'P', chain: ['@a', '@a'] }],
     ['an unknown proxy', { name: 'P', chain: ['@a', 'ghost'] }],
     ['a non-string item', { name: 'P', chain: ['@a', 7] }],
-    [
-      'too many items',
-      { name: 'P', chain: Array.from({ length: MAX_CHAIN_ITEMS + 1 }, (_, i) => `@s${i}`) },
-    ],
+    ['too many items', { name: 'P', chain: Array.from({ length: 7 }, (_, i) => `@s${i}`) }],
   ])('rejects %s with 400 and writes nothing', async (_label, body) => {
     const { service, db, a } = withServers();
     const resolved = JSON.parse(JSON.stringify(body).replaceAll('"@a"', JSON.stringify(a.id)));
@@ -1083,12 +1134,9 @@ describe('ProxyServersService profiles', () => {
 
   it('accepts a chain of exactly the maximum length', async () => {
     const ctx = build();
-    const ids = Array.from(
-      { length: MAX_CHAIN_ITEMS },
-      (_, i) => ctx.addServer({ name: `s${i}` }).id,
-    );
+    const ids = Array.from({ length: 6 }, (_, i) => ctx.addServer({ name: `s${i}` }).id);
     const created = await ctx.service.createProfile(T1, { name: 'Max', chain: ids });
-    expect(created!.chain).toHaveLength(MAX_CHAIN_ITEMS);
+    expect(created!.chain).toHaveLength(6);
   });
 
   it('refuses a duplicate profile name (any case) with 409, but not in another workspace', async () => {
@@ -1392,9 +1440,9 @@ describe('ProxyServersService assignments', () => {
       assign('connection', 'c-key', 'profile', profile.id);
       const out = await service.getAssignment(T1, 'connection', 'c-key');
       expect((out.effective as Row).chain).toEqual([
-        { kind: 'proxy', proxy_id: a.id, name: 'a', enabled: true },
-        { kind: 'proxy', proxy_id: b.id, name: 'b', enabled: false },
-        { kind: 'direct', proxy_id: null, name: 'Direct', enabled: true },
+        { kind: 'proxy', proxy_id: a.id, name: 'a', enabled: true, line: 1, mode: 'proxy' },
+        { kind: 'proxy', proxy_id: b.id, name: 'b', enabled: false, line: 2, mode: 'proxy' },
+        { kind: 'direct', proxy_id: null, name: 'Direct', enabled: true, line: 3, mode: 'direct' },
       ]);
     });
 

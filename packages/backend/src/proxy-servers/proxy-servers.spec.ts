@@ -1,45 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { ProxyEgressService } from './proxy-egress.service';
-import { ProxyServersService, rewriteChain, validateChain } from './proxy-servers.service';
+import { ProxyServersService } from './proxy-servers.service';
 import type { HopEvent } from '../common/outbound/outbound-proxy';
-
-describe('validateChain', () => {
-  const known = new Set(['a', 'b', 'c']);
-
-  it('accepts a proxy first, then proxies and one "direct" anywhere after', () => {
-    expect(validateChain(['a', 'direct', 'b'], known)).toEqual(['a', null, 'b']);
-    expect(validateChain(['a', 'b', 'direct'], known)).toEqual(['a', 'b', null]);
-    expect(validateChain([], known)).toEqual([]);
-  });
-
-  it('rejects direct first, direct twice, repeats, unknown ids and long chains', () => {
-    expect(() => validateChain(['direct', 'a'], known)).toThrow();
-    expect(() => validateChain(['a', 'direct', 'direct'], known)).toThrow();
-    expect(() => validateChain(['a', 'a'], known)).toThrow();
-    expect(() => validateChain(['zzz'], known)).toThrow();
-    expect(() => validateChain(['a', 'b', 'c', 'direct', 'a', 'b', 'c'], known)).toThrow();
-  });
-});
-
-describe('rewriteChain', () => {
-  it('removes the proxy position and keeps the order', () => {
-    expect(rewriteChain(['a', 'b', null], 'b', null)).toEqual(['a', null]);
-  });
-
-  it('drops the whole chain when no proxy is left', () => {
-    expect(rewriteChain(['a'], 'a', null)).toBeNull();
-    expect(rewriteChain(['a', null], 'a', null)).toBeNull();
-  });
-
-  it('keeps a proxy first when the removed one was first', () => {
-    expect(rewriteChain(['a', null, 'b'], 'a', null)).toEqual(['b', null]);
-  });
-
-  it('replaces in place and removes the duplicate when the substitute is already there', () => {
-    expect(rewriteChain(['a', 'b'], 'a', 'c')).toEqual(['c', 'b']);
-    expect(rewriteChain(['a', 'b', null], 'a', 'b')).toEqual(['b', null]);
-  });
-});
 
 describe('ProxyServersService.remove', () => {
   const row = {
@@ -104,7 +66,7 @@ describe('ProxyServersService.remove', () => {
       affected: 2,
     });
     const inserts = executed.filter(([sql]) => sql.includes('INSERT INTO proxy_bindings'));
-    expect(inserts.map(([, p]) => p)).toEqual([['t1', 'profile', 'pr2', 1, 'p2']]);
+    expect(inserts.map(([, p]) => p)).toEqual([['t1', 'pr2', 1, 'p2', 1]]);
     expect(executed.at(-1)![0]).toContain('DELETE FROM proxy_servers');
     expect(egress.invalidate).toHaveBeenCalledWith('t1');
   });
@@ -245,6 +207,38 @@ describe('ProxyEgressService.scopeForConnection (assignments)', () => {
     expect(
       kinds((await egress.scopeForConnection('t1', 'openai', null, 'subscription')).chain),
     ).toEqual(['direct']);
+  });
+
+  it('resolves a balanced line into a group and Direct after it', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM proxy_servers'))
+        return [proxyRow, { ...proxyRow, id: 'p2', name: 'B' }];
+      if (sql.includes('FROM proxy_bindings')) {
+        const line = { mode: 'affinity', on_failure: 'next_line', no_session: 'agent' };
+        return [
+          { target_id: 'pr1', line: 1, position: 1, proxy_id: 'p1', ...line },
+          { target_id: 'pr1', line: 1, position: 2, proxy_id: 'p2', ...line },
+          { target_id: 'pr1', line: 2, position: 3, proxy_id: null, mode: 'direct' },
+        ];
+      }
+      if (sql.includes('FROM proxy_assignments')) {
+        return [{ target_type: 'connection', target_id: 'c1', mode: 'profile', profile_id: 'pr1' }];
+      }
+      return [];
+    });
+    const egress = new ProxyEgressService({ query } as never);
+    const { chain } = await egress.scopeForConnection('t1', 'openai', 'c1');
+    expect(chain).toEqual([
+      expect.objectContaining({
+        kind: 'group',
+        key: 't1:pr1:1',
+        mode: 'affinity',
+        onFailure: 'next_line',
+        noSession: 'agent',
+        members: [expect.objectContaining({ id: 'p1' }), expect.objectContaining({ id: 'p2' })],
+      }),
+      { kind: 'direct' },
+    ]);
   });
 
   it('a connection assignment wins; global means no chain', async () => {

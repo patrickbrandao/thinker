@@ -1,25 +1,45 @@
 import { describe, it, expect } from 'vitest';
-import { moveItem, validateChain } from '../../src/components/proxy/proxy-chain';
+import {
+  groupChain,
+  moveItem,
+  newLine,
+  validateLines,
+} from '../../src/components/proxy/proxy-chain';
 
-describe('validateChain', () => {
-  it('accepts an empty chain and valid chains', () => {
-    expect(validateChain([])).toBeNull();
-    expect(validateChain(['a'])).toBeNull();
-    expect(validateChain(['a', 'direct', 'b'])).toBeNull();
-    expect(validateChain(['a', 'b', 'c', 'd', 'e', 'direct'])).toBeNull();
+const P = (id: string) => newLine('proxy', [id]);
+const D = newLine('direct');
+
+describe('validateLines', () => {
+  it('accepts an empty profile and valid lines', () => {
+    expect(validateLines([])).toBeNull();
+    expect(validateLines([P('a')])).toBeNull();
+    expect(
+      validateLines([newLine('affinity', ['a', 'c']), newLine('request', ['b', 'd']), D]),
+    ).toBeNull();
   });
 
-  it('rejects a chain that starts with Direct', () => {
-    expect(validateChain(['direct', 'a'])).toBe('firstNotProxy');
+  it('rejects Direct first, more than 6 lines, empty lines and repeats', () => {
+    expect(validateLines([D, P('a')])).toBe('firstNotProxy');
+    expect(validateLines(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(P))).toBe('tooLong');
+    expect(validateLines([newLine('affinity', [])])).toBe('emptyLine');
+    expect(validateLines([newLine('affinity', ['a', 'b']), P('a')])).toBe('duplicateProxy');
+    expect(validateLines([P('a'), D, P('b'), D])).toBe('duplicateDirect');
   });
+});
 
-  it('rejects more than 6 items', () => {
-    expect(validateChain(['a', 'b', 'c', 'd', 'e', 'f', 'g'])).toBe('tooLong');
-  });
-
-  it('rejects a repeated proxy or Direct twice', () => {
-    expect(validateChain(['a', 'b', 'a'])).toBe('duplicateProxy');
-    expect(validateChain(['a', 'direct', 'b', 'direct'])).toBe('duplicateDirect');
+describe('groupChain', () => {
+  it('groups by line, one line per item without line numbers', () => {
+    const item = (name: string, line?: number) => ({
+      kind: 'proxy' as const,
+      proxy_id: name,
+      name,
+      enabled: true,
+      line,
+    });
+    expect(groupChain([item('a', 1), item('b', 1), item('c', 2)]).map((g) => g.length)).toEqual([
+      2, 1,
+    ]);
+    expect(groupChain([item('a'), item('b')]).map((g) => g.length)).toEqual([1, 1]);
   });
 });
 

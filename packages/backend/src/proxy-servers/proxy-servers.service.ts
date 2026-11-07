@@ -22,6 +22,13 @@ import {
 } from '../common/outbound/outbound-proxy';
 import { PROVIDER_ENDPOINTS, resolveEndpointKey } from '../routing/proxy/provider-endpoints';
 import {
+  groupLines,
+  linesFromChain,
+  rewriteLines,
+  validateLines,
+  type ProfileLine,
+} from './profile-lines';
+import {
   PROXY_TARGET_TYPES,
   ProxyEgressService,
   isDebugActive,
@@ -32,7 +39,6 @@ import {
   type ProxyTargetType,
 } from './proxy-egress.service';
 
-export const MAX_CHAIN_ITEMS = 6;
 const MIN_TIMEOUT_MS = 500;
 const MAX_TIMEOUT_MS = 120_000;
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -72,9 +78,13 @@ export interface BindingRef {
 
 export interface ProxyProfileInput {
   name?: unknown;
-  /** [proxyId | "direct", ...] */
+  /** Legacy shorthand: [proxyId | "direct", ...], one line per item. */
   chain?: unknown;
+  /** [{ mode, proxies, on_failure?, no_session? }, ...] */
+  lines?: unknown;
 }
+
+type LineRow = Parameters<typeof groupLines>[0][number];
 
 const PROXY_MODES = new Set(['global', 'direct', 'profile']);
 
@@ -123,61 +133,6 @@ export async function validateProxyHost(value: unknown): Promise<string> {
     }
   }
   return host.toLowerCase();
-}
-
-/**
- * Chain validation: the first item is a proxy, then up to five fallbacks that
- * are proxies or "direct" (at most once, never first); no proxy twice.
- */
-export function validateChain(chain: unknown, known: Set<string>): Array<string | null> {
-  if (!Array.isArray(chain)) bad('chain must be an array');
-  if (chain.length > MAX_CHAIN_ITEMS) bad(`A chain has at most ${MAX_CHAIN_ITEMS} items`);
-  const out: Array<string | null> = [];
-  const seen = new Set<string>();
-  let direct = false;
-  chain.forEach((item, index) => {
-    if (item === 'direct' || item === null) {
-      if (index === 0) bad('The first item of a chain must be a proxy');
-      if (direct) bad('"Direct" can appear only once');
-      direct = true;
-      out.push(null);
-      return;
-    }
-    if (typeof item !== 'string' || !known.has(item)) bad(`Unknown proxy ${String(item)}`);
-    if (seen.has(item)) bad('A proxy can appear only once in a chain');
-    seen.add(item);
-    out.push(item);
-  });
-  return out;
-}
-
-/**
- * Removes or replaces one proxy in a chain. Returns null when no proxy is
- * left (the whole chain goes). A leading "direct" left by the removal is
- * moved behind the next proxy, so the chain still starts with a proxy.
- */
-export function rewriteChain(
-  chain: Array<string | null>,
-  proxyId: string,
-  replacement: string | null,
-): Array<string | null> | null {
-  const out: Array<string | null> = [];
-  for (const item of chain) {
-    if (item === proxyId) {
-      if (replacement && !chain.includes(replacement) && !out.includes(replacement)) {
-        out.push(replacement);
-      }
-      continue;
-    }
-    out.push(item);
-  }
-  if (!out.some((item) => item !== null)) return null;
-  if (out[0] === null) {
-    const next = out.findIndex((item) => item !== null);
-    const [proxy] = out.splice(next, 1);
-    out.splice(0, 1, proxy!, null);
-  }
-  return out;
 }
 
 @Injectable()
@@ -475,55 +430,66 @@ export class ProxyServersService {
   // Removal
   // ---------------------------------------------------------------------------
 
-  private async chainsUsing(
+  /** Lines of every profile that uses `proxyId`. */
+  private async linesUsing(
     manager: EntityManager | DataSource,
     tenantId: string,
     proxyId: string,
-  ): Promise<
-    Array<{ target_type: ProxyTargetType; target_id: string; chain: Array<string | null> }>
-  > {
-    const rows = unwrap<{
-      target_type: ProxyTargetType;
-      target_id: string;
-      position: number;
-      proxy_id: string | null;
-    }>(
+  ): Promise<Array<{ target_id: string; lines: ProfileLine[] }>> {
+    const rows = unwrap<LineRow & { target_id: string }>(
       await manager.query(
-        `SELECT b.target_type, b.target_id, b.position, b.proxy_id
+        `SELECT b.target_id, b.line, b.position, b.proxy_id, l.mode, l.on_failure, l.no_session
            FROM proxy_bindings b
+           LEFT JOIN proxy_profile_lines l
+             ON l.tenant_id = b.tenant_id AND l.profile_id = b.target_id AND l.line = b.line
           WHERE b.tenant_id = $1 AND b.target_type = 'profile' AND b.target_id IN (
             SELECT target_id FROM proxy_bindings
              WHERE tenant_id = $1 AND target_type = 'profile' AND proxy_id = $2)
-          ORDER BY b.target_type, b.target_id, b.position`,
+          ORDER BY b.target_id, b.position`,
         [tenantId, proxyId],
       ),
     );
-    const chains = new Map<
-      string,
-      { target_type: ProxyTargetType; target_id: string; chain: Array<string | null> }
-    >();
+    const byProfile = new Map<string, LineRow[]>();
     for (const row of rows) {
-      const key = `${row.target_type}:${row.target_id}`;
-      const entry = chains.get(key) ?? {
-        target_type: row.target_type,
-        target_id: row.target_id,
-        chain: [],
-      };
-      entry.chain.push(row.proxy_id);
-      chains.set(key, entry);
+      const list = byProfile.get(row.target_id) ?? [];
+      list.push(row);
+      byProfile.set(row.target_id, list);
     }
-    return [...chains.values()];
+    return [...byProfile.entries()].map(([target_id, list]) => ({
+      target_id,
+      lines: groupLines(list),
+    }));
+  }
+
+  /** A profile's lines from its bindings and line settings. */
+  private async profileLines(
+    manager: EntityManager | DataSource,
+    tenantId: string,
+    profileId: string,
+  ): Promise<ProfileLine[]> {
+    const rows = unwrap<LineRow>(
+      await manager.query(
+        `SELECT b.line, b.position, b.proxy_id, l.mode, l.on_failure, l.no_session
+           FROM proxy_bindings b
+           LEFT JOIN proxy_profile_lines l
+             ON l.tenant_id = b.tenant_id AND l.profile_id = b.target_id AND l.line = b.line
+          WHERE b.tenant_id = $1 AND b.target_type = 'profile' AND b.target_id = $2
+          ORDER BY b.position`,
+        [tenantId, profileId],
+      ),
+    );
+    return groupLines(rows);
   }
 
   /** Bindings of a proxy with display labels. */
   async bindingsOf(tenantId: string, proxyId: string): Promise<BindingRef[]> {
-    const chains = await this.chainsUsing(this.ds, tenantId, proxyId);
+    const profiles = await this.linesUsing(this.ds, tenantId, proxyId);
     const names = await this.profileNames(tenantId);
-    return chains.map((c) => ({
+    return profiles.map((c) => ({
       target_type: 'profile' as const,
       target_id: c.target_id,
       label: names.get(c.target_id) ?? c.target_id,
-      loses_proxy: rewriteChain(c.chain, proxyId, null) === null,
+      loses_proxy: rewriteLines(c.lines, proxyId, null) === null,
     }));
   }
 
@@ -618,10 +584,10 @@ export class ProxyServersService {
     }
     let affected = 0;
     await this.ds.transaction(async (manager) => {
-      const chains = await this.chainsUsing(manager, tenant, id);
-      for (const c of chains) {
-        const next = rewriteChain(c.chain, id, mode === 'replace' ? replaceWith! : null);
-        await this.writeChain(manager, tenant, c.target_type, c.target_id, next ?? []);
+      const profiles = await this.linesUsing(manager, tenant, id);
+      for (const c of profiles) {
+        const next = rewriteLines(c.lines, id, mode === 'replace' ? replaceWith! : null);
+        await this.writeLines(manager, tenant, c.target_id, next ?? []);
         affected++;
       }
       await manager.query(`DELETE FROM proxy_servers WHERE id = $1 AND tenant_id = $2`, [
@@ -637,23 +603,36 @@ export class ProxyServersService {
   // Bindings
   // ---------------------------------------------------------------------------
 
-  private async writeChain(
+  private async writeLines(
     manager: EntityManager | DataSource,
     tenantId: string,
-    targetType: string,
-    targetId: string,
-    chain: Array<string | null>,
+    profileId: string,
+    lines: ProfileLine[],
   ) {
     await manager.query(
-      `DELETE FROM proxy_bindings WHERE tenant_id = $1 AND target_type = $2 AND target_id = $3`,
-      [tenantId, targetType, targetId],
+      `DELETE FROM proxy_bindings WHERE tenant_id = $1 AND target_type = 'profile' AND target_id = $2`,
+      [tenantId, profileId],
     );
-    for (let i = 0; i < chain.length; i++) {
+    await manager.query(
+      `DELETE FROM proxy_profile_lines WHERE tenant_id = $1 AND profile_id = $2`,
+      [tenantId, profileId],
+    );
+    let position = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
       await manager.query(
-        `INSERT INTO proxy_bindings (tenant_id, target_type, target_id, position, proxy_id)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [tenantId, targetType, targetId, i + 1, chain[i]],
+        `INSERT INTO proxy_profile_lines (tenant_id, profile_id, line, mode, on_failure, no_session)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [tenantId, profileId, i + 1, line.mode, line.on_failure, line.no_session],
       );
+      const items: Array<string | null> = line.mode === 'direct' ? [null] : line.proxies;
+      for (const proxyId of items) {
+        await manager.query(
+          `INSERT INTO proxy_bindings (tenant_id, target_type, target_id, position, proxy_id, line)
+           VALUES ($1, 'profile', $2, $3, $4, $5)`,
+          [tenantId, profileId, ++position, proxyId, i + 1],
+        );
+      }
     }
   }
 
@@ -729,26 +708,41 @@ export class ProxyServersService {
     }
   }
 
-  private async chainView(tenantId: string, profileId: string) {
-    const rows = unwrap<{ proxy_id: string | null; name: string | null; enabled: boolean | null }>(
-      await this.ds.query(
-        `SELECT b.proxy_id, p.name, p.enabled FROM proxy_bindings b
-           LEFT JOIN proxy_servers p ON p.id = b.proxy_id
-          WHERE b.tenant_id = $1 AND b.target_type = 'profile' AND b.target_id = $2
-          ORDER BY b.position`,
-        [tenantId, profileId],
-      ),
+  /**
+   * A profile for display: `lines` (each with its members) and `chain`, the
+   * same items flattened in order with their line and line mode.
+   */
+  private async profileView(tenantId: string, profileId: string) {
+    const lines = await this.profileLines(this.ds, tenantId, profileId);
+    const ids = lines.flatMap((l) => l.proxies);
+    const info = new Map(
+      ids.length
+        ? unwrap<{ id: string; name: string; enabled: boolean }>(
+            await this.ds.query(
+              `SELECT id, name, enabled FROM proxy_servers WHERE tenant_id = $1 AND id = ANY($2)`,
+              [tenantId, ids],
+            ),
+          ).map((r) => [r.id, r])
+        : [],
     );
-    return rows.map((r) =>
-      r.proxy_id === null
-        ? { kind: 'direct' as const, proxy_id: null, name: 'Direct', enabled: true }
-        : {
-            kind: 'proxy' as const,
-            proxy_id: r.proxy_id,
-            name: r.name ?? '',
-            enabled: !!r.enabled,
-          },
-    );
+    const member = (id: string) => ({
+      kind: 'proxy' as const,
+      proxy_id: id as string | null,
+      name: info.get(id)?.name ?? '',
+      enabled: !!info.get(id)?.enabled,
+    });
+    const direct = { kind: 'direct' as const, proxy_id: null, name: 'Direct', enabled: true };
+    const view = lines.map((l, i) => ({
+      line: i + 1,
+      mode: l.mode,
+      on_failure: l.on_failure,
+      no_session: l.no_session,
+      members: l.mode === 'direct' ? [direct] : l.proxies.map(member),
+    }));
+    return {
+      lines: view,
+      chain: view.flatMap((l) => l.members.map((m) => ({ ...m, line: l.line, mode: l.mode }))),
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -809,7 +803,7 @@ export class ProxyServersService {
     for (const row of rows) {
       profiles.push({
         ...row,
-        chain: await this.chainView(tenantId, row.id),
+        ...(await this.profileView(tenantId, row.id)),
         used_by: usage.filter((u) => u.profile_id === row.id),
       });
     }
@@ -828,13 +822,16 @@ export class ProxyServersService {
     );
     if (dup.length > 0) throw new ConflictException('An outbound profile with this name exists');
     const known = new Set((await this.rows(tenantId)).map((r) => r.id));
-    const chain = validateChain(input.chain ?? [], known);
-    if (chain.length === 0) bad('A profile needs at least one proxy server');
-    return { name, chain };
+    const lines = validateLines(
+      input.lines !== undefined ? input.lines : linesFromChain(input.chain ?? []),
+      known,
+    );
+    if (lines.length === 0) bad('A profile needs at least one proxy server');
+    return { name, lines };
   }
 
   async createProfile(tenantId: string, input: ProxyProfileInput) {
-    const { name, chain } = await this.profileInput(tenantId, input ?? {});
+    const { name, lines } = await this.profileInput(tenantId, input ?? {});
     const id = randomUUID();
     await this.ds.transaction(async (manager) => {
       await manager.query(`INSERT INTO proxy_profiles (id, tenant_id, name) VALUES ($1, $2, $3)`, [
@@ -842,7 +839,7 @@ export class ProxyServersService {
         tenantId,
         name,
       ]);
-      await this.writeChain(manager, tenantId, 'profile', id, chain);
+      await this.writeLines(manager, tenantId, id, lines);
     });
     this.egress.invalidate(tenantId);
     return (await this.listProfiles(tenantId)).profiles.find((p) => p.id === id);
@@ -850,13 +847,13 @@ export class ProxyServersService {
 
   async updateProfile(tenantId: string | null, id: string, input: ProxyProfileInput) {
     const row = await this.profileRow(tenantId, id);
-    const { name, chain } = await this.profileInput(row.tenant_id, input ?? {}, id);
+    const { name, lines } = await this.profileInput(row.tenant_id, input ?? {}, id);
     await this.ds.transaction(async (manager) => {
       await manager.query(
         `UPDATE proxy_profiles SET name = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`,
         [name, id, row.tenant_id],
       );
-      await this.writeChain(manager, row.tenant_id, 'profile', id, chain);
+      await this.writeLines(manager, row.tenant_id, id, lines);
     });
     this.egress.invalidate(row.tenant_id);
     return (await this.listProfiles(row.tenant_id)).profiles.find((p) => p.id === id);
@@ -879,7 +876,7 @@ export class ProxyServersService {
         `DELETE FROM proxy_assignments WHERE tenant_id = $1 AND profile_id = $2`,
         [row.tenant_id, id],
       );
-      await this.writeChain(manager, row.tenant_id, 'profile', id, []);
+      await this.writeLines(manager, row.tenant_id, id, []);
       await manager.query(`DELETE FROM proxy_profiles WHERE id = $1 AND tenant_id = $2`, [
         id,
         row.tenant_id,
@@ -957,7 +954,7 @@ export class ProxyServersService {
             mode,
             profile_id: used.profile_id,
             profile_name: used.profile_name,
-            chain: await this.chainView(tenantId, used.profile_id),
+            ...(await this.profileView(tenantId, used.profile_id)),
           }
         : mode === 'direct'
           ? { source, mode, chain: [] }

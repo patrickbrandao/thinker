@@ -77,6 +77,10 @@ export class ProxyBinding {
   @Column('varchar', { nullable: true })
   proxy_id!: string | null;
 
+  /** Profile line (1-based) the item belongs to. */
+  @Column('integer', { nullable: true })
+  line!: number | null;
+
   @Column(timestampType(), { default: timestampDefault() })
   created_at!: string;
 
@@ -102,6 +106,35 @@ export class ProxyProfile {
 
   @Column(timestampType(), { default: timestampDefault() })
   updated_at!: string;
+}
+
+/** One line of an outbound profile: a proxy, Direct, or balanced proxies. */
+@Entity('proxy_profile_lines')
+export class ProxyProfileLine {
+  @PrimaryColumn('varchar')
+  tenant_id!: string;
+
+  @PrimaryColumn('varchar')
+  profile_id!: string;
+
+  @PrimaryColumn('integer')
+  line!: number;
+
+  /** 'proxy' | 'direct' | 'affinity' | 'request' */
+  @Column('varchar', { length: 10 })
+  mode!: string;
+
+  /** 'next_member' | 'next_line' */
+  @Column('varchar', { length: 12, default: 'next_member' })
+  on_failure!: string;
+
+  /** 'request' | 'agent' | 'first' */
+  @Column('varchar', { length: 8, default: 'request' })
+  no_session!: string;
+
+  @ManyToOne(() => ProxyProfile, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'profile_id' })
+  profile?: ProxyProfile;
 }
 
 /** How a provider default, connection, trigger or e-mail config leaves: global, direct or a profile. */
