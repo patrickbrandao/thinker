@@ -71,8 +71,8 @@ describe('DeepSeekHarnessSetup', () => {
     expect(pre).toHaveLength(2);
     expect(pre[0].textContent).toContain('baseURL: http://localhost:2099');
     expect(pre[0].textContent).not.toContain('http://localhost:2099/v1');
-    expect(pre[0].textContent).toContain('apiKeyEnv: THINKER_API_KEY');
-    expect(pre[1].textContent).toBe('export THINKER_API_KEY="thk_pp..."');
+    expect(pre[0].textContent).toContain('apiKeyEnv: THINKER_AGENT_KEY');
+    expect(pre[1].textContent).toBe('export THINKER_AGENT_KEY="thk_pp..."');
     expect(screen.getByRole('tab', { name: 'Native route' }).getAttribute('aria-selected')).toBe(
       'true',
     );
@@ -104,15 +104,15 @@ describe('DeepSeekHarnessSetup', () => {
       <DeepSeekHarnessSetup {...base} apiKey="thk_real" keyPrefix="thk_re" />,
     );
     const exportPre = () => container.querySelectorAll('pre')[1].textContent;
-    expect(exportPre()).toBe('export THINKER_API_KEY="thk_re..."');
+    expect(exportPre()).toBe('export THINKER_AGENT_KEY="thk_re..."');
     fireEvent.click(screen.getByRole('button', { name: 'Reveal API key' }));
-    expect(exportPre()).toBe('export THINKER_API_KEY="thk_real"');
+    expect(exportPre()).toBe('export THINKER_AGENT_KEY="thk_real"');
     fireEvent.click(screen.getByRole('button', { name: 'Hide API key' }));
     const copyButtons = screen.getAllByRole('button', { name: 'Copy to clipboard' });
     await act(async () => {
       fireEvent.click(copyButtons[1]);
     });
-    expect(writeText).toHaveBeenCalledWith('export THINKER_API_KEY="thk_real"');
+    expect(writeText).toHaveBeenCalledWith('export THINKER_AGENT_KEY="thk_real"');
   });
 
   it('has no reveal toggle when only a prefix is known', () => {

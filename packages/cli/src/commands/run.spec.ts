@@ -116,6 +116,26 @@ describe('runCmd', () => {
     }
   });
 
+  it('never passes the server master key or the root account to the child', async () => {
+    let env: Record<string, string | undefined> = {};
+    const { io } = authedIo([], async (_c, _a, e) => {
+      env = e;
+      return 0;
+    });
+    io.env['THINKER_ENCRYPTION_KEY'] = 'master';
+    io.env['thinker_encryption_key_previous'] = 'old-master';
+    io.env['THINKER_ROOT_USER'] = 'admin@example.com';
+    saveAgentKey(io.env, HOST, 'my-bot', 'thk_run_secret');
+    await runCmd(io, ['--agent', 'my-bot', '--', 'tool']);
+    expect(env['THINKER_AGENT_KEY']).toBe('thk_run_secret');
+    expect(env['THINKER_ENCRYPTION_KEY']).toBeUndefined();
+    expect(env['thinker_encryption_key_previous']).toBeUndefined();
+    expect(env['THINKER_ROOT_USER']).toBeUndefined();
+    await expect(
+      runCmd(io, ['--agent', 'my-bot', '--env', 'THINKER_ENCRYPTION_KEY', '--', 'tool']),
+    ).rejects.toThrow(expect.objectContaining({ code: 'invalid_env_name' }));
+  });
+
   it('rejects an invalid --env variable name', async () => {
     const { io } = authedIo([]);
     saveAgentKey(io.env, HOST, 'my-bot', 'k');

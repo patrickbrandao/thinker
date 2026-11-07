@@ -54,7 +54,7 @@ describe('harness setup guides', () => {
   it('DeepSeek Harness: native route without /v1, Custom model API with /v1', () => {
     const c = guide('deepseek-harness');
     expect(c.textContent).toContain('baseURL: http://localhost:2099\n');
-    expect(c.textContent).toContain('export THINKER_API_KEY=');
+    expect(c.textContent).toContain('export THINKER_AGENT_KEY=');
     fireEvent.click(Array.from(c.querySelectorAll('[role="tab"]')).at(-1)!);
     expect(c.textContent).toContain('baseURL: http://localhost:2099/v1');
     expect(c.textContent).toContain('api: openai-completions');

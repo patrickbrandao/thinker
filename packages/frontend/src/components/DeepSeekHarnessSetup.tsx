@@ -30,7 +30,7 @@ const PROFILE_FILE = '$DSH_HOME/profiles/<profile>/cordis.patch.yml';
 /**
  * DeepSeek Harness (dsh): the native route (Anthropic Messages, which sends
  * the dsh session id) or the pi-ai "Custom model API" route (Chat
- * Completions). Both read the key from `THINKER_API_KEY`.
+ * Completions). Both read the key from `THINKER_AGENT_KEY`.
  */
 export default function DeepSeekHarnessSetup({
   apiKey,
