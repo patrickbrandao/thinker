@@ -12,7 +12,15 @@ O Thinker é um gateway de LLM auto-hospedado. Ele fica entre agentes ("harnesse
 
 Três superfícies de gestão compartilham a mesma API REST (`/api/v1/*`): o dashboard, a CLI `thinker` (`packages/cli/`) e o servidor MCP remoto (`packages/backend/src/mcp/`). Adicione a capacidade uma vez na camada de serviço e exponha onde precisar; nunca duplique a lógica por superfície.
 
-A imagem Docker traz a CLI no PATH (`/app/cli-bin/thinker`, lançador com shebang `#!/nodejs/bin/node`, já que a imagem distroless não tem shell nem `/usr/bin/env`): `docker exec -e THINKER_API_KEY=thk_... <contêiner> thinker proxy server list`. Ela usa `http://localhost:2099` por padrão e precisa de uma chave `thk_`.
+A imagem Docker traz a CLI no PATH (`/app/cli-bin/thinker`, lançador com shebang `#!/nodejs/bin/node`, já que a imagem distroless não tem shell nem `/usr/bin/env`; `/app/thinker` é o mesmo arquivo, para `docker run <imagem> thinker ...`, já que o entrypoint é o `node`).
+
+**Credenciais de gestão** (API REST, CLI e MCP), resolvidas por `common/services/api-key-auth.service.ts` para o `ApiKeyGuard` e para o `McpController`:
+- **Chaves de API** (`thk_adm_…`): criadas por owner/admin em Organização → Chaves de API ou com `thinker key create --name <n> [--expires-days <d>]` (`/api/v1/api-keys`, `auth/api-keys.controller.ts`). Por padrão nunca expiram; a expiração escolhida é fixa (não desliza). Valem no `X-API-Key` da API e no MCP (`X-API-Key` ou `Authorization: Bearer thk_adm_…`, com escopos de leitura e escrita), com o papel atual de quem criou.
+- **Tokens do `thinker login`** (`thk_pat_…`, nome `cli`): deslizam até o teto absoluto, como antes; também valem no MCP.
+- **Token root** (`thk_root_v1.<ts>.<email>.<hmac>`, `common/utils/root-token.ts` e `packages/cli/src/root-token.ts`, com vetor de teste comum): a CLI o gera sozinha quando não há outra credencial e `THINKER_ENCRYPTION_KEY` está no ambiente (o próprio contêiner, ou `docker run` com a mesma variável). HMAC derivado da `THINKER_ENCRYPTION_KEY` (aceita também a `_PREVIOUS`), janela de 5 min. Age como o admin da instância mais antigo, com papel `owner` (`THINKER_ROOT_USER=<email>` escolhe outra conta; `x-thinker-organization` escolhe a organização). Quem tem essa chave já decifra tudo e mexe no banco, então ela basta como prova de root.
+- **Log**: toda requisição feita com essas credenciais gera, ao terminar, uma linha `[ManagementAudit] Management API|MCP request: <método> <caminho> status=… credential=api_key|root key=<nome> key_id=… user=… tenant=… client_ip=…`; criar e revogar chave também (`API key created|revoked`). As mutações com `@Audit` gravam `credential`, `key_name` e `key_id` no `metadata` do alerta de auditoria.
+
+Uso em produção: `docker exec thinker-app thinker proxy server list` (sem chave). De outro contêiner: `docker run --rm --network container:<app> --env-file <(docker inspect <app> --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^THINKER_ENCRYPTION_KEY=') tmsoftbrasil/thinker thinker <comando>`. Fora do servidor: `THINKER_URL` + `THINKER_API_KEY=thk_adm_…` ou `thinker login`.
 
 ## Arquitetura
 

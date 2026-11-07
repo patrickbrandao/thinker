@@ -112,6 +112,9 @@ COPY --from=build --chown=nonroot:nonroot /app/packages/cli/bin packages/cli/bin
 COPY --from=build --chown=nonroot:nonroot /app/packages/cli/dist packages/cli/dist
 COPY --from=build --chown=nonroot:nonroot /app/packages/cli/package.json packages/cli/
 COPY --from=build --chown=nonroot:nonroot /app/cli-bin cli-bin
+# `docker run tmsoftbrasil/thinker thinker <command>`: the entrypoint is node,
+# so "thinker" resolves to this file (the same launcher; node skips the shebang).
+COPY --from=build --chown=nonroot:nonroot /app/cli-bin/thinker thinker
 # Thinker's license (it keeps the upstream copyright notice) and the
 # notices of every bundled third-party package.
 COPY --chown=nonroot:nonroot LICENSE LICENSE

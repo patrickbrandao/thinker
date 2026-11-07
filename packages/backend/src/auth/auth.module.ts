@@ -3,13 +3,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MeController } from './me.controller';
 import { CliAuthController } from './cli-auth.controller';
 import { CliAuthService } from './cli-auth.service';
+import { ApiKeysController } from './api-keys.controller';
 import { ApiKey } from '../entities/api-key.entity';
 import { CliAuthCode } from '../entities/cli-auth-code.entity';
 import { Tenant } from '../entities/tenant.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ApiKey, CliAuthCode, Tenant])],
-  controllers: [MeController, CliAuthController],
+  controllers: [MeController, CliAuthController, ApiKeysController],
   providers: [CliAuthService],
 })
 export class AuthModule {}

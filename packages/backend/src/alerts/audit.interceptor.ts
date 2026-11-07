@@ -134,7 +134,12 @@ export class AuditInterceptor implements NestInterceptor {
       actorUserId: ctx.userId ?? null,
       actorIp: clientIpInfo(req).clientIp,
       actorUserAgent: typeof ua === 'string' ? ua : null,
-      metadata: { fields, method: req.method, path: req.route?.path ?? null },
+      metadata: {
+        fields,
+        method: req.method,
+        path: req.route?.path ?? null,
+        ...credentialMetadata(req),
+      },
       vars: { 'audit.fields': fields.join(', ') },
     } as const;
     if (ctx.tenantId) {
@@ -149,6 +154,22 @@ export class AuditInterceptor implements NestInterceptor {
         this.logger.warn(`Audit failed: ${err instanceof Error ? err.message : err}`),
       );
   }
+}
+
+/** Which management credential made the change (admin key, CLI token, root). */
+function credentialMetadata(req: Request): Record<string, string> {
+  const r = req as Request & {
+    authMethod?: string;
+    managementAuth?: { kind: string; keyId: string | null; keyName: string };
+  };
+  if (r.managementAuth) {
+    return {
+      credential: r.managementAuth.kind,
+      key_name: r.managementAuth.keyName,
+      ...(r.managementAuth.keyId ? { key_id: r.managementAuth.keyId } : {}),
+    };
+  }
+  return r.authMethod ? { credential: r.authMethod } : {};
 }
 
 function capitalize(text: string): string {

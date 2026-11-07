@@ -4,6 +4,8 @@ import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
 import { OrganizationMember } from '../entities/organization-member.entity';
 import { UserProfile } from '../entities/user-profile.entity';
+import { ApiKey } from '../entities/api-key.entity';
+import { ApiKeyAuthService } from './services/api-key-auth.service';
 import { IngestEventBusService } from './services/ingest-event-bus.service';
 import { ThinkerRuntimeService } from './services/thinker-runtime.service';
 import { TenantCacheService } from './services/tenant-cache.service';
@@ -18,7 +20,7 @@ import { SystemEventsService } from './services/system-events.service';
 
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([Tenant, Agent, OrganizationMember, UserProfile])],
+  imports: [TypeOrmModule.forFeature([Tenant, Agent, OrganizationMember, UserProfile, ApiKey])],
   providers: [
     IngestEventBusService,
     ThinkerRuntimeService,
@@ -31,6 +33,7 @@ import { SystemEventsService } from './services/system-events.service';
     RequestRecordingStorageService,
     TriggerSignalService,
     SystemEventsService,
+    ApiKeyAuthService,
   ],
   exports: [
     IngestEventBusService,
@@ -44,6 +47,7 @@ import { SystemEventsService } from './services/system-events.service';
     RequestRecordingStorageService,
     TriggerSignalService,
     SystemEventsService,
+    ApiKeyAuthService,
   ],
 })
 export class CommonModule {}
