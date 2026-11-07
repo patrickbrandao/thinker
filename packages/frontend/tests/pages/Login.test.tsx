@@ -74,7 +74,7 @@ describe('Login', () => {
     await vi.waitFor(() => {
       expect(mockSignInEmail).toHaveBeenCalledWith({
         email: 'admin@thinker.example.com',
-        password: 'thinker',
+        password: 'thinker123',
       });
     });
     expect(getLastAuthMethod()).toBe('email');
