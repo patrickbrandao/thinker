@@ -347,6 +347,25 @@ describe('resolveForwardEndpoint', () => {
     expect(account.customEndpoint?.allowPrivateDestination).toBe(false);
   });
 
+  it('strips the catalog prefix when a connection base URL overrides a native endpoint', () => {
+    const go = resolveForwardEndpoint({
+      provider: 'opencode-go',
+      authType: 'api_key',
+      model: 'opencode-go/glm-5.3',
+      providerBaseUrl: 'http://wwz:8000/opencode/inference/go/openai',
+    });
+    expect(go.customEndpoint).toBeDefined();
+    expect(go.forwardModel).toBe('glm-5.3');
+    // OpenRouter ids keep their vendor segment, as on the native endpoint.
+    const or = resolveForwardEndpoint({
+      provider: 'openrouter',
+      authType: 'api_key',
+      model: 'white-wizard/wwz-fast',
+      providerBaseUrl: 'http://wwz:8000/openrouter',
+    });
+    expect(or.forwardModel).toBe('white-wizard/wwz-fast');
+  });
+
   it('sets no override for a custom provider whose row is missing', () => {
     const out = resolveForwardEndpoint({
       provider: 'custom:gone',
