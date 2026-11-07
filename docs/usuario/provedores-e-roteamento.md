@@ -73,6 +73,10 @@ Ligada, cada requisição é pontuada pelo conteúdo (palavras-chave, tamanho, f
 
 `auto` pede para o Thinker rotear. Qualquer outro valor é uma escolha explícita: o Thinker procura o modelo entre os descobertos do harness (use os IDs de `GET /v1/models`). Um ID qualificado pelo provedor (`openai/gpt-novo`) ainda pode ser roteado por esse provedor se a credencial dele estiver habilitada no harness, mesmo fora do catálogo. Se o modelo não está disponível para o harness, a resposta é `M302`.
 
+Uma rota explícita **não tem fallback**: é só aquele modelo, na conexão fixada pelo tier (o rótulo da chave vem do tier, os fallbacks não). Se ela falha, ou está em espera depois de um 429 (`Provider route temporarily cooling down after an upstream 429`), o cliente recebe esse erro direto, sem cabeçalho `X-Thinker-Fallback-*`. A afinidade de sessão e os cabeçalhos do cliente não mudam isso: o que decide é o `model` do corpo.
+
+Isso pega o **Claude Code**, que manda sempre um ID concreto (`claude-sonnet-5-5`, `claude-haiku-5-5` para subagentes e tarefas leves) quando não está configurado com `auto`. Para dar cascata a esses nomes sem mexer no cliente, crie um [modelo virtual](#modelos-virtuais) com o **mesmo nome** do ID: o virtual vence o ID explícito e roteia pela própria cadeia (ou, com Continue on Default, pela do tier `default`).
+
 ## Fallback
 
 Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, resposta em streaming que não começa dentro de `STREAM_WARMUP_MS`, silêncio maior que `STREAM_IDLE_TIMEOUT_MS`, resposta 200 sem conteúdo e com zero tokens, resposta 200 que só traz um erro, erro no início do streaming antes de qualquer conteúdo), o Thinker tenta o próximo modelo de fallback do tier, na ordem configurada. A primeira tentativa que der certo atende a requisição; o cliente vê um único resultado.

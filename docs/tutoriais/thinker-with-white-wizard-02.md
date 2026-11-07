@@ -451,6 +451,16 @@ h-claude-code-1 anthropic claude-sonnet-5-5
 h-claude-code-2 anthropic claude-haiku-5-5
 EOF
 
+# 4b - o gerador do Claude Code manda um ID concreto (claude-sonnet-5-5), e ID
+# concreto e rota explicita, sem fallback. Um modelo virtual com esse nome, sem
+# principal e com Continue on Default, herda a cadeia do tier default
+# (falhas -> instavel -> perfeito)
+for h in h-claude-code-1 h-claude-code-2; do
+  jq -n '{name: "claude-sonnet-5-5", continue_on_default: true}' \
+    | api POST "/routing/$h/virtual-models" >/dev/null
+  echo "virtual $h claude-sonnet-5-5 -> cadeia do default";
+done
+
 # 5 - chaves dos harnesses num arquivo 600 (lido pelo loop)
 umask 077
 : > harnesses.keys
@@ -788,6 +798,8 @@ Construir esse ambiente revelou três bugs no Thinker, já corrigidos:
 - **0.31.5**: com base URL própria, o OpenCode recebia o modelo **com o prefixo do catálogo** (`opencode-go/glm-5.3`) e respondia `Model is unavailable`;
 - **0.31.6**: a conexão Anthropic com base URL própria não recebia o **`anthropic-beta`** do cliente, e todo turno do Claude Code voltava 400 (`messages.1.output_config: Extra inputs are not permitted`).
 
+E um achado que **não é bug**: com o principal em cooldown, os harnesses Claude Code recebiam o 429 local (`Provider route temporarily cooling down after an upstream 429`) e nenhum fallback, enquanto o Anthropic SDK, com a mesma rota, descia a cascata. A diferença era o `model` do corpo: o gerador do SDK manda `auto`, o do Claude Code manda `claude-sonnet-5-5`, e um ID concreto é uma rota explícita, **sem fallback** (veja [`model` explícito](../usuario/provedores-e-roteamento.md#model-explícito)). Os cabeçalhos do Claude Code e a afinidade de sessão não entram nisso. O passo 4b cria um modelo virtual com o nome do ID, que devolve a cascata; o teste `proxy.service.claude-code-fallback.spec.ts` prova os três casos (`auto`, ID concreto e virtual).
+
 E as lacunas que continuam abertas (contorne como mostrado):
 
 - **Uma réplica = um núcleo**: ~125 req/s por processo; escala horizontal só com réplicas, e os guardrails `THINKER_*_MAX` valem por processo;
@@ -798,7 +810,6 @@ E as lacunas que continuam abertas (contorne como mostrado):
 - **Sem Azure nativo**: provedor custom OpenAI;
 - **`provider connect` sem `--base-url`**: a primeira validação vai ao provedor real;
 - **Headers `x-wwz-*` não passam**: o comportamento do simulador fica todo no YAML;
-- **Cooldown sem cascata no Claude Code** (aberta, sem correção): com o principal em cooldown, os harnesses Claude Code receberam o 429 local (`Provider route temporarily cooling down after an upstream 429`) em vez de seguir para os fallbacks, enquanto o Anthropic SDK, com a mesma rota, desceu a cascata. Isolar se é a plataforma, a forma da requisição ou a janela de indisponibilidade da **instavel** fica para uma investigação própria.
 
 ## 11 – Limpeza
 
