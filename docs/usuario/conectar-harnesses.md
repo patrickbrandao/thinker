@@ -33,6 +33,8 @@ A URL base **não** leva `/v1`: o cliente Anthropic acrescenta `/v1/messages`. D
 
 Por um gateway, o Claude Code assume contexto de 200k e compacta sessões longas cedo. Para trabalho com contexto longo, fixe um modelo de 1M em vez de `auto` (por exemplo `/model claude-opus-5-5[1m]`).
 
+Um modelo fixado (no `/model`, em `ANTHROPIC_MODEL` ou nos subagentes, que pedem `claude-haiku-*`) é uma rota explícita e **não tem fallback**. Para manter a cascata num nome fixo, crie um modelo virtual com esse nome (veja [`model` explícito](provedores-e-roteamento.md#model-explícito)).
+
 ## Codex
 
 O Codex usa a API Responses. Em `~/.codex/config.toml`:
