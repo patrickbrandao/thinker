@@ -2,6 +2,26 @@ import type en from '../en/org.js';
 import type { Catalog } from '../../types.js';
 
 const ptBR: Catalog<typeof en> = {
+  apiKeys: {
+    title: 'Chaves de API',
+    body: 'Chaves para a API REST do Thinker, a CLI thinker (THINKER_API_KEY) e o MCP (X-API-Key ou Authorization: Bearer). A chave age com o papel atual de quem a criou. Toda requisição feita com uma chave é registrada no log.',
+    name: 'Nome',
+    namePlaceholder: 'ci, automação, notebook…',
+    expiry: 'Expira',
+    never: 'Nunca',
+    days: 'Em {{ days }} dias',
+    create: 'Criar chave',
+    createdTitle: 'Chave de API {{ name }}',
+    createdWarning: 'Copie agora: ela aparece só uma vez.',
+    saved: 'Já guardei',
+    cliLogin: 'Login da CLI',
+    meta: 'Criada em {{ created }} por {{ by }} · último uso {{ used }} · expira {{ expires }}',
+    neverUsed: 'nunca',
+    revoke: 'Revogar',
+    confirmRevoke: 'Confirmar revogação',
+    revoked: 'Chave de API revogada',
+    empty: 'Nenhuma chave de API ainda.',
+  },
   roles: {
     owner: 'Proprietário',
     admin: 'Administrador',

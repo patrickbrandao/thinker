@@ -1,5 +1,25 @@
 /** Organizations: switcher, gate, Organization page, Users admin page. */
 export default {
+  apiKeys: {
+    title: 'API keys',
+    body: "Keys for the Thinker REST API, the thinker CLI (THINKER_API_KEY) and MCP (X-API-Key or Authorization: Bearer). A key acts with its creator's current role. Every request made with a key is logged.",
+    name: 'Name',
+    namePlaceholder: 'ci, automation, laptop…',
+    expiry: 'Expires',
+    never: 'Never',
+    days: 'In {{ days }} days',
+    create: 'Create key',
+    createdTitle: 'API key {{ name }}',
+    createdWarning: 'Copy it now: it is shown only once.',
+    saved: 'I saved it',
+    cliLogin: 'CLI login',
+    meta: 'Created {{ created }} by {{ by }} · last used {{ used }} · expires {{ expires }}',
+    neverUsed: 'never',
+    revoke: 'Revoke',
+    confirmRevoke: 'Confirm revoke',
+    revoked: 'API key revoked',
+    empty: 'No API keys yet.',
+  },
   roles: {
     owner: 'Owner',
     admin: 'Admin',

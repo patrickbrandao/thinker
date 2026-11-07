@@ -30,7 +30,10 @@ import { ModelPricesService } from '../model-prices/model-prices.service';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
 import { Agent } from '../entities/agent.entity';
-import { resolveMcpOperator } from './mcp-auth';
+import { resolveMcpOperator, McpOperator, MCP_WRITE_SCOPE } from './mcp-auth';
+import { ApiKeyAuthService, ADMIN_KEY_PREFIX } from '../common/services/api-key-auth.service';
+import { logManagementRequest } from '../common/guards/api-key.guard';
+import { ROOT_TOKEN_PREFIX } from '../common/utils/root-token';
 import { buildMcpServer } from './mcp-server.factory';
 import { McpToolDeps } from './tool-deps';
 import { RouteModelParamsService } from '../routing/model-params/route-model-params.service';
@@ -80,7 +83,55 @@ export class McpController {
     private readonly agentEnabledProviderRepo: Repository<AgentEnabledProvider>,
     @InjectRepository(Agent)
     private readonly agentRepo: Repository<Agent>,
+    private readonly keyAuth: ApiKeyAuthService,
   ) {}
+
+  private readonly auditLogger = new Logger('ManagementAudit');
+
+  /**
+   * A Thinker API key (or CLI/root token) instead of an OAuth token: sent in
+   * `X-API-Key`, or as `Authorization: Bearer thk_adm_…|thk_pat_…|thk_root_v1…`.
+   * Returns null when the request carries no such credential.
+   */
+  private managementCredential(req: Request): string | null {
+    const header = req.headers['x-api-key'];
+    if (typeof header === 'string' && header) return header;
+    const authz = req.headers.authorization;
+    if (typeof authz !== 'string') return null;
+    const match = /^Bearer\s+(\S+)$/i.exec(authz);
+    const token = match?.[1];
+    if (!token) return null;
+    return token.startsWith(ADMIN_KEY_PREFIX) ||
+      token.startsWith('thk_pat_') ||
+      token.startsWith(ROOT_TOKEN_PREFIX)
+      ? token
+      : null;
+  }
+
+  private async operatorFromKey(
+    req: Request,
+    res: Response,
+    raw: string,
+  ): Promise<McpOperator | null> {
+    const org = req.headers['x-thinker-organization'];
+    try {
+      const auth = await this.keyAuth.authenticate(
+        raw,
+        typeof org === 'string' && org ? org : null,
+      );
+      if (!auth || !auth.ctx.tenantId || !auth.ctx.userId) return null;
+      logManagementRequest(this.auditLogger, req, res, auth, 'MCP');
+      return {
+        userId: auth.ctx.userId,
+        tenantId: auth.ctx.tenantId,
+        scopes: new Set([MCP_READ_SCOPE, MCP_WRITE_SCOPE]),
+        role: auth.ctx.role ?? 'viewer',
+      };
+    } catch (err) {
+      this.logger.warn(`MCP API key rejected: ${err instanceof Error ? err.message : err}`);
+      return null;
+    }
+  }
 
   private deps(): McpToolDeps {
     return {
@@ -134,6 +185,34 @@ export class McpController {
     const deps = this.deps();
     const resource = mcpResource;
     const issuer = authIssuer;
+    const rawKey = this.managementCredential(req);
+    if (rawKey) {
+      try {
+        const operator = await this.operatorFromKey(req, res, rawKey);
+        if (!operator) {
+          await sendWebResponse(unauthorizedResponse(resource), res, this.logger);
+          return;
+        }
+        const webReq = new globalThis.Request(resource, {
+          method: req.method,
+          headers: fromNodeHeaders(req.headers),
+        });
+        const handler = createMcpHandler(() => buildMcpServer(deps, operator), {
+          responseMode: 'json',
+        });
+        await sendWebResponse(
+          await handler.fetch(webReq, { parsedBody: req.body }),
+          res,
+          this.logger,
+        );
+      } catch (error) {
+        this.logger.error(
+          `MCP request failed: ${error instanceof Error ? error.stack : String(error)}`,
+        );
+        await sendWebResponse(internalErrorResponse(), res, this.logger);
+      }
+      return;
+    }
     const webRequest = new globalThis.Request(resource, {
       method: req.method,
       headers: fromNodeHeaders(req.headers),

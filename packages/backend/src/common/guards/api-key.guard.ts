@@ -8,27 +8,54 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { timingSafeEqual } from 'crypto';
-import { ApiKey } from '../../entities/api-key.entity';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { RequestWithTenantContext } from '../decorators/tenant-context.decorator';
-import { verifyKey, keyPrefix as computePrefix } from '../utils/hash.util';
-import { toLocalSqlTimestamp } from '../utils/postgres-sql';
-import { TenantCacheService } from '../services/tenant-cache.service';
+import { ApiKeyAuthService, ManagementAuth } from '../services/api-key-auth.service';
+// Same header as auth/session.guard.ts (not imported: that module loads the ESM-only auth instance).
+const ORGANIZATION_HEADER = 'x-thinker-organization';
+
+/** Request fields set for a management credential (read by /me and the audit trail). */
+export type RequestWithManagementAuth = Request & {
+  authMethod?: string;
+  apiKeyExpiresAt?: string | null;
+  managementAuth?: Pick<ManagementAuth, 'kind' | 'keyId' | 'keyName'>;
+};
+
+/**
+ * Writes one log line per request made with a management credential (admin
+ * API key, CLI token or root token), once the response is sent: who, which
+ * key, what, and the outcome. Never the key itself.
+ */
+export function logManagementRequest(
+  logger: Logger,
+  request: Request,
+  response: Response | undefined,
+  auth: ManagementAuth,
+  surface: string,
+): void {
+  const line = (status: number | string) =>
+    `Management ${surface} request: ${request.method} ${request.originalUrl ?? request.url} ` +
+    `status=${status} credential=${auth.kind} key=${auth.keyName}` +
+    `${auth.keyId ? ` key_id=${auth.keyId}` : ''} user=${auth.ctx.userId ?? '-'} ` +
+    `tenant=${auth.ctx.tenantId ?? '-'} ${clientIpLogFields(request)}`;
+  if (!response || typeof response.once !== 'function') {
+    logger.log(line('-'));
+    return;
+  }
+  response.once('finish', () => logger.log(line(response.statusCode)));
+}
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   private readonly logger = new Logger(ApiKeyGuard.name);
+  private readonly auditLogger = new Logger('ManagementAudit');
 
   constructor(
     private readonly reflector: Reflector,
     private readonly configService: ConfigService,
-    @InjectRepository(ApiKey)
-    private readonly apiKeyRepo: Repository<ApiKey>,
-    private readonly tenantCache: TenantCacheService,
+    private readonly keyAuth: ApiKeyAuthService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,10 +65,10 @@ export class ApiKeyGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<RequestWithManagementAuth>();
 
     // Skip if already authenticated via session (explicit flag prevents accidental bypass)
-    if ((request as Request & { authMethod?: string }).authMethod === 'session') return true;
+    if (request.authMethod === 'session') return true;
 
     const apiKey = request.headers['x-api-key'];
 
@@ -50,82 +77,35 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('X-API-Key header required');
     }
 
-    // Try DB-based API key lookup first (multi-tenant)
-    const prefix = computePrefix(apiKey);
-    const candidates = await this.apiKeyRepo.find({ where: { key_prefix: prefix } });
-    const found = candidates.find((c) => verifyKey(apiKey, c.key_hash));
-
-    if (found) {
-      const now = Date.now();
-      const absoluteExpiryAt = found.absolute_expires_at
-        ? new Date(found.absolute_expires_at).getTime()
-        : null;
-      // Two independent deadlines: the sliding window (`expires_at`) and the
-      // hard ceiling (`absolute_expires_at`). A token in constant use keeps the
-      // window alive forever, so the ceiling is what ultimately retires it.
-      const expired =
-        (found.expires_at && new Date(found.expires_at).getTime() <= now) ||
-        (absoluteExpiryAt !== null && absoluteExpiryAt <= now);
-      if (expired) {
-        this.logger.warn(`Rejected expired API key from ${clientIpLogFields(request)}`);
-        throw new UnauthorizedException('API key expired — run thinker login');
-      }
-      // Keys are tenant credentials: the tenant comes straight off the key
-      // row — no key → user → tenant indirection. The creating user is kept
-      // as attribution so @CurrentUser-scoped controllers (and audit writes)
-      // still see a user when one exists.
-      // The key carries its creator's CURRENT role in that organization
-      // (ADR 0006); a creator who left the organization loses the key (403).
-      // A key with no creator has no role to inherit, so it is refused.
-      if (!found.created_by_user_id) {
-        this.logger.warn(`Rejected API key with no creator from ${clientIpLogFields(request)}`);
-        throw new UnauthorizedException('API key has no owning user — run thinker login');
-      }
-      const access = await this.tenantCache.resolveAccess(
-        found.created_by_user_id,
-        found.tenant_id,
+    const header = request.headers[ORGANIZATION_HEADER];
+    const requested = typeof header === 'string' && header ? header : null;
+    let auth: ManagementAuth | null;
+    try {
+      auth = await this.keyAuth.authenticate(apiKey, requested);
+    } catch (err) {
+      this.logger.warn(
+        `Rejected management credential (${err instanceof Error ? err.message : err}) from ${clientIpLogFields(request)}`,
       );
-      (request as RequestWithTenantContext).tenantContext = {
-        tenantId: found.tenant_id,
-        userId: found.created_by_user_id,
-        role: access.role,
-        isInstanceAdmin: access.isInstanceAdmin,
-      };
-      (request as Request & { user: { id: string } }).user = {
-        id: String(found.created_by_user_id),
-      };
-      (request as Request & { authMethod: string }).authMethod = 'api_key';
-      const ttlDays = this.configService.get<number>('app.cliTokenTtlDays', 30);
-      const slidExpiryAt = now + ttlDays * 86_400_000;
-      const nextExpiryAt =
-        absoluteExpiryAt !== null && absoluteExpiryAt < slidExpiryAt
-          ? absoluteExpiryAt
-          : slidExpiryAt;
-      // Stamp the REFRESHED deadline, not the pre-refresh one, so /me reports
-      // what the next request will actually enforce. ISO UTC on the wire (like
-      // the mint response), while the DB update keeps the naive-local form.
-      (request as Request & { apiKeyExpiresAt?: string | null }).apiKeyExpiresAt = found.expires_at
-        ? new Date(nextExpiryAt).toISOString()
-        : null;
-      this.apiKeyRepo
-        .createQueryBuilder()
-        .update(ApiKey)
-        .set(
-          found.expires_at
-            ? {
-                last_used_at: () => 'CURRENT_TIMESTAMP',
-                // Node clock, not CURRENT_TIMESTAMP: CliAuthService mints
-                // expiries with toLocalSqlTimestamp, and one column must not
-                // be written by two different clocks. Never past the ceiling.
-                expires_at: toLocalSqlTimestamp(new Date(nextExpiryAt)),
-              }
-            : { last_used_at: () => 'CURRENT_TIMESTAMP' },
-        )
-        .where('id = :id', { id: found.id })
-        .execute()
-        .catch((err: Error) =>
-          this.logger.warn(`Failed to update last_used_at/expires_at: ${err.message}`),
-        );
+      throw err;
+    }
+
+    if (auth) {
+      (request as RequestWithTenantContext).tenantContext = auth.ctx;
+      if (auth.ctx.userId) {
+        (request as Request & { user: { id: string } }).user = { id: String(auth.ctx.userId) };
+      }
+      request.authMethod = auth.kind;
+      request.apiKeyExpiresAt = auth.expiresAt;
+      request.managementAuth = { kind: auth.kind, keyId: auth.keyId, keyName: auth.keyName };
+      logManagementRequest(
+        this.auditLogger,
+        request,
+        typeof context.switchToHttp().getResponse === 'function'
+          ? context.switchToHttp().getResponse<Response>()
+          : undefined,
+        auth,
+        'API',
+      );
       return true;
     }
 
@@ -135,7 +115,10 @@ export class ApiKeyGuard implements CanActivate {
     // is unset (see CurrentUser decorator).
     const validKey = this.configService.get<string>('app.apiKey', '');
     if (validKey && this.safeCompare(apiKey, validKey)) {
-      (request as Request & { authMethod: string }).authMethod = 'env_api_key';
+      request.authMethod = 'env_api_key';
+      this.auditLogger.log(
+        `Management API request: ${request.method} ${request.originalUrl ?? request.url} credential=env_api_key ${clientIpLogFields(request)}`,
+      );
       return true;
     }
 
@@ -148,8 +131,7 @@ export class ApiKeyGuard implements CanActivate {
     const bBuf = Buffer.from(b, 'utf8');
     // timingSafeEqual requires equal-length inputs. A length mismatch is
     // a definite mismatch, and the length of the configured env-based
-    // API_KEY is not a secret worth hiding. Real agent ingest keys take
-    // the scrypt path via hash.util.verifyKey further up.
+    // API_KEY is not a secret worth hiding.
     if (aBuf.length !== bBuf.length) return false;
     return timingSafeEqual(aBuf, bBuf);
   }

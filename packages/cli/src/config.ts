@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CliError } from './errors';
+import { signRootToken } from './root-token';
 
 /**
  * Origin used when no `--url`, `THINKER_URL` or stored login selects one: a
@@ -87,13 +88,14 @@ export interface ResolvedTarget {
   origin: string;
   apiKey: string | null;
   /** Where the credential came from; null when unauthenticated. */
-  source: 'env' | 'config' | null;
+  source: 'env' | 'config' | 'root' | null;
 }
 
 /**
  * Resolution order — url: --url flag, then THINKER_URL, then the active
  * config host, then DEFAULT_URL (this machine). Credential: THINKER_API_KEY, then the stored
- * credential whose origin EXACTLY matches the target. A credential stored
+ * credential whose origin EXACTLY matches the target, then a root token when
+ * THINKER_ENCRYPTION_KEY is set (the server's own env; THINKER_ROOT_USER picks the account). A credential stored
  * for another host is never sent.
  */
 export function resolveTarget(
@@ -109,6 +111,17 @@ export function resolveTarget(
   const stored = config.hosts?.[origin]?.apiKey;
   if (stored) {
     return { origin, apiKey: stored, source: 'config' };
+  }
+  // Running with the server's own environment (inside the container, or a
+  // `docker run` with the same env file): THINKER_ENCRYPTION_KEY proves root,
+  // so mint a short-lived root token instead of asking for a login.
+  const rootSecret = env['THINKER_ENCRYPTION_KEY'];
+  if (rootSecret) {
+    return {
+      origin,
+      apiKey: signRootToken(rootSecret, env['THINKER_ROOT_USER'] ?? ''),
+      source: 'root',
+    };
   }
   return { origin, apiKey: null, source: null };
 }

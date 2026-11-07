@@ -1013,3 +1013,27 @@ export const user: Record<string, Handler> = {
     );
   },
 };
+
+// ─── API keys (REST API, CLI and MCP) ────────────────────────────────────────
+
+export const key: Record<string, Handler> = {
+  list: simple('GET', () => '/api-keys', { maxPositionals: 0 }),
+  create: async (io, argv) => {
+    const args = parseArgs(argv, { strings: ['name', 'expires-days', 'url'], maxPositionals: 0 });
+    const name = requireString(args, 'name');
+    const { client } = clientFromFlags(io, args);
+    const body: Record<string, unknown> = { name };
+    const days = intFlag(args, 'expires-days');
+    if (days !== undefined) body['expires_in_days'] = days;
+    printJson(io, await client.request('POST', '/api-keys', { body }));
+  },
+  revoke: async (io, argv) => {
+    const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'], maxPositionals: 1 });
+    const needle = requirePositional(args, 0, '<id|name>');
+    requireYes(args, `revoke API key ${needle}`);
+    const { client } = clientFromFlags(io, args);
+    const rows = rowsOf(await client.request('GET', '/api-keys'), 'keys');
+    const id = findRow(rows, needle, 'API key', 'See thinker key list').id;
+    printJson(io, await client.request('DELETE', `/api-keys/${enc(id)}`));
+  },
+};

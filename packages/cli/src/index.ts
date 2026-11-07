@@ -80,6 +80,7 @@ export const COMMANDS: Record<string, Handler> = {
   ...prefixed('trigger', manage.trigger),
   ...prefixed('proxy', manage.proxy),
   ...prefixed('alert', manage.alert),
+  ...prefixed('key', manage.key),
   ...prefixed('limit', manage.limit),
   ...prefixed('provider local', manage.providerLocal),
   ...prefixed('connection', manage.connection),
@@ -191,6 +192,10 @@ Outbound proxies
   thinker proxy assign list [--target-type <t>] | get <target-type> <target-id>
   thinker proxy assign set <target-type> <target-id> --mode inherit|global|direct|profile [--profile <id|name>]
 
+API keys (REST API, CLI and MCP; every use is logged)
+  thinker key list | thinker key create --name <n> [--expires-days <d>] (default: never expires)
+  thinker key revoke <id|name> --yes
+
 Alerts
   thinker alert list [--level <l>] [--category <c>] [--unread] [--page <n>] [--limit <n>]
   thinker alert read <alert-id> | thinker alert read-all [--level <l>] [--category <c>]
@@ -227,7 +232,10 @@ Run (key injection, 1Password-style)
     The key never crosses stdout or your transcript.
 
 Environment: THINKER_URL, THINKER_API_KEY (overrides stored login)
-Credentials are stored per-host in ~/.config/thinker/config.json (mode 0600).`;
+Credentials are stored per-host in ~/.config/thinker/config.json (mode 0600).
+With the server's own environment (inside the container, or docker run with its
+env file) no login is needed: THINKER_ENCRYPTION_KEY mints a root token that acts
+as the instance admin (THINKER_ROOT_USER=<email> picks another account).`;
 
 export function resolveCommand(
   argv: readonly string[],
