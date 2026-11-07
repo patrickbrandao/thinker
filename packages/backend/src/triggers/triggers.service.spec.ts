@@ -568,7 +568,10 @@ describe('TriggersService', () => {
       expect(q.sql).toContain('e.status = $3');
       expect(q.sql).toContain('e.event_type = $4');
       expect(q.sql).toContain('e.agent_name = $5');
-      expect(q.sql).toContain('e.created_at < $6');
+      // Inclusive at the client's millisecond precision: rows sharing the
+      // last row's millisecond are not skipped (the client dedupes by id).
+      expect(q.sql).toContain("date_trunc('milliseconds', e.created_at) <= $6::timestamptz");
+      expect(q.sql).toContain('ORDER BY e.created_at DESC, e.id DESC');
       expect(q.sql).toContain('LIMIT 20');
       expect(q.params).toEqual([
         'tenant-1',
