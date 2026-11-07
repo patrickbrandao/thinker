@@ -20,6 +20,7 @@ import {
   type ProviderEndpoint,
 } from './provider-endpoints';
 import { CustomProviderService } from '../custom-provider/custom-provider.service';
+import { stripModelPrefix } from './model-prefix';
 import { normalizeMinimaxSubscriptionBaseUrl } from '../provider-base-url';
 import {
   getBedrockMantleBaseUrl,
@@ -160,10 +161,12 @@ export function resolveForwardEndpoint(
     }
   } else if (providerBaseUrl && authType === 'api_key' && resolveEndpointKey(provider)) {
     const key = resolveEndpointKey(provider)!;
-    customEndpoint = buildEndpointOverride(
-      providerBaseUrl,
-      key === 'bedrock' ? resolveBedrockEndpointKey(model, apiMode) : key,
-    );
+    const overrideKey = key === 'bedrock' ? resolveBedrockEndpointKey(model, apiMode) : key;
+    customEndpoint = buildEndpointOverride(providerBaseUrl, overrideKey);
+    // The override reaches ProviderClient as a custom endpoint, which forwards
+    // the model untouched; strip the catalog prefix (opencode-go/glm-5.3) here,
+    // exactly as the native endpoint would have.
+    forwardModel = stripModelPrefix(forwardModel, overrideKey);
     customEndpoint.allowPrivateDestination = allowsPrivateDestination(providerBaseUrlAllowsPrivate);
   } else if (resolveEndpointKey(provider) === 'bedrock' && isBedrockRegion(providerRegion)) {
     const bedrockEndpointKey = resolveBedrockEndpointKey(model, apiMode);
