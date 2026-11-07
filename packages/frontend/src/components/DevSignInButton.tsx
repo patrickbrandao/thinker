@@ -7,7 +7,7 @@ import { t } from '../i18n/index.js';
 // module, these literals and the button template (#229). The account exists only in a
 // dev database.
 const DEV_EMAIL = 'admin@thinker.example.com';
-const DEV_PASSWORD = 'thinker';
+const DEV_PASSWORD = 'thinker123';
 
 export default function DevSignInButton({
   disabled,
