@@ -67,6 +67,12 @@ export interface ProviderEndpoint {
    */
   allowPrivateDestination?: boolean;
   /**
+   * The Anthropic provider's own connection with an operator-set base URL
+   * (a proxy in front of Anthropic, a simulator). It is Anthropic as far as
+   * the caller's `anthropic-beta` flags go, though the host is not.
+   */
+  anthropicAccountOverride?: boolean;
+  /**
    * Upper bound of one forwarded request, overriding PROVIDER_TIMEOUT_MS.
    * Set per local server, whose first call may have to load the model.
    */
