@@ -38,7 +38,7 @@ curl -sSf https://<your-coolify-domain>/api/v1/health
 
 ## What Gets Provisioned
 
-- Thinker Docker image `tmsoftbrasil/thinker:0.1`.
+- Thinker Docker image `tmsoftbrasil/thinker:0.31`.
 - PostgreSQL 18 container.
 - Persistent Docker volume for PostgreSQL data.
 - Persistent Docker volume for compressed request recordings at `/data/request-recordings`.
