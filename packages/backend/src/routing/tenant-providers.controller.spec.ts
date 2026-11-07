@@ -21,6 +21,7 @@ describe('TenantProvidersController', () => {
       key_prefix: 'sk-test',
       region: null,
       base_url: null,
+      allow_private_destination: true,
       stream_warmup_ms: null,
       stream_idle_timeout_ms: null,
       is_active: true,

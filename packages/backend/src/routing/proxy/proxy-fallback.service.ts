@@ -55,6 +55,8 @@ interface ForwardProviderOptions {
   providerRegion?: string | null;
   /** The connection's own base URL (API-key connections only). */
   providerBaseUrl?: string | null;
+  /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
+  providerBaseUrlAllowsPrivate?: boolean;
   apiMode?: ProxyApiMode;
   signatureLookup?: SignatureLookup;
   thinkingLookup?: ThinkingBlockLookup;
@@ -411,6 +413,7 @@ export class ProxyFallbackService {
         resourceUrl: credentials.resourceUrl,
         providerRegion: credentials.providerRegion,
         providerBaseUrl: credentials.providerBaseUrl,
+        providerBaseUrlAllowsPrivate: credentials.providerBaseUrlAllowsPrivate,
         signatureLookup,
         thinkingLookup,
         clientAnthropicBeta,
@@ -600,6 +603,7 @@ export class ProxyFallbackService {
         tenantProviderId: k.id,
         providerRegion: k.region,
         providerBaseUrl: k.baseUrl ?? null,
+        providerBaseUrlAllowsPrivate: k.baseUrlAllowsPrivate !== false,
       })),
     ];
   }
@@ -1118,6 +1122,7 @@ export class ProxyFallbackService {
       model: opts.model,
       providerRegion,
       providerBaseUrl: opts.providerBaseUrl,
+      providerBaseUrlAllowsPrivate: opts.providerBaseUrlAllowsPrivate,
       resourceUrl,
       customProvider,
       logger: this.logger,

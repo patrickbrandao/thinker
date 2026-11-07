@@ -44,7 +44,10 @@ import {
 import { MinRole } from '../common/decorators/roles.decorator';
 import { providerKeyDisplay } from '../common/utils/provider-key-mask';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
-import { assertCanUseLocalRunners } from '../common/utils/private-url-policy';
+import {
+  assertCanUseLocalRunners,
+  canUsePrivateDestinations,
+} from '../common/utils/private-url-policy';
 import { PROVIDER_CONNECTION_SCOPE } from './routing-core/resolve-agent.service';
 import { checkAccountBaseUrl } from './account-base-url-check';
 import { supportsAccountBaseUrl } from './account-base-url';
@@ -221,7 +224,12 @@ export class ProviderController {
       ctx.userId,
     );
     if (accountBaseUrl !== undefined) {
-      result = await this.providerService.setBaseUrl(agent.tenant_id, result.id, accountBaseUrl);
+      result = await this.providerService.setBaseUrl(
+        agent.tenant_id,
+        result.id,
+        accountBaseUrl,
+        canUsePrivateDestinations(ctx),
+      );
     }
 
     // Discover models before returning so the frontend sees updated model

@@ -190,6 +190,7 @@ describe('route-credentials', () => {
         resourceUrl: undefined,
         providerRegion: 'us',
         providerBaseUrl: null,
+        providerBaseUrlAllowsPrivate: true,
         tenantProviderId: 'up-1',
         keyLabel: 'Work',
         streamWarmupMs: null,

@@ -37,6 +37,7 @@ import {
 import { MinRole } from '../common/decorators/roles.decorator';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { providerKeyDisplay } from '../common/utils/provider-key-mask';
+import { canUsePrivateDestinations } from '../common/utils/private-url-policy';
 import { checkAccountBaseUrl, baseUrlFields } from './account-base-url-check';
 import { defaultAccountBaseUrl, supportsAccountBaseUrl } from './account-base-url';
 import { buildProviderModels } from './provider-models';
@@ -180,7 +181,12 @@ export class TenantProvidersController {
   ) {
     const tenantId = this.requireTenant(ctx);
     const baseUrl = await checkAccountBaseUrl(body.base_url, ctx);
-    const updated = await this.providerService.setBaseUrl(tenantId, id, baseUrl);
+    const updated = await this.providerService.setBaseUrl(
+      tenantId,
+      id,
+      baseUrl,
+      canUsePrivateDestinations(ctx),
+    );
     await this.invalidateTenantRouting(tenantId);
     try {
       await this.discoveryService.discoverModels(updated);

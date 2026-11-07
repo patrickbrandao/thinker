@@ -322,6 +322,29 @@ describe('resolveForwardEndpoint', () => {
     });
     expect(out.customEndpoint).toBeDefined();
     expect(out.forwardModel).toBe('meta-llama/Llama-3.1-8B');
+    expect(out.customEndpoint?.allowPrivateDestination).toBe(true);
+  });
+
+  it('carries the stored private-destination flag of custom providers and connection base URLs', () => {
+    const custom = resolveForwardEndpoint({
+      provider: 'custom:abc',
+      authType: 'api_key',
+      model: 'custom:abc/m',
+      customProvider: {
+        base_url: 'https://llm.example/v1',
+        api_kind: 'openai',
+        allow_private_destination: false,
+      },
+    });
+    expect(custom.customEndpoint?.allowPrivateDestination).toBe(false);
+    const account = resolveForwardEndpoint({
+      provider: 'openai',
+      authType: 'api_key',
+      model: 'gpt-4o',
+      providerBaseUrl: 'https://llm.example/v1',
+      providerBaseUrlAllowsPrivate: false,
+    });
+    expect(account.customEndpoint?.allowPrivateDestination).toBe(false);
   });
 
   it('sets no override for a custom provider whose row is missing', () => {

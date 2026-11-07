@@ -579,10 +579,12 @@ export class ProviderClient {
     // names and plaintext to public hosts early with a clear message; it cannot
     // stop DNS rebinding on its own, so the request itself goes through
     // ssrfSafeFetch, which validates the address it actually connects to.
-    // LAN destinations are allowed (local models are a feature).
+    // LAN destinations are allowed (local models are a feature), unless the
+    // URL was registered by someone the private-URL policy did not allow
+    // (`allowPrivateDestination: false`, ADR 0006 item 7).
     if (endpoint.requiresSsrfRevalidation) {
       try {
-        await validatePublicUrl(url, { allowPrivate: true });
+        await validatePublicUrl(url, { allowPrivate: endpoint.allowPrivateDestination !== false });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         throw new ProviderUrlBlockedError(`Refusing to forward to disallowed URL: ${message}`);
@@ -608,6 +610,7 @@ export class ProviderClient {
       },
       endpoint.requiresSsrfRevalidation === true,
       endpoint.timeoutMs,
+      endpoint.allowPrivateDestination !== false,
     );
     const result = {
       ...fetched,
@@ -1056,6 +1059,8 @@ export class ProviderClient {
     pinDestination = false,
     // Per-endpoint upper bound (local servers); PROVIDER_TIMEOUT_MS otherwise.
     timeoutMs = PROVIDER_TIMEOUT_MS,
+    // False: the pinned connection also refuses private/LAN addresses.
+    allowPrivateDestination = true,
   ): Promise<ForwardResult> {
     let fetchSignal: AbortSignal;
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -1087,7 +1092,9 @@ export class ProviderClient {
         redirect: 'error',
       };
       // Both honor the outbound proxy chain of the active scope.
-      response = pinDestination ? await ssrfSafeFetch(url, init) : await outboundFetch(url, init);
+      response = pinDestination
+        ? await ssrfSafeFetch(url, init, { allowPrivate: allowPrivateDestination })
+        : await outboundFetch(url, init);
     } catch (err) {
       // Every proxy of the chain failed: its own transport error (502).
       if (isProviderProxyFailedError(err)) throw err;

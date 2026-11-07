@@ -1219,7 +1219,12 @@ export interface ProviderModelFetchOptions {
    * The connection's own base URL and the official one it replaces: a models
    * URL under the official base moves under the connection's base.
    */
-  accountBaseUrl?: { base: string; official: string | null };
+  accountBaseUrl?: {
+    base: string;
+    official: string | null;
+    /** False: refuse private/LAN addresses too (ADR 0006 item 7). Default true. */
+    allowPrivate?: boolean;
+  };
   forceRefresh?: boolean;
   /**
    * Bedrock only: the connection's last discovered models. Their CRIS profiles
@@ -1336,7 +1341,9 @@ export class ProviderModelFetcherService {
     if (options?.accountBaseUrl) {
       url = rebaseUrl(url, options.accountBaseUrl.official, options.accountBaseUrl.base);
       try {
-        await validatePublicUrl(url, { allowPrivate: true });
+        await validatePublicUrl(url, {
+          allowPrivate: options.accountBaseUrl.allowPrivate !== false,
+        });
       } catch (err) {
         this.logger.warn(
           `Ignoring model discovery on a blocked base URL: ${(err as Error).message}`,
@@ -1374,7 +1381,9 @@ export class ProviderModelFetcherService {
       apiKey,
       providerId,
       configKey,
-      !!options?.accountBaseUrl,
+      options?.accountBaseUrl
+        ? { allowPrivate: options.accountBaseUrl.allowPrivate !== false }
+        : undefined,
     );
   }
 
@@ -1385,7 +1394,7 @@ export class ProviderModelFetcherService {
     apiKey: string,
     providerId: string,
     configKey: string,
-    userBaseUrl = false,
+    userBaseUrl?: { allowPrivate: boolean },
   ): Promise<DiscoveredModel[]> {
     const body = await this.requestModelsJson(url, headers, apiKey, providerId, userBaseUrl);
     if (body === undefined) return [];
@@ -1398,7 +1407,7 @@ export class ProviderModelFetcherService {
     headers: Record<string, string>,
     apiKey: string,
     providerId: string,
-    userBaseUrl = false,
+    userBaseUrl?: { allowPrivate: boolean },
   ): Promise<unknown> {
     try {
       const controller = new AbortController();
@@ -1409,7 +1418,7 @@ export class ProviderModelFetcherService {
       // time) and redirects are refused, like provider-client does.
       const init: RequestInit = { headers, signal: controller.signal };
       const res = userBaseUrl
-        ? await ssrfSafeFetch(url, { ...init, redirect: 'error' })
+        ? await ssrfSafeFetch(url, { ...init, redirect: 'error' }, userBaseUrl)
         : await outboundFetch(url, init);
       clearTimeout(timeout);
 

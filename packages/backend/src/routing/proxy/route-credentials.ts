@@ -52,6 +52,8 @@ export type ResolvedRouteCredentials =
       providerRegion?: string | null;
       /** The selected API-key connection's own base URL (`tenant_providers.base_url`). */
       providerBaseUrl?: string | null;
+      /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
+      providerBaseUrlAllowsPrivate?: boolean;
       tenantProviderId: string | null;
       /**
        * Label of the `tenant_providers` row that was actually selected — the
@@ -303,6 +305,7 @@ export async function resolveRouteCredentials(
     resourceUrl: unwrapped.resourceUrl,
     providerRegion: key.region,
     providerBaseUrl: key.baseUrl ?? null,
+    providerBaseUrlAllowsPrivate: key.baseUrlAllowsPrivate !== false,
     tenantProviderId,
     // The selected row's own label, not `args.providerKeyLabel`: selection may
     // have fallen back to the default key when the pin matched nothing.

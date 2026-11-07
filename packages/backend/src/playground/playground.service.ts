@@ -91,6 +91,7 @@ export class PlaygroundService {
     let oauthResourceUrl: string | undefined;
     let providerRegion: string | null | undefined;
     let providerBaseUrl: string | null | undefined;
+    let providerBaseUrlAllowsPrivate: boolean | undefined;
     let egressScope: OutboundScope | undefined;
     try {
       // The Playground always runs under the reserved per-tenant "Playground"
@@ -133,6 +134,7 @@ export class PlaygroundService {
       providerKeyLabel = key.label;
       providerRegion = key.region;
       providerBaseUrl = key.baseUrl ?? null;
+      providerBaseUrlAllowsPrivate = key.baseUrlAllowsPrivate !== false;
       egressScope = await this.egress?.scopeForConnection(agent.tenant_id, dto.provider, key.id);
       const resolved = await runWithOutboundScope(egressScope, () =>
         resolveApiKey(
@@ -215,6 +217,7 @@ export class PlaygroundService {
       model: dto.model,
       providerRegion,
       providerBaseUrl,
+      providerBaseUrlAllowsPrivate,
       resourceUrl: oauthResourceUrl,
       customProvider,
       logger: this.logger,
