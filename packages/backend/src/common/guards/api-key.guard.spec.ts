@@ -1,4 +1,4 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { ApiKeyGuard } from './api-key.guard';
@@ -165,6 +165,46 @@ describe('ApiKeyGuard', () => {
 
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     expect(request.tenantContext).toBeUndefined();
+  });
+
+  it('refuses every key while the creator must change a temporary password (ADR 0006)', async () => {
+    const rawKey = 'thk_adm_blocked-key';
+    mockFind.mockResolvedValueOnce([
+      {
+        id: 'key-3',
+        tenant_id: 'tenant-789',
+        created_by_user_id: 'user-1',
+        key_hash: hashKey(rawKey),
+        key_prefix: rawKey.substring(0, 12),
+        expires_at: null,
+        absolute_expires_at: null,
+      },
+    ]);
+    const configService = { get: configGet } as unknown as ConfigService;
+    const blocked = new ApiKeyGuard(
+      reflector,
+      configService,
+      new ApiKeyAuthService(
+        configService,
+        { find: mockFind } as never,
+        {
+          resolveAccess: jest.fn().mockResolvedValue({
+            tenantId: 'tenant-789',
+            role: 'owner',
+            isInstanceAdmin: false,
+            mustChangePassword: true,
+          }),
+        } as never,
+        { query: rootQuery } as never,
+      ),
+    );
+    const request = { headers: { 'x-api-key': rawKey }, ip: '127.0.0.1' };
+    const ctx = {
+      switchToHttp: () => ({ getRequest: () => request }),
+      getHandler: () => ({}),
+      getClass: () => ({}),
+    } as unknown as ExecutionContext;
+    await expect(blocked.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 
   it('falls back to env-based API key when DB lookup returns empty', async () => {

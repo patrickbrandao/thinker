@@ -181,7 +181,10 @@ describe('AccountsService.resetPassword', () => {
       'user_id',
     ]);
     expect(tenantCache.invalidate).toHaveBeenCalledWith('u1');
-    expect(statements[statements.length - 1]).toContain('DELETE FROM session');
+    expect(statements.some((s) => s.startsWith('DELETE FROM session'))).toBe(true);
+    // `thinker login` tokens go too; admin keys stay (blocked until the change).
+    const keys = statements.find((s) => s.startsWith('DELETE FROM api_keys'));
+    expect(keys).toContain("key_prefix LIKE 'thk\\_pat\\_%'");
   });
 
   it('creates the credential row for an account that only had social sign-in', async () => {

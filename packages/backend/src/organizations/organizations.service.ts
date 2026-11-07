@@ -269,6 +269,12 @@ export class OrganizationsService {
     this.assertCanGrant(callerRole, current.role);
     if (current.role === 'owner') await this.assertNotLastOwner(tenantId);
     await this.memberRepo.delete({ tenant_id: tenantId, user_id: memberId });
+    // A removed creator no longer owns the organization: free the
+    // owner_user_id slot so ensureForUser gives them a new personal one.
+    await this.tenantRepo.update(
+      { id: tenantId, owner_user_id: memberId },
+      { owner_user_id: null },
+    );
     this.tenantCache.invalidate(memberId);
   }
 
