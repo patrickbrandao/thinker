@@ -1,3 +1,4 @@
+import type { OutboundScope } from '../../common/outbound/outbound-proxy';
 import { Injectable, Logger, HttpStatus, Optional } from '@nestjs/common';
 import { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import { ConfigService } from '@nestjs/config';
@@ -936,13 +937,21 @@ export class ProxyService {
     agentId: string,
     tenantId: string,
     provider: string,
-  ): Promise<{ apiKey: string; authType: AuthType } | null> {
+  ): Promise<{ apiKey: string; authType: AuthType; egressScope?: OutboundScope } | null> {
     for (const authType of ['api_key', 'subscription'] as AuthType[]) {
       const credentials = await this.resolveCredentials(agentId, tenantId, {
         provider,
         auth_type: authType,
       });
-      if (credentials.ok) return { apiKey: credentials.apiKey, authType };
+      // The egress scope travels with the key: the passthrough call must leave
+      // through the connection's outbound profile, like the chat routes do.
+      if (credentials.ok) {
+        return {
+          apiKey: credentials.apiKey,
+          authType,
+          ...(credentials.egressScope ? { egressScope: credentials.egressScope } : {}),
+        };
+      }
     }
     return null;
   }
