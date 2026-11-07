@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { toSqlTimestamp } from '../../common/utils/postgres-sql';
+import type { LimitAlertType } from '../../entities/notification-log.entity';
 
 export function formatNotificationTimestamp(): string {
   return toSqlTimestamp();
@@ -11,16 +12,22 @@ export function formatNotificationTimestamp(): string {
 export class NotificationLogService {
   constructor(private readonly ds: DataSource) {}
 
-  async hasAlreadySent(ruleId: string, periodStart: string): Promise<boolean> {
+  /** Soft alerts and block notices dedupe apart: a `both` rule sends each once per period. */
+  async hasAlreadySent(
+    ruleId: string,
+    periodStart: string,
+    alertType: LimitAlertType,
+  ): Promise<boolean> {
     const rows = await this.ds.query(
-      `SELECT 1 FROM notification_logs WHERE rule_id = $1 AND period_start = $2`,
-      [ruleId, periodStart],
+      `SELECT 1 FROM notification_logs WHERE rule_id = $1 AND period_start = $2 AND alert_type = $3`,
+      [ruleId, periodStart, alertType],
     );
     return rows.length > 0;
   }
 
   async insertLog(params: {
     ruleId: string;
+    alertType: LimitAlertType;
     periodStart: string;
     periodEnd: string;
     actualValue: number;
@@ -31,8 +38,8 @@ export class NotificationLogService {
   }): Promise<void> {
     await this.ds.query(
       `INSERT INTO notification_logs
-         (id, rule_id, period_start, period_end, actual_value, threshold_value, metric_type, agent_name, sent_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         (id, rule_id, period_start, period_end, actual_value, threshold_value, metric_type, agent_name, sent_at, alert_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         randomUUID(),
         params.ruleId,
@@ -43,6 +50,7 @@ export class NotificationLogService {
         params.metricType,
         params.agentName,
         params.sentAt,
+        params.alertType,
       ],
     );
   }

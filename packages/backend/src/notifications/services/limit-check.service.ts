@@ -92,11 +92,12 @@ export class LimitCheckService {
     periodStart: string,
     periodEnd: string,
   ): Promise<void> {
-    if (await this.notificationLog.hasAlreadySent(rule.id, periodStart)) return;
+    if (await this.notificationLog.hasAlreadySent(rule.id, periodStart, 'hard')) return;
 
     const now = formatNotificationTimestamp();
     await this.notificationLog.insertLog({
       ruleId: rule.id,
+      alertType: 'hard',
       periodStart,
       periodEnd,
       actualValue: actual,
