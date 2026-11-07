@@ -155,6 +155,8 @@ export interface CancelledRequestOpts {
   traceId?: string;
   /** API surface to retain when cancellation creates or repairs the Request. */
   apiMode?: ProxyApiMode;
+  /** Usage the provider already reported before the stream was cut. */
+  usage?: StreamUsage;
 }
 
 export interface FallbackSuccessOpts extends VirtualModelRef {
@@ -712,7 +714,34 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
 
   /** Finish caller-disconnected work without attributing an error to Thinker or the provider. */
   async recordCancelledRequest(ctx: IngestionContext, opts: CancelledRequestOpts): Promise<void> {
+    // The provider bills what it already processed: keep the partial usage
+    // (and its cost) instead of recording a cancelled request as free.
+    const usage = opts.usage;
+    const model = opts.attemptStart?.model;
+    const costUsd =
+      usage && model
+        ? await this.computeCost(
+            ctx,
+            model,
+            opts.attemptStart?.provider,
+            opts.attemptStart?.authType,
+            usage,
+            opts.attemptStart?.tenantProviderId,
+            undefined,
+            opts.attempt ? new Date(opts.attempt.startedAt) : undefined,
+          ).catch(() => null)
+        : null;
+    const usageFields = usage
+      ? {
+          input_tokens: usage.prompt_tokens,
+          output_tokens: usage.completion_tokens,
+          cache_read_tokens: usage.cache_read_tokens ?? 0,
+          cache_creation_tokens: usage.cache_creation_tokens ?? 0,
+          cost_usd: costUsd,
+        }
+      : {};
     const row = buildMessageRow(ctx, {
+      ...usageFields,
       request_id: opts.requestId,
       ...attemptIdentity(opts.attempt, opts.attempt?.attemptNumber),
       timestamp: new Date().toISOString(),

@@ -33,6 +33,27 @@ export interface StreamUsage {
   reported_cost_usd?: number;
 }
 
+const PARTIAL_USAGE = Symbol('thinker.partialUsage');
+
+/**
+ * Usage the provider had already reported when a stream broke off (client
+ * disconnect, idle timeout, upstream failure). Anthropic sends input usage in
+ * `message_start`, so a cancelled request still has a real cost to record.
+ */
+export function attachPartialUsage(error: unknown, usage: StreamUsage | null | undefined): void {
+  if (!usage || error === null || typeof error !== 'object') return;
+  try {
+    Object.defineProperty(error, PARTIAL_USAGE, { value: usage, configurable: true });
+  } catch {
+    // A frozen error simply carries no usage.
+  }
+}
+
+export function partialUsageOf(error: unknown): StreamUsage | undefined {
+  if (error === null || typeof error !== 'object') return undefined;
+  return (error as { [PARTIAL_USAGE]?: StreamUsage })[PARTIAL_USAGE];
+}
+
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 180_000;
 
 /** Bounds of a per-connection idle timeout override. */
@@ -368,6 +389,7 @@ export async function pipePassthrough(
     protocol.observer?.assertComplete();
   } catch (error) {
     if (isAbortAfterProviderOutcome(error, protocol.observer)) return capturedUsage;
+    attachPartialUsage(error, capturedUsage);
     streamFailed = error instanceof StreamFailure;
     if (error instanceof StreamIdleTimeoutError) await reader.cancel(error).catch(() => undefined);
     throw error;
@@ -482,6 +504,7 @@ export async function pipeStream(
     }
   } catch (error) {
     if (isAbortAfterProviderOutcome(error, protocol.observer)) return capturedUsage;
+    attachPartialUsage(error, capturedUsage);
     streamFailed = error instanceof StreamFailure;
     if (error instanceof StreamIdleTimeoutError) await reader.cancel(error).catch(() => undefined);
     throw error;

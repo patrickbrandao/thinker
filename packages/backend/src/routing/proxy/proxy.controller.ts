@@ -80,7 +80,7 @@ import { redactInlineImageDataUrls } from './inline-image-redaction';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
 import { openAiModelCapabilities, type OpenAiModelCapabilities } from './openai-model-capabilities';
 import { publishedContextWindow } from '../virtual-models/published-context';
-import { StreamFailure } from './stream-writer';
+import { StreamFailure, partialUsageOf } from './stream-writer';
 import { AgentRecordingConfigService } from '../../common/services/agent-recording-config.service';
 import { AttemptRecordingService } from './attempt-recording.service';
 import { safeJsonStringify } from '../../common/utils/safe-json';
@@ -972,6 +972,7 @@ export class ProxyController {
           requestDurationMs: startTime == null ? undefined : Date.now() - startTime,
           traceId,
           apiMode,
+          usage: partialUsageOf(err),
         })
         .catch((e) => this.logger.warn(`Failed to record cancelled Request: ${e}`));
       if (!res.writableEnded) res.end();
