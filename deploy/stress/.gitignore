@@ -1,0 +1,7 @@
+# segredos e artefatos gerados no servidor
+.env
+harnesses.keys
+run/
+reports/
+docker-compose.replicas.yml
+docker-compose.override.yml

@@ -8,6 +8,8 @@ Pré-requisitos:
 - DNS de `wwz-todos-panel.seudominio.com.br` apontando para o servidor;
 - Um servidor que você **aceita derrubar**. O loop da seção 8 não tem freio.
 
+Os arquivos deste tutorial (e o `stress.sh` de disparo da seção 8.4) estão em [`deploy/stress/opt/`](../../deploy/stress/README.md), no mesmo caminho do servidor.
+
 **CRÍTICO**: não rode este teste num servidor que tem outros serviços de produção. Ele foi feito para esgotar recursos; o kernel vai começar a matar processo por falta de memória e o disco vai encher de gravações. Você foi avisado.
 
 ## 1 – O que muda em relação ao #1
@@ -761,6 +763,21 @@ sysctl fs.file-max net.core.somaxconn net.ipv4.ip_local_port_range;
 ```
 
 Com dezenas de milhares de conexões, o `ip_local_port_range` padrão (28 mil portas por destino) acaba antes da CPU. Ajuste por sua conta e risco: é configuração do sistema.
+
+#### 8.4 – Atalho: um comando para disparar
+
+O [`deploy/stress/opt/thinker-stress-02/stress.sh`](../../deploy/stress/opt/thinker-stress-02/stress.sh) junta os passos acima. Copie-o com o `sem-freios.override.yml` para `/opt/thinker-stress-02/`:
+
+```Bash
+cd /opt/thinker-stress-02;
+./stress.sh iniciar;                # com freios: 3 replicas, 10 degraus, limites do compose
+./stress.sh iniciar --sem-freios;   # secao 8.3: pede confirmacao (digite SIM)
+./stress.sh status;
+./stress.sh parar;                  # para o loop, volta a 1 replica, tira o override
+    # Thinker de volta a 1 replica, com os limites do compose
+```
+
+O override "sem freios" fica guardado fora de `/opt/thinker`: só vira `docker-compose.override.yml` (que o compose lê sozinho) no `--sem-freios`, e o `parar` o remove. Cada rodada começa um `reports/loop.log` novo e guarda o anterior com a data.
 
 ## 9 – Lendo os resultados
 

@@ -1,0 +1,101 @@
+# /opt/wwz-openai/docker-compose.yml
+# White Wizard somente OpenAI: API (wwz-openai), Valkey e painel admin.
+name: wwz-openai
+
+services:
+  wwz-openai:
+    image: white-wizard:local
+    container_name: wwz-openai
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/run, /tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cpus: ${WWZ_CPUS:-4}
+    mem_limit: ${WWZ_MEM:-8g}
+    ulimits:
+      nofile: {soft: 1048576, hard: 1048576}
+    environment:
+      WWZ_CONFIG: /etc/wwz/wwz.yaml
+      WWZ_ADMIN_TOKEN: ${WWZ_ADMIN_TOKEN}
+      WWZ_VALKEY_ADDR: wwz-openai-valkey:6379
+      WWZ_LOG_LEVEL: warn
+      GOGC: "200"
+    volumes: ["./run/wwz.yaml:/etc/wwz/wwz.yaml:ro"]
+    depends_on:
+      wwz-openai-valkey: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:9000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [interna, network_public]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: network_public
+      traefik.http.routers.wwz-openai.entrypoints: web,websecure
+      traefik.http.routers.wwz-openai.rule: Host(`wwz-openai.${DOMINIO}`)
+      traefik.http.routers.wwz-openai.tls: "true"
+      traefik.http.routers.wwz-openai.tls.certresolver: letsencrypt
+      traefik.http.routers.wwz-openai.service: wwz-openai
+      traefik.http.services.wwz-openai.loadbalancer.server.port: "8000"
+
+  wwz-openai-valkey:
+    image: valkey/valkey:8.1-alpine
+    container_name: wwz-openai-valkey
+    restart: unless-stopped
+    user: "999:999"
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "2gb"]
+    tmpfs: [/run, /data]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    networks: [interna]
+
+  wwz-openai-panel:
+    image: white-wizard-panel:local
+    container_name: wwz-openai-panel
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      WWZ_PANEL_LISTEN: ":8100"
+      WWZ_PANEL_DB: /data/panel.db
+      WWZ_PANEL_PUBLIC_URL: https://wwz-openai-panel.${DOMINIO}
+      WWZ_PANEL_VALKEY_ADDR: wwz-openai-valkey:6379
+      WWZ_PANEL_WWZ_ADMIN_URL: http://wwz-openai:9000
+      WWZ_ADMIN_TOKEN: ${WWZ_ADMIN_TOKEN}
+      WWZ_PANEL_ADMIN_USER: admin
+      WWZ_PANEL_ADMIN_PASSWORD: ${WWZ_PANEL_ADMIN_PASSWORD}
+    volumes: [panel-data:/data]
+    depends_on:
+      wwz-openai: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:8100/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [interna, network_public]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: network_public
+      traefik.http.routers.wwz-openai-panel.entrypoints: web,websecure
+      traefik.http.routers.wwz-openai-panel.rule: Host(`wwz-openai-panel.${DOMINIO}`)
+      traefik.http.routers.wwz-openai-panel.tls: "true"
+      traefik.http.routers.wwz-openai-panel.tls.certresolver: letsencrypt
+      traefik.http.routers.wwz-openai-panel.service: wwz-openai-panel
+      traefik.http.services.wwz-openai-panel.loadbalancer.server.port: "8100"
+
+volumes:
+  panel-data: {name: wwz-openai-panel-data}
+
+networks:
+  interna:
+    name: wwz-openai-interna
+  network_public:
+    external: true
+    name: network_public

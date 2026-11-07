@@ -1,0 +1,54 @@
+# /opt/wwz-openai/wwz.yaml
+# White Wizard somente OpenAI, para estressar o Thinker.
+server:
+  listen: ":8000"
+  auth: keys
+  reuseport: true
+  concurrency: 1000000
+  trusted_proxies: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+
+admin:
+  listen: ":9000"
+
+# eventos no Valkey para o painel (wwz-panel)
+store:
+  event_stream: true
+  event_sample: 1
+
+drivers:
+  - {name: openai}
+
+# contas: da 01 (ilimitada e perfeita) a 03 (apertada e com falhas)
+accounts:
+  - {id: conta-01}
+  - {id: conta-02, limits: {rpm: 60000, tpm: 10000000, concurrency: 5000}}
+  - {id: conta-03, limits: {rpm: 600, tpm: 100000, concurrency: 50}}
+
+keys:
+  - {key: ${WWZ_KEY_1}, label: conta-01, account: conta-01, errors: sem-erro, latency: rapida}
+  - {key: ${WWZ_KEY_2}, label: conta-02, account: conta-02, errors: erro-05, latency: realista}
+  - {key: ${WWZ_KEY_3}, label: conta-03, account: conta-03, errors: erro-20, latency: realista}
+
+profiles:
+  latency:
+    rapida: {ttft: 0ms, itl: 0ms}
+    realista: {queue: {dist: lognormal, median: 20ms, p99: 300ms}, ttft: {dist: normal, mean: 450ms, stddev: 120ms}, itl: {dist: normal, mean: 18ms, stddev: 4ms}}
+  errors:
+    sem-erro: {rate: 0}
+    erro-05: {rate: 5, types: [rate_limit, server_error, overloaded], mid_stream_rate: 1}
+    erro-20: {rate: 20, types: [rate_limit, server_error, overloaded, bad_gateway, gateway_timeout, connection_reset], mid_stream_rate: 6, mid_stream_types: [stream_truncated, stream_error_event]}
+
+models:
+  - id: wwz-fast
+    owned_by: white-wizard
+    protocols: [openai]
+    context_window: 128000
+    capabilities: {tools: true, reasoning: true, json_schema: true}
+    generation: default
+  - id: gpt-5-sim
+    owned_by: white-wizard
+    protocols: [openai]
+    context_window: 400000
+    capabilities: {tools: true, reasoning: true, json_schema: true}
+    latency: realista
+    generation: default

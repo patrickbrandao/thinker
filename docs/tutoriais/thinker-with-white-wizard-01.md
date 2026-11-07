@@ -11,6 +11,8 @@ Pré-requisitos:
 - Acesso ao repositório do **White Wizard** (`github.com/patrickbrandao/white-wizard`);
 - `jq`, `envsubst` (pacote `gettext-base`) e `openssl` no servidor.
 
+Todos os arquivos deste tutorial também estão prontos em [`deploy/stress/opt/`](../../deploy/stress/README.md), no mesmo caminho do servidor, com `.env.example` no lugar dos segredos.
+
 Todos os comandos rodam como **root** no servidor. Onde aparecer `seudominio.com.br`, troque pelo seu domínio.
 
 ## 1 – Como funciona

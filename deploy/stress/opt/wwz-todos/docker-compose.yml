@@ -1,0 +1,119 @@
+# /opt/wwz-todos/docker-compose.yml
+# White Wizard com os seis drivers em quatro instancias de comportamento
+# diferente (perfeito, falhas, lento, instavel), Valkey e painel admin.
+name: wwz-todos
+
+x-wwz: &wwz
+  image: white-wizard:local
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/run, /tmp]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  cpus: ${WWZ_CPUS:-4}
+  mem_limit: ${WWZ_MEM:-8g}
+  ulimits:
+    nofile: {soft: 1048576, hard: 1048576}
+  healthcheck:
+    test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:9000/health/ready"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+  networks: [interna, network_public]
+
+services:
+  wwz-perfeito:
+    <<: *wwz
+    container_name: wwz-perfeito
+    environment:
+      WWZ_CONFIG: /etc/wwz/wwz.yaml
+      WWZ_ADMIN_TOKEN: ${WWZ_ADMIN_TOKEN}
+      WWZ_VALKEY_ADDR: wwz-todos-valkey:6379
+      WWZ_LOG_LEVEL: warn
+      GOGC: "200"
+    volumes: ["./run/perfeito.yaml:/etc/wwz/wwz.yaml:ro"]
+    depends_on:
+      wwz-todos-valkey: {condition: service_healthy}
+
+  wwz-falhas:
+    <<: *wwz
+    container_name: wwz-falhas
+    environment: &memoria
+      WWZ_CONFIG: /etc/wwz/wwz.yaml
+      WWZ_ADMIN_TOKEN: ${WWZ_ADMIN_TOKEN}
+      WWZ_STORE: memory
+      WWZ_LOG_LEVEL: warn
+      GOGC: "200"
+    volumes: ["./run/falhas.yaml:/etc/wwz/wwz.yaml:ro"]
+
+  wwz-lento:
+    <<: *wwz
+    container_name: wwz-lento
+    environment: *memoria
+    volumes: ["./run/lento.yaml:/etc/wwz/wwz.yaml:ro"]
+
+  wwz-instavel:
+    <<: *wwz
+    container_name: wwz-instavel
+    environment: *memoria
+    volumes: ["./run/instavel.yaml:/etc/wwz/wwz.yaml:ro"]
+
+  wwz-todos-valkey:
+    image: valkey/valkey:8.1-alpine
+    container_name: wwz-todos-valkey
+    restart: unless-stopped
+    user: "999:999"
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "2gb"]
+    tmpfs: [/run, /data]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    networks: [interna]
+
+  wwz-todos-panel:
+    image: white-wizard-panel:local
+    container_name: wwz-todos-panel
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      WWZ_PANEL_LISTEN: ":8100"
+      WWZ_PANEL_DB: /data/panel.db
+      WWZ_PANEL_PUBLIC_URL: https://wwz-todos-panel.${DOMINIO}
+      WWZ_PANEL_VALKEY_ADDR: wwz-todos-valkey:6379
+      WWZ_PANEL_WWZ_ADMIN_URL: http://wwz-perfeito:9000
+      WWZ_ADMIN_TOKEN: ${WWZ_ADMIN_TOKEN}
+      WWZ_PANEL_ADMIN_USER: admin
+      WWZ_PANEL_ADMIN_PASSWORD: ${WWZ_PANEL_ADMIN_PASSWORD}
+    volumes: [panel-data:/data]
+    depends_on:
+      wwz-perfeito: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck", "http://127.0.0.1:8100/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [interna, network_public]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: network_public
+      traefik.http.routers.wwz-todos-panel.entrypoints: web,websecure
+      traefik.http.routers.wwz-todos-panel.rule: Host(`wwz-todos-panel.${DOMINIO}`)
+      traefik.http.routers.wwz-todos-panel.tls: "true"
+      traefik.http.routers.wwz-todos-panel.tls.certresolver: letsencrypt
+      traefik.http.routers.wwz-todos-panel.service: wwz-todos-panel
+      traefik.http.services.wwz-todos-panel.loadbalancer.server.port: "8100"
+
+volumes:
+  panel-data: {name: wwz-todos-panel-data}
+
+networks:
+  interna:
+    name: wwz-todos-interna
+  network_public:
+    external: true
+    name: network_public
