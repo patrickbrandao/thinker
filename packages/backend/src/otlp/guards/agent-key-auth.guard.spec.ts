@@ -168,6 +168,14 @@ describe('AgentKeyAuthGuard', () => {
     expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
   });
 
+  it('only accepts keys of active organizations (a deleted organization stops serving)', async () => {
+    mockGetMany.mockResolvedValue([]);
+    const { ctx } = makeContext({ authorization: 'Bearer thk_deleted-org-key' });
+    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    const qb = mockCreateQueryBuilder.mock.results[0].value as { andWhere: jest.Mock };
+    expect(qb.andWhere).toHaveBeenCalledWith('t.is_active = true');
+  });
+
   it('throws UnauthorizedException when API key is not found in DB', async () => {
     mockGetMany.mockResolvedValue([]);
     const { ctx } = makeContext({ authorization: 'Bearer thk_unknown-key' });
@@ -275,7 +283,11 @@ describe('AgentKeyAuthGuard', () => {
     await guard.canActivate(ctx2);
 
     expect(mockCreateQueryBuilder).not.toHaveBeenCalled();
-    expect(mockExistsBy).toHaveBeenCalledWith({ id: 'key-4', is_active: true });
+    expect(mockExistsBy).toHaveBeenCalledWith({
+      id: 'key-4',
+      is_active: true,
+      tenant: { is_active: true },
+    });
   });
 
   it('rejects a cached key deactivated by another replica', async () => {
@@ -1244,7 +1256,11 @@ describe('AgentKeyAuthGuard', () => {
       const { ctx: viaHeader, req } = makeContext({ 'x-api-key': VALID });
       await expect(guard.canActivate(viaHeader)).resolves.toBe(true);
       expect(mockGetMany).not.toHaveBeenCalled();
-      expect(mockExistsBy).toHaveBeenCalledWith({ id: 'key-xak', is_active: true });
+      expect(mockExistsBy).toHaveBeenCalledWith({
+        id: 'key-xak',
+        is_active: true,
+        tenant: { is_active: true },
+      });
       expect(req.ingestionContext).toEqual(EXPECTED_CONTEXT);
     });
 

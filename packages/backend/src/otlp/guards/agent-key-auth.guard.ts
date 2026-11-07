@@ -278,9 +278,11 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     } else if (cached && cached.expiresAt > now) {
       let stillActive: boolean;
       try {
+        // A deactivated (deleted) organization stops serving its harnesses.
         stillActive = await this.keyRepo.existsBy({
           id: cached.keyId,
           is_active: true,
+          tenant: { is_active: true },
         });
       } catch (err) {
         this.logger.warn(`Agent-key activity recheck failed: ${(err as Error).message}`);
@@ -324,6 +326,7 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       .where('k.key_prefix = :prefix', { prefix })
       .andWhere('k.is_active = true')
       .andWhere('a.deleted_at IS NULL')
+      .andWhere('t.is_active = true')
       .getMany();
 
     const keyRecord = candidates.find((c) => verifyKey(token, c.key_hash));
