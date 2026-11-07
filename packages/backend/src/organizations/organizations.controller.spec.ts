@@ -30,6 +30,7 @@ function orgService() {
     removeMember: jest.fn().mockResolvedValue(undefined),
     roleOf: jest.fn().mockResolvedValue('member'),
     addExistingMember: jest.fn().mockResolvedValue(undefined),
+    assertCanAddMember: jest.fn().mockResolvedValue('member'),
     allMemberships: jest.fn().mockResolvedValue([]),
   };
 }
@@ -286,14 +287,12 @@ describe('AdminUsersController', () => {
     });
   });
 
-  // BUG: create() makes the Better Auth account (and its one-time temporary
-  // password) before the organization/role is validated. A bad role or an
-  // organization the caller cannot administer then fails with the account
-  // already created and the temporary password lost, so a retry hits 409.
-  it.skip('does not create the account when the requested membership would be refused', async () => {
+  // The membership is validated before the account (and its one-time
+  // temporary password) exists, so a refusal never leaves an orphan account.
+  it('does not create the account when the requested membership would be refused', async () => {
     const accounts = accountsService();
     const orgs = orgService();
-    orgs.addExistingMember.mockRejectedValue(new Error('refused'));
+    orgs.assertCanAddMember.mockRejectedValue(new Error('refused'));
     const controller = new AdminUsersController(accounts as never, orgs as never);
     await expect(
       controller.create(ctx(), { email: 'a@b.test', name: 'A', organizationId: 'o', role: 'god' }),

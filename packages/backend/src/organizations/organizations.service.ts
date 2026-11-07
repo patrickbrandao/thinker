@@ -217,10 +217,23 @@ export class OrganizationsService {
     memberId: string,
     roleInput: unknown,
   ): Promise<void> {
+    const role = await this.assertCanAddMember(userId, tenantId, roleInput);
+    await this.tenantCache.addMember(tenantId, memberId, role);
+  }
+
+  /**
+   * The checks of addExistingMember without the write, so a caller that
+   * creates the account first (admin user creation) can fail before it.
+   */
+  async assertCanAddMember(
+    userId: string,
+    tenantId: string,
+    roleInput: unknown,
+  ): Promise<OrganizationRole> {
     const callerRole = await this.require(userId, tenantId, 'admin');
     const role = assertRole(roleInput);
     this.assertCanGrant(callerRole, role);
-    await this.tenantCache.addMember(tenantId, memberId, role);
+    return role;
   }
 
   /** Every active membership, for the instance admin's user list. */
