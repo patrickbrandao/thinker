@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, waitFor, screen } from '@testing-library/react';
+import { render, fireEvent, waitFor, screen, act } from '@testing-library/react';
 import { MemoryRouter, useLocation as useRouterLocation } from 'react-router';
 import type { ReactNode } from 'react';
 
@@ -440,21 +440,13 @@ vi.mock('../../src/pages/RoutingSpecificitySection.js', () => ({
   ),
 }));
 
-// The unified clean-agent view renders RoutingTierCard directly
-// (the legacy tabbed path delegates to the section components instead, so these
-// are only exercised here). Mock them to surface their callbacks as buttons.
-vi.mock('../../src/pages/RoutingTierCard.js', () => ({
+// The unified clean-agent view renders the `auto` chain card directly (the
+// legacy tabbed path delegates to the section components instead).
+let autoCardProps: Record<string, any> | null = null;
+vi.mock('../../src/pages/AutoChainCard.js', () => ({
   default: (props: Record<string, unknown>) => {
-    return (
-      <div data-testid="tier-card">
-        <button
-          data-testid="tier-card-dropdown"
-          onClick={() => (props.onDropdownOpen as (id: string) => void)('default')}
-        >
-          open
-        </button>
-      </div>
-    );
+    autoCardProps = props;
+    return <div data-testid="auto-card" />;
   },
 }));
 
@@ -1779,23 +1771,28 @@ describe('Routing page', () => {
     it('renders the auto card in the virtual models grid, without tabs or footer', async () => {
       const { container } = renderRouting();
       await waitFor(() => {
-        expect(screen.getByTestId('tier-card')).toBeDefined();
+        expect(screen.getByTestId('auto-card')).toBeDefined();
       });
       expect(screen.queryByTestId('routing-tabs')).toBeNull();
       expect(
-        container.querySelector('.virtual-model-list [data-testid="tier-card"]'),
+        container.querySelector('.virtual-model-list [data-testid="auto-card"]'),
       ).not.toBeNull();
       expect(screen.queryByText('Reset all to auto')).toBeNull();
       expect(screen.queryByText('How routing works')).toBeNull();
       expect(screen.queryByText('Setup instructions')).toBeNull();
     });
 
-    it('opens the dropdown picker from the auto card', async () => {
+    it('hands the auto card a tier reload', async () => {
       renderRouting();
-      fireEvent.click(await screen.findByTestId('tier-card-dropdown'));
       await waitFor(() => {
-        expect(lastModalsProps?.dropdownTier).toBe('default');
+        expect(autoCardProps).not.toBeNull();
       });
+      expect(autoCardProps!.agentName).toBeTruthy();
+      const calls = mockGetTierAssignments.mock.calls.length;
+      await act(async () => {
+        await autoCardProps!.reloadTiers();
+      });
+      expect(mockGetTierAssignments.mock.calls.length).toBeGreaterThan(calls);
     });
   });
 });

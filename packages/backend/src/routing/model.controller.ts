@@ -161,6 +161,7 @@ export class ModelController {
           model_name: m.id,
           provider: m.provider,
           auth_type: authType,
+          ...(m.keyLabels ? { key_labels: m.keyLabels } : {}),
           input_price_per_token: m.inputPricePerToken,
           output_price_per_token: m.outputPricePerToken,
           context_window: m.contextWindow,
