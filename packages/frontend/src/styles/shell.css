@@ -604,6 +604,10 @@
     width: min(840px, calc(100vw - 32px));
     height: min(760px, calc(100vh - 32px));
   }
+  .floating-window--xwide {
+    width: min(1180px, calc(100vw - 32px));
+    height: min(800px, calc(100vh - 32px));
+  }
   /* Height follows the content, up to the viewport. */
   .floating-window--fit {
     height: auto;

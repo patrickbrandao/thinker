@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { Pencil, Settings } from 'lucide-react';
+import { ArrowDown, Settings } from 'lucide-react';
 import type {
   AuthType,
   AvailableModel,
@@ -11,56 +11,20 @@ import type {
 } from '../services/api.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { authBadgeFor } from './AuthBadge.js';
-import {
-  resolveProviderId,
-  inferProviderFromModel,
-  pricePerM,
-  usedKeyLabelsForModelInTier,
-  activeRouteKeys,
-  routeKeySelectionForModel,
-} from '../services/routing-utils.js';
+import { pricePerM } from '../services/routing-utils.js';
 import { customProviderColor, formatPerRequestCost } from '../services/formatters.js';
-import { PROVIDERS } from '../services/providers.js';
-import FallbackList from './FallbackList.js';
-import ModelParamsAffordance from './ModelParamsAffordance.jsx';
-import ModelPickerModal from './ModelPickerModal.js';
+import ModelChainManager from './ModelChainManager.js';
 import NotInCatalogBadge from './NotInCatalogBadge.js';
+import { AuthIcon, routeAccountLabel } from './RouteAccount.js';
 import { routeNotInCatalog } from '../lib/route-catalog.js';
-import RouteKeyChip from './RouteKeyChip.js';
-import KeyPickerModal from './KeyPickerModal.js';
-import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { Button, cx, useClickOutside } from './ui.js';
 
-function providerIdForModel(model: string, apiModels: AvailableModel[]): string | undefined {
-  const m =
-    apiModels.find((x) => x.model_name === model) ??
-    apiModels.find((x) => x.model_name.startsWith(model + '-'));
-  if (m) {
-    const dbId = resolveProviderId(m.provider);
-    if (dbId && dbId !== 'openrouter' && PROVIDERS.find((p) => p.id === dbId)) return dbId;
-    const prefixId = inferProviderFromModel(m.model_name);
-    if (prefixId && PROVIDERS.find((p) => p.id === prefixId)) return prefixId;
-    return dbId ?? prefixId;
-  }
-  const prefix = inferProviderFromModel(model);
-  if (prefix && PROVIDERS.find((p) => p.id === prefix)) return prefix;
-  return undefined;
-}
-
-function providerDisplayName(providerId: string, customProviders: CustomProviderData[]): string {
-  if (providerId.startsWith('custom:')) {
-    const id = providerId.slice('custom:'.length);
-    const cp = customProviders.find((p) => p.id === id);
-    if (cp) return cp.name;
-  }
-  return PROVIDERS.find((p) => p.id === providerId)?.name ?? providerId;
-}
-
 /**
  * A named chain of concrete routes: a primary (`override_route`) and up to 5
- * fallbacks. Header tiers and virtual models (ADR 0004) share this shape and
- * this card; each wrapper adds its own header details and menu.
+ * fallbacks. Header tiers, virtual models (ADR 0004) and the `auto` model
+ * share this shape and this card; each wrapper adds its own header details
+ * and menu.
  */
 export interface RouteChain {
   id: string;
@@ -80,6 +44,7 @@ export interface RouteChainCardProps {
   models: AvailableModel[];
   customProviders: CustomProviderData[];
   connectedProviders: RoutingProvider[];
+  /** Saves the primary route. Throws when the save fails. */
   onOverride: (
     model: string,
     provider: string,
@@ -89,24 +54,21 @@ export interface RouteChainCardProps {
   onFallbacksUpdate: (fallbacks: string[], routes?: ModelRoute[] | null) => void;
   persistFallbacks: (models: string[], routes?: ModelRoute[]) => Promise<unknown>;
   persistClearFallbacks: () => Promise<unknown>;
+  /** Clears the primary and its fallbacks; enables emptying the chain in the manager. */
+  persistClearChain?: () => Promise<unknown>;
   /** Model params scope for every route of the chain (`header:<id>`, `virtual:<id>`). */
   paramsScope: string;
-  /** Items of the options menu. `close` hides the menu. */
-  renderMenu: (close: () => void) => ReactNode;
+  /** Items of the options menu. `close` hides the menu. No menu when absent. */
+  renderMenu?: (close: () => void) => ReactNode;
   /** Rendered next to the name, inside the title. */
   titleExtra?: ReactNode;
   /** Rendered before the name, e.g. a drag handle. */
   titleLeading?: ReactNode;
   /** Replaces the plain name in the title. */
   titleContent?: ReactNode;
-  /** Rendered under the header, before the primary chip. */
+  /** Rendered under the header, before the routes. */
   details?: ReactNode;
-  /**
-   * Per-route params getter, threaded from the routing page boundary. When
-   * present, the primary chip and every fallback row render a
-   * `<ModelParamsAffordance>` for their own `(provider, authType, model)`
-   * tuple.
-   */
+  /** Per-route params, threaded from the routing page boundary to the manager window. */
   getModelParams?: (
     scope: string,
     provider: string,
@@ -122,189 +84,149 @@ export interface RouteChainCardProps {
   ) => Promise<unknown>;
 }
 
-type PickerMode = 'primary' | 'fallback' | null;
-interface PendingKeyPick {
-  mode: Exclude<PickerMode, null>;
-  model: string;
-  provider: string;
-  authType?: AuthType;
-  keys: RoutingProvider[];
-}
-
+/**
+ * The chain as a read-only flow, top to bottom. Everything is edited in the
+ * "Manage model" window (`ModelChainManager`): the routes and each model's
+ * request params.
+ */
 export default function RouteChainCard(props: RouteChainCardProps) {
-  const [pickerMode, setPickerMode] = useState<PickerMode>(null);
-  const [pendingKeyPick, setPendingKeyPick] = useState<PendingKeyPick | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   useClickOutside(menuRef, menuOpen, closeMenu);
 
-  const currentModel: string | null = props.chain.override_route?.model ?? null;
-  const fallbacks: string[] = props.chain.fallback_routes?.map((r) => r.model) ?? [];
-
-  const providerId: string | undefined = !currentModel
-    ? undefined
-    : props.chain.override_route?.provider
-      ? props.chain.override_route.provider.toLowerCase()
-      : providerIdForModel(currentModel, props.models);
-
-  const modelInfo: AvailableModel | undefined = currentModel
-    ? (props.models.find((x) => x.model_name === currentModel) ??
-      props.models.find((x) => x.model_name.startsWith(currentModel + '-')))
-    : undefined;
-
-  const modelLabel = modelInfo?.display_name ?? currentModel ?? '';
+  const routes: ModelRoute[] = [
+    ...(props.chain.override_route ? [props.chain.override_route] : []),
+    ...(props.chain.fallback_routes ?? []),
+  ];
   const isStreamMode = props.chain.response_mode === 'stream';
-  const primarySkipped = isStreamMode && !(modelInfo?.capabilities?.includes('stream') ?? false);
 
-  const priceLabel = modelInfo
-    ? t('routing.pricePerM', {
-        input: pricePerM(modelInfo.input_price_per_token),
-        output: pricePerM(modelInfo.output_price_per_token),
-      })
-    : '';
-
-  const effectiveAuth: AuthType | null = (() => {
-    if (props.chain.override_route?.authType) return props.chain.override_route.authType;
-    const id = providerId;
-    if (!id) return null;
-    const provs = props.connectedProviders.filter(
-      (p) => p.provider.toLowerCase() === id.toLowerCase(),
+  /** Saves a whole chain built in the manager: primary first, then fallbacks. */
+  const saveChain = async (next: ModelRoute[]): Promise<void> => {
+    const [primary, ...rest] = next;
+    if (!primary) {
+      if (!props.persistClearChain) throw new Error('chain cannot be cleared');
+      await props.persistClearChain();
+      props.onFallbacksUpdate([], undefined);
+      return;
+    }
+    await props.onOverride(
+      primary.model,
+      primary.provider,
+      primary.authType,
+      primary.keyLabel ?? undefined,
     );
-    // Precedence subscription > api_key > local. Keep the "you already pay a
-    // sub" signal on top so a user with both a subscription and a local
-    // Ollama connection sees the subscription badge first; local is the
-    // weakest signal and only wins when it's the sole connection.
-    if (provs.some((p) => p.auth_type === 'subscription')) return 'subscription';
-    if (provs.some((p) => p.auth_type === 'api_key')) return 'api_key';
-    if (provs.some((p) => p.auth_type === 'local')) return 'local';
-    return null;
-  })();
-
-  const customProviderForId = (id: string | undefined): CustomProviderData | undefined => {
-    if (!id?.startsWith('custom:')) return undefined;
-    return props.customProviders.find((p) => `custom:${p.id}` === id);
-  };
-
-  const primaryKeys: RoutingProvider[] =
-    !providerId || !effectiveAuth || effectiveAuth === 'local'
-      ? []
-      : activeRouteKeys(props.connectedProviders, providerId, effectiveAuth);
-
-  const handlePrimaryKeyPick = async (label: string | null): Promise<void> => {
-    const route = props.chain.override_route;
-    const provider = providerId ?? route?.provider;
-    const auth = effectiveAuth ?? route?.authType;
-    if (!route || !provider || !auth) return;
-    await props.onOverride(route.model, provider, auth, label ?? undefined);
-  };
-
-  const addFallbackRoute = async (
-    model: string,
-    provider: string,
-    authType: AuthType | undefined,
-    keyLabel?: string,
-  ): Promise<void> => {
-    const next = [...fallbacks, model];
-    const currentRoutes = props.chain.fallback_routes ?? [];
-    const auth = authType ?? 'api_key';
-    const nextRoute: ModelRoute = keyLabel
-      ? { provider, authType: auth, model, keyLabel }
-      : { provider, authType: auth, model };
-    const nextRoutes = [...currentRoutes, nextRoute];
-    try {
-      await props.persistFallbacks(next, nextRoutes);
-      props.onFallbacksUpdate(next, nextRoutes);
-      toast.success(t('routing.fallbackAdded'));
-    } catch {
-      toast.error(t('routing.fallbackAddFailed'));
+    if (rest.length > 0) {
+      const models = rest.map((r) => r.model);
+      await props.persistFallbacks(models, rest);
+      props.onFallbacksUpdate(models, rest);
+    } else {
+      await props.persistClearFallbacks();
+      props.onFallbacksUpdate([], []);
     }
   };
 
-  const completePickerSelection = async (
-    mode: Exclude<PickerMode, null>,
-    model: string,
-    provider: string,
-    authType?: AuthType,
-    keyLabel?: string,
-  ): Promise<void> => {
-    if (mode === 'primary') {
-      if (keyLabel === undefined) await props.onOverride(model, provider, authType);
-      else await props.onOverride(model, provider, authType, keyLabel);
-      return;
-    }
-    await addFallbackRoute(model, provider, authType, keyLabel);
-  };
+  const modelInfo = (r: ModelRoute): AvailableModel | undefined =>
+    props.models.find(
+      (m) => m.model_name === r.model && m.provider.toLowerCase() === r.provider.toLowerCase(),
+    ) ??
+    props.models.find((m) => m.model_name === r.model) ??
+    props.models.find((m) => m.model_name.startsWith(r.model + '-'));
 
-  const handlePickerSelect = async (
-    _tierId: string,
-    model: string,
-    provider: string,
-    authType?: AuthType,
-  ): Promise<void> => {
-    const mode = pickerMode;
-    setPickerMode(null);
-    if (!mode) return;
-    const selection = routeKeySelectionForModel({
-      providers: props.connectedProviders,
-      tier: props.chain,
-      modelName: model,
-      providerId: provider,
-      authType: authType ?? 'api_key',
-      slot: mode,
-    });
-    if (selection.exhausted) return;
-    if (selection.autoLabel) {
-      await completePickerSelection(mode, model, provider, authType, selection.autoLabel);
-      return;
-    }
-    if (!selection.needsChoice) {
-      await completePickerSelection(mode, model, provider, authType);
-      return;
-    }
-    setPendingKeyPick({ mode, model, provider, authType, keys: selection.keys });
-  };
-
-  const handlePendingKeyPick = (label: string | null): void => {
-    const pending = pendingKeyPick;
-    if (!pending) return;
-    setPendingKeyPick(null);
-    void completePickerSelection(
-      pending.mode,
-      pending.model,
-      pending.provider,
-      pending.authType,
-      label ?? undefined,
-    );
-  };
-
-  const renderOverrideIcon = () => {
-    if (providerId?.startsWith('custom:')) {
-      const cp = customProviderForId(providerId);
-      const logo = cp ? customProviderLogo(cp.name, 14) : null;
+  const renderIcon = (r: ModelRoute) => {
+    const provId = r.provider.toLowerCase();
+    if (provId.startsWith('custom:')) {
+      const cp = props.customProviders.find((p) => `custom:${p.id}` === provId);
+      const logo = cp ? customProviderLogo(cp.name, 24) : null;
       return (
-        <span
-          className="routing-card__override-icon inline-flex size-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-on-accent"
-          style={{ backgroundColor: customProviderColor(providerId.slice('custom:'.length)) }}
-        >
-          {logo ?? (cp?.name ?? 'C').charAt(0).toUpperCase()}
-        </span>
+        logo ?? (
+          <span
+            className="routing-card__override-icon inline-flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-on-accent"
+            style={{ backgroundColor: customProviderColor(provId.slice('custom:'.length)) }}
+          >
+            {(cp?.name ?? 'C').charAt(0).toUpperCase()}
+          </span>
+        )
       );
     }
-    if (!providerId) return null;
     return (
       <span className="routing-card__override-icon relative inline-flex shrink-0">
-        {providerIcon(providerId, 14)}
-        {authBadgeFor(effectiveAuth, 8)}
+        {providerIcon(provId, 24)}
+        {authBadgeFor(r.authType, 10)}
       </span>
     );
   };
 
-  const skippedBadge = primarySkipped ? (
-    <span className="routing-card__skipped-badge badge is-warn">
-      {t('routing.skippedInStream')}
-    </span>
-  ) : null;
+  const priceText = (r: ModelRoute, info: AvailableModel | undefined): string => {
+    if (r.authType === 'subscription') {
+      return formatPerRequestCost(info?.cost_per_request) ?? t('routing.cardSubscription');
+    }
+    if (r.authType === 'local' || !info) return '';
+    const input = Number(info.input_price_per_token);
+    const output = Number(info.output_price_per_token);
+    if (info.input_price_per_token != null && input === 0 && output === 0) {
+      return t('routing.free');
+    }
+    return t('routing.cardPrice', {
+      input: pricePerM(info.input_price_per_token),
+      output: pricePerM(info.output_price_per_token),
+    });
+  };
+
+  const renderRoute = (r: ModelRoute, index: number) => {
+    const info = modelInfo(r);
+    const label = info?.display_name ?? r.model;
+    const skipped = isStreamMode && !(info?.capabilities?.includes('stream') ?? false);
+    const account = routeAccountLabel(r, props.connectedProviders);
+    const price = priceText(r, info);
+    return (
+      <div key={`${r.provider}|${r.authType}|${r.model}|${r.keyLabel ?? ''}`}>
+        {index > 0 ? (
+          <div className="routing-card__flow-arrow flex h-4 items-center justify-center text-faint">
+            <ArrowDown aria-hidden="true" className="size-3" />
+          </div>
+        ) : null}
+        <div
+          className={cx(
+            'routing-card__route flex items-center gap-2 rounded-control border border-line bg-sunken px-2.5 py-2',
+            index === 0 && 'routing-card__model-chip',
+            skipped && 'routing-card__route--skipped opacity-60',
+          )}
+          title={skipped ? t('routing.skippedWhileStream') : undefined}
+        >
+          <span className="inline-flex shrink-0">{renderIcon(r)}</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span
+              className={cx(
+                'routing-card__main truncate text-ink',
+                index === 0 ? 'text-sm font-medium' : 'text-sm',
+              )}
+              title={r.model}
+            >
+              {label}
+            </span>
+            <span className="routing-card__chip-meta flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+              <span
+                className="routing-card__account inline-flex min-w-0 items-center gap-1 font-medium text-ink"
+                title={t('models.picker.account', { label: account })}
+              >
+                <AuthIcon authType={r.authType} />
+                <span className="truncate">{account}</span>
+              </span>
+              {price ? <span className="routing-card__chip-price">{price}</span> : null}
+              {skipped ? (
+                <span className="routing-card__skipped-badge badge is-warn">
+                  {t('routing.skippedInStream')}
+                </span>
+              ) : null}
+              {routeNotInCatalog(r, props.models) ? <NotInCatalogBadge /> : null}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const rootClasses = Object.entries(props.classList ?? {})
     .filter(([, on]) => on)
@@ -321,166 +243,59 @@ export default function RouteChainCard(props: RouteChainCardProps) {
             <span className="header-tier-card__name truncate">{props.chain.name}</span>
           )}
           {props.titleExtra}
-          <div ref={menuRef} className="header-tier-card__kebab relative">
-            <button
-              type="button"
-              className="header-tier-card__icon-btn icon-btn size-6"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label={t('routing.chain.optionsFor', { name: props.chain.name })}
-              aria-expanded={menuOpen}
-              title={t('routing.chain.options')}
-            >
-              <Settings aria-hidden="true" className="size-3.5" />
-            </button>
-            {menuOpen ? (
-              <div className="header-tier-card__menu menu left-0 top-full mt-1 font-normal">
-                {props.renderMenu(closeMenu)}
-              </div>
-            ) : null}
-          </div>
+          {props.renderMenu ? (
+            <div ref={menuRef} className="header-tier-card__kebab relative">
+              <button
+                type="button"
+                className="header-tier-card__icon-btn icon-btn size-6"
+                onClick={() => setMenuOpen(!menuOpen)}
+                aria-label={t('routing.chain.optionsFor', { name: props.chain.name })}
+                aria-expanded={menuOpen}
+                title={t('routing.chain.options')}
+              >
+                <Settings aria-hidden="true" className="size-3.5" />
+              </button>
+              {menuOpen ? (
+                <div className="header-tier-card__menu menu left-0 top-full mt-1 font-normal">
+                  {props.renderMenu(closeMenu)}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </span>
-        {currentModel ? null : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="routing-card__header-add"
-            onClick={() => setPickerMode('primary')}
-          >
-            {t('routing.addModel')}
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="routing-card__header-add"
+          onClick={() => setManagerOpen(true)}
+        >
+          {t('routing.manageModel')}
+        </Button>
       </div>
 
       {props.details}
 
-      <div className="routing-card__body">
-        {currentModel ? (
-          <div
-            className={cx(
-              'routing-card__model-chip cursor-pointer rounded-control border border-line bg-sunken p-2.5 transition-colors hover:border-line-strong',
-              primarySkipped && 'routing-card__model-chip--skipped opacity-60',
-            )}
-            title={primarySkipped ? t('routing.skippedWhileStream') : undefined}
-            onClick={() => setPickerMode('primary')}
-          >
-            <div className="routing-card__chip-main flex items-center justify-between gap-2">
-              <div className="routing-card__override flex min-w-0 items-center gap-1.5">
-                {renderOverrideIcon()}
-                <span className="routing-card__main truncate text-sm font-medium text-ink">
-                  {modelLabel || currentModel}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {primaryKeys.length > 1 ? (
-                  <RouteKeyChip
-                    keys={primaryKeys}
-                    currentLabel={props.chain.override_route?.keyLabel ?? undefined}
-                    modelLabel={modelLabel || currentModel}
-                    usedLabels={usedKeyLabelsForModelInTier(
-                      props.chain,
-                      currentModel,
-                      'primary',
-                      primaryKeys[0]?.label,
-                    )}
-                    buttonClass="routing-card__key-chip"
-                    leadingMargin
-                    stopPropagation
-                    onPick={handlePrimaryKeyPick}
-                  />
-                ) : null}
-                {props.getModelParams &&
-                props.setModelParams &&
-                providerId &&
-                effectiveAuth &&
-                effectiveAuth !== 'local' ? (
-                  <ModelParamsAffordance
-                    provider={providerId}
-                    authType={effectiveAuth}
-                    model={currentModel}
-                    slotLabel={modelLabel || currentModel}
-                    scope={props.paramsScope}
-                    agentName={props.agentName}
-                    getParams={props.getModelParams}
-                    setParams={props.setModelParams}
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  className="routing-card__chip-action icon-btn size-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPickerMode('primary');
-                  }}
-                  aria-label={t('routing.changeModelFor', { name: props.chain.name })}
-                  title={t('routing.change')}
-                >
-                  <Pencil aria-hidden="true" className="size-3" />
-                </button>
-              </div>
-            </div>
-            <div className="routing-card__chip-footer mt-1.5">
-              <span className="routing-card__chip-meta flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                <span className="routing-card__chip-price">
-                  {effectiveAuth === 'subscription'
-                    ? (formatPerRequestCost(modelInfo?.cost_per_request) ??
-                      t('routing.includedInSubscription'))
-                    : priceLabel}
-                </span>
-                {skippedBadge}
-                {routeNotInCatalog(props.chain.override_route, props.models) ? (
-                  <NotInCatalogBadge />
-                ) : null}
-              </span>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {currentModel ? (
-        <div className="routing-card__right">
-          <FallbackList
-            agentName={props.agentName}
-            tier={props.chain.id}
-            fallbacks={fallbacks}
-            fallbackRoutes={props.chain.fallback_routes ?? null}
-            tierData={props.chain}
-            models={props.models}
-            customProviders={props.customProviders}
-            connectedProviders={props.connectedProviders}
-            onUpdate={(updated, updatedRoutes) => props.onFallbacksUpdate(updated, updatedRoutes)}
-            onAddFallback={() => setPickerMode('fallback')}
-            persistFallbacks={(_agent, _id, models, routes) =>
-              props.persistFallbacks(models, routes)
-            }
-            getModelParams={props.getModelParams}
-            setModelParams={props.setModelParams}
-            modelParamsScope={props.paramsScope}
-            responseMode={props.chain.response_mode ?? 'buffered'}
-            persistClearFallbacks={() => props.persistClearFallbacks()}
-          />
+      {routes.length > 0 ? (
+        <div className="routing-card__body routing-card__flow flex flex-col">
+          {routes.map(renderRoute)}
         </div>
       ) : null}
 
-      {pickerMode !== null ? (
-        <ModelPickerModal
-          tierId={props.chain.id}
+      {managerOpen ? (
+        <ModelChainManager
+          agentName={props.agentName}
+          chainId={props.chain.id}
+          chainName={props.chain.name}
+          routes={routes}
           models={props.models}
-          tiers={[]}
           customProviders={props.customProviders}
           connectedProviders={props.connectedProviders}
-          requiredCapability={props.chain.response_mode === 'stream' ? 'stream' : undefined}
-          onClose={() => setPickerMode(null)}
-          onSelect={handlePickerSelect}
-        />
-      ) : null}
-
-      {pendingKeyPick ? (
-        <KeyPickerModal
-          providerName={providerDisplayName(pendingKeyPick.provider, props.customProviders)}
-          modelName={pendingKeyPick.model}
-          keys={pendingKeyPick.keys}
-          onPick={handlePendingKeyPick}
-          onClose={() => setPendingKeyPick(null)}
+          requiredCapability={isStreamMode ? 'stream' : undefined}
+          onSave={saveChain}
+          onClose={() => setManagerOpen(false)}
+          paramsScope={props.paramsScope}
+          getModelParams={props.getModelParams}
+          setModelParams={props.setModelParams}
         />
       ) : null}
     </div>

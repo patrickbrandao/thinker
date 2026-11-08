@@ -126,6 +126,12 @@ const ptBR: Catalog<typeof en> = {
     included: 'Incluído na assinatura',
     priceInOut: '{{ input }} entrada · {{ output }} saída',
     unavailable: '{{ capability }} indisponível',
+    allAccounts: 'Todas as contas',
+    searchRegexPlaceholder: 'Buscar modelos, provedores ou contas (regex)...',
+    searchRegexHint:
+      'Aceita expressões regulares, sem diferenciar maiúsculas. Ex.: ^gpt-5, flash|pro, free$',
+    accountFilter: 'Filtrar por conta',
+    account: 'Conta: {{ label }}',
   },
   vm: {
     nameTaken: 'Outro modelo virtual deste harness já usa este nome',

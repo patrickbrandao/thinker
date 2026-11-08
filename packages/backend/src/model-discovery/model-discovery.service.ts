@@ -616,7 +616,9 @@ export class ModelDiscoveryService {
     const models: DiscoveredModel[] = [];
     const seen = new Map<string, number>();
 
-    for (const p of providers) {
+    // Priority order, so each model's account list starts with the primary key.
+    const byPriority = [...providers].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+    for (const p of byPriority) {
       if (p.provider.startsWith('custom:')) continue;
       const rawCached = p.cached_models;
       if (!Array.isArray(rawCached)) continue;
@@ -634,9 +636,18 @@ export class ModelDiscoveryService {
         // providers can expose the same native model name, and the picker must
         // keep each provider-specific route selectable.
         const dedupeKey = `${providerId}::${effectiveAuthType}::${m.id}`;
-        if (!seen.has(dedupeKey)) {
+        const existing = seen.get(dedupeKey);
+        if (existing === undefined) {
           seen.set(dedupeKey, models.length);
-          models.push({ ...m, provider: p.provider, authType: effectiveAuthType });
+          models.push({
+            ...m,
+            provider: p.provider,
+            authType: effectiveAuthType,
+            keyLabels: [p.label],
+          });
+        } else {
+          const labels = models[existing]!.keyLabels;
+          if (labels && !labels.includes(p.label)) labels.push(p.label);
         }
       }
     }

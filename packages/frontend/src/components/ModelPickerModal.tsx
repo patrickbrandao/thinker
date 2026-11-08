@@ -23,6 +23,7 @@ import ModelCapabilityBadges, {
   ModelModalityBadges,
 } from './ModelCapabilityBadges.js';
 import VirtualList from './VirtualList.js';
+import { beginRouteDrag } from './route-drag.js';
 import { Button, Modal, Tabs, cx, type TabItem } from './ui.js';
 
 const PICKER_NARROW_QUERY = '(max-width: 640px)';
@@ -31,10 +32,20 @@ const PICKER_MODEL_ROW_HEIGHT = 40;
 /** Stacked label + four cells + gaps + padding in the ≤640px layout. */
 const PICKER_MODEL_ROW_HEIGHT_NARROW = 160;
 
-type ModalModel = { value: string; label: string; pricing: AvailableModel; authType: AuthType };
+type ModalModel = {
+  value: string;
+  label: string;
+  pricing: AvailableModel;
+  authType: AuthType;
+  /** Account the row was listed by; '' when the connection has no label. */
+  keyLabel: string;
+  /** More than one account of this provider and billing: the route pins `keyLabel`. */
+  multiKey: boolean;
+};
 type PickerItem =
-  | { kind: 'header'; provId: string; name: string; authType: AuthType }
+  | { kind: 'header'; provId: string; name: string; authType: AuthType; keyLabel: string }
   | { kind: 'model'; provId: string; name: string; model: ModalModel };
+
 /** Picker tab: one auth category, or every connected provider at once. */
 type PickerTab = AuthType | 'all';
 
@@ -52,8 +63,18 @@ interface Props {
   tiers: TierAssignment[];
   customProviders?: CustomProviderData[];
   connectedProviders?: RoutingProvider[];
-  onSelect: (tierId: string, modelName: string, providerId: string, authType?: AuthType) => void;
+  onSelect: (
+    tierId: string,
+    modelName: string,
+    providerId: string,
+    authType?: AuthType,
+    keyLabel?: string,
+  ) => void;
   onClose: () => void;
+  /** Render only the picker body, without the modal (e.g. inside a floating window). */
+  embedded?: boolean;
+  /** Rows can be dragged out to a registered route drop zone (see `route-drag.ts`). */
+  draggableRows?: boolean;
   onConnectProviders?: () => void;
   onProviderRefreshed?: () => void | Promise<void>;
   requiredCapability?: ModelCapability;
@@ -83,6 +104,23 @@ function labelForModel(
     return bare;
   }
   return name;
+}
+
+/**
+ * Search text as a case-insensitive regular expression (`^gpt-5`, `flash|pro`).
+ * Text that is not a valid expression yet (e.g. `gpt(` mid-typing) falls back
+ * to a plain substring match. Null when the search is empty.
+ */
+export function searchMatcher(raw: string): ((text: string) => boolean) | null {
+  const q = raw.trim();
+  if (!q) return null;
+  try {
+    const re = new RegExp(q, 'i');
+    return (text) => re.test(text);
+  } catch {
+    const needle = q.toLowerCase();
+    return (text) => text.toLowerCase().includes(needle);
+  }
 }
 
 const isFreeModel = (m: AvailableModel): boolean =>
@@ -147,6 +185,8 @@ export default function ModelPickerModal(props: Props) {
     return 'api_key';
   });
   const [search, setSearch] = useState('');
+  /** Connection id of the account filter; '' = every account. */
+  const [accountId, setAccountId] = useState('');
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   /** Required capabilities: only show models that have ALL of these. */
   const [requiredCapabilities, setRequiredCapabilities] = useState<Set<ModelCapability>>(() =>
@@ -236,8 +276,42 @@ export default function ModelPickerModal(props: Props) {
     }
   };
 
+  /** Display name of a provider id (built-in or custom). */
+  const providerName = (provId: string): string => {
+    if (provId.startsWith('custom:')) {
+      const cp = (props.customProviders ?? []).find((c) => `custom:${c.id}` === provId);
+      return cp?.name ?? provId;
+    }
+    return PROVIDERS.find((p) => p.id === provId)?.name ?? provId;
+  };
+  const authText = (a: AuthType): string =>
+    a === 'subscription'
+      ? t('models.picker.subscription')
+      : a === 'local'
+        ? t('models.picker.local')
+        : t('models.picker.usageBased');
+
+  /** Usable connections, as account filter options (scoped to the active tab). */
+  const accountOptions = useMemo(() => {
+    return connected
+      .filter((c) => isUsable(c) && (activeTab === 'all' || c.auth_type === activeTab))
+      .map((c) => {
+        const provId = resolveProviderId(c.provider) ?? c.provider.toLowerCase();
+        return {
+          id: c.id,
+          provId,
+          authType: c.auth_type,
+          label: c.label,
+          text: `${providerName(provId)} · ${authText(c.auth_type)} · ${c.label}`,
+        };
+      })
+      .sort((a, b) => a.text.localeCompare(b.text));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.connectedProviders, props.customProviders, activeTab]);
+  const selectedAccount = accountOptions.find((o) => o.id === accountId) ?? null;
+
   const groupedModels = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const match = searchMatcher(search);
     const labels = new Map<string, string>();
     for (const prov of PROVIDERS) {
       for (const m of prov.models) labels.set(m.value, m.label);
@@ -272,9 +346,29 @@ export default function ModelPickerModal(props: Props) {
       return conn?.auth_type ?? 'api_key';
     };
 
-    type Group = { provId: string; name: string; authType: AuthType; models: ModalModel[] };
+    type Group = {
+      provId: string;
+      name: string;
+      authType: AuthType;
+      keyLabel: string;
+      order: number;
+      models: ModalModel[];
+    };
     const groupMap = new Map<string, Group>();
     const freeOnly = tab === 'api_key' && showFreeOnly;
+
+    /** `auth\0provider` → active account labels, by priority. */
+    const accountLabels = new Map<string, string[]>();
+    for (const c of [...connectedList].sort((a, b) => a.priority - b.priority)) {
+      if (!c.is_active) continue;
+      for (const id of new Set([c.provider.toLowerCase(), resolveProviderId(c.provider)])) {
+        if (!id) continue;
+        const key = `${c.auth_type}\0${id}`;
+        const list = accountLabels.get(key) ?? [];
+        if (!list.includes(c.label)) list.push(c.label);
+        accountLabels.set(key, list);
+      }
+    }
 
     for (const m of props.models) {
       // Filter by the model's own auth_type to prevent subscription models
@@ -312,20 +406,47 @@ export default function ModelPickerModal(props: Props) {
       if (!provId) continue;
       const authType = authFor(m, provId);
       if (allowedProviders && !allowedProviders.has(`${authType}\0${provId}`)) continue;
-      const groupKey = `${authType}\0${provId}`;
-      if (!groupMap.has(groupKey)) {
-        const isCustom = provId.startsWith('custom:');
-        const provDef = PROVIDERS.find((p) => p.id === provId);
-        const name = isCustom
-          ? (m.provider_display_name ?? cpNames.get(provId) ?? m.provider)
-          : (provDef?.name ?? m.provider);
-        groupMap.set(groupKey, { provId, name, authType, models: [] });
-      }
+      if (
+        selectedAccount &&
+        (selectedAccount.authType !== authType || selectedAccount.provId !== provId)
+      )
+        continue;
+      const providerAccounts = accountLabels.get(`${authType}\0${provId}`) ?? [];
+      // One row per account that lists the model (the backend's key_labels),
+      // so two accounts of the same provider never blur into one group.
+      const modelAccounts =
+        m.key_labels && m.key_labels.length > 0
+          ? m.key_labels.filter(
+              (l) => providerAccounts.length === 0 || providerAccounts.includes(l),
+            )
+          : providerAccounts;
+      const accounts = modelAccounts.length > 0 ? modelAccounts : [''];
+      const multiKey = providerAccounts.length > 1;
       const label =
         m.display_name && m.display_name !== m.model_name
           ? m.display_name
           : labelForModel(m.model_name, labels, providerIds);
-      groupMap.get(groupKey)!.models.push({ value: m.model_name, label, pricing: m, authType });
+      for (const keyLabel of accounts) {
+        if (selectedAccount && selectedAccount.label !== keyLabel) continue;
+        const groupKey = `${authType}\0${provId}\0${keyLabel}`;
+        if (!groupMap.has(groupKey)) {
+          const isCustom = provId.startsWith('custom:');
+          const provDef = PROVIDERS.find((p) => p.id === provId);
+          const name = isCustom
+            ? (m.provider_display_name ?? cpNames.get(provId) ?? m.provider)
+            : (provDef?.name ?? m.provider);
+          const order = providerAccounts.indexOf(keyLabel);
+          groupMap.set(groupKey, { provId, name, authType, keyLabel, order, models: [] });
+        }
+        groupMap.get(groupKey)!.models.push({
+          value: m.model_name,
+          label,
+          pricing: m,
+          authType,
+          keyLabel,
+          multiKey,
+        });
+      }
     }
 
     const groups: Group[] = [];
@@ -335,21 +456,23 @@ export default function ModelPickerModal(props: Props) {
         if (b.value === 'openrouter/free') return 1;
         return a.label.localeCompare(b.label);
       });
-      if (q) {
-        const nameMatch = group.name.toLowerCase().includes(q);
+      if (match) {
+        const nameMatch = match(group.name) || (group.keyLabel !== '' && match(group.keyLabel));
         const filtered = nameMatch
           ? group.models
-          : group.models.filter(
-              (m) => m.label.toLowerCase().includes(q) || m.value.toLowerCase().includes(q),
-            );
+          : group.models.filter((m) => match(m.label) || match(m.value));
         if (filtered.length > 0) groups.push({ ...group, models: filtered });
       } else if (group.models.length > 0) {
         groups.push(group);
       }
     }
-    groups.sort((a, b) => a.name.localeCompare(b.name) || a.authType.localeCompare(b.authType));
+    groups.sort(
+      (a, b) =>
+        a.name.localeCompare(b.name) || a.authType.localeCompare(b.authType) || a.order - b.order,
+    );
     return groups;
   }, [
+    selectedAccount,
     search,
     activeTab,
     showFreeOnly,
@@ -368,6 +491,7 @@ export default function ModelPickerModal(props: Props) {
         provId: group.provId,
         name: group.name,
         authType: group.authType,
+        keyLabel: group.keyLabel,
       });
       for (const model of group.models) {
         items.push({ kind: 'model', provId: group.provId, name: group.name, model });
@@ -383,7 +507,7 @@ export default function ModelPickerModal(props: Props) {
         ? PICKER_MODEL_ROW_HEIGHT_NARROW
         : PICKER_MODEL_ROW_HEIGHT;
 
-  const pickerResetKey = `${activeTab}\0${search}\0${showFreeOnly}\0${[...requiredCapabilities].sort().join(',')}`;
+  const pickerResetKey = `${activeTab}\0${accountId}\0${search}\0${showFreeOnly}\0${[...requiredCapabilities].sort().join(',')}`;
 
   /** Returns the role of a model in the current tier: "Primary", "Fallback 1", etc. or null */
   const modelRole = (
@@ -539,7 +663,32 @@ export default function ModelPickerModal(props: Props) {
         )}
         disabled={disabled}
         title={tooltip}
-        onClick={() => props.onSelect(props.tierId, model.value, provId, model.authType)}
+        onPointerDown={
+          props.draggableRows && !disabled
+            ? (e) =>
+                beginRouteDrag(
+                  e,
+                  {
+                    kind: 'route',
+                    route: {
+                      model: model.value,
+                      provider: provId,
+                      authType: model.authType,
+                      ...(model.multiKey && model.keyLabel ? { keyLabel: model.keyLabel } : {}),
+                    },
+                  },
+                  model.keyLabel ? `${model.label} · ${model.keyLabel}` : model.label,
+                )
+            : undefined
+        }
+        onClick={() => {
+          // The account goes along only when it picks one of several keys.
+          if (model.multiKey && model.keyLabel) {
+            props.onSelect(props.tierId, model.value, provId, model.authType, model.keyLabel);
+          } else {
+            props.onSelect(props.tierId, model.value, provId, model.authType);
+          }
+        }}
       >
         <span className="routing-modal__model-left flex min-w-0 items-center">
           <span className="routing-modal__model-label flex min-w-0 items-center gap-2 font-medium text-ink">
@@ -603,6 +752,179 @@ export default function ModelPickerModal(props: Props) {
     );
   };
 
+  const body = (
+    <div className="routing-modal flex min-h-0 flex-col gap-3 [&>*]:shrink-0">
+      {showTabs ? (
+        <Tabs
+          className="!mb-0"
+          items={tabItems}
+          value={activeTab}
+          onChange={(key: PickerTab) => {
+            setActiveTab(key);
+            if (key !== 'api_key') setShowFreeOnly(false);
+          }}
+        />
+      ) : null}
+
+      {showSearch || accountOptions.length > 1 ? (
+        <div className="routing-modal__search-row flex flex-col gap-2 sm:flex-row">
+          <div className="routing-modal__search-wrap search-bar min-w-0 sm:basis-1/2">
+            <Search aria-hidden="true" />
+            <input
+              ref={searchRef}
+              className="routing-modal__search field !w-full"
+              type="text"
+              placeholder={t('models.picker.searchRegexPlaceholder')}
+              title={t('models.picker.searchRegexHint')}
+              aria-label={t('models.searchLabel')}
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+            />
+          </div>
+          <select
+            className="routing-modal__account field min-w-0 sm:basis-1/2"
+            aria-label={t('models.picker.accountFilter')}
+            title={t('models.picker.accountFilter')}
+            value={selectedAccount ? accountId : ''}
+            onChange={(e) => setAccountId(e.currentTarget.value)}
+          >
+            <option value="">{t('models.picker.allAccounts')}</option>
+            {accountOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.text}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
+      <div className="routing-modal__filter-bar flex flex-wrap items-center justify-between gap-2">
+        <div className="routing-modal__filter-left flex items-center gap-2">
+          {isPaid ? (
+            <button
+              type="button"
+              className={pillClass(showFreeOnly)}
+              aria-pressed={showFreeOnly}
+              onClick={() => setShowFreeOnly(!showFreeOnly)}
+            >
+              {t('models.picker.freeOnly')}
+            </button>
+          ) : null}
+        </div>
+        <div className="routing-modal__filter-right flex flex-wrap items-center gap-2">
+          {availableCapabilities.map((cap) => (
+            <button
+              key={cap}
+              type="button"
+              className={pillClass(requiredCapabilities.has(cap))}
+              aria-pressed={requiredCapabilities.has(cap)}
+              onClick={() => toggleCapability(cap)}
+            >
+              <span
+                className="routing-modal__filter-pill-icon inline-flex"
+                dangerouslySetInnerHTML={{ __html: CAPABILITY_ICONS[cap] }}
+              />
+              {CAPABILITY_LABELS[cap]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {groupedModels.length > 0 ? (
+        <div
+          className={cx(
+            'routing-modal__table-head hidden border-b border-line pb-2 pl-8 pr-3 text-xs font-medium uppercase tracking-wide text-faint',
+            'sm:grid',
+            ROW_COLUMNS,
+          )}
+          aria-hidden="true"
+        >
+          <span>{t('models.picker.colModel')}</span>
+          <span>{t('models.picker.colCapabilities')}</span>
+          <span>{t('models.picker.colInput')}</span>
+          <span>{t('models.picker.colOutput')}</span>
+          <span className="sm:text-right">{t('models.picker.colPrice')}</span>
+        </div>
+      ) : null}
+
+      {pickerItems.length > 0 ? (
+        <VirtualList
+          // Remount on a filter change: VirtualList's shrink-clamp reads the
+          // pre-reset offset and would undo the resetKey jump to the top.
+          key={pickerResetKey}
+          className={cx(
+            'routing-modal__list -mx-1 overflow-y-auto px-1',
+            props.embedded ? 'max-h-[calc(100vh-340px)]' : 'max-h-[55vh]',
+          )}
+          items={pickerItems}
+          itemHeight={pickerItemHeight}
+          resetKey={pickerResetKey}
+        >
+          {(item) =>
+            item.kind === 'header' ? (
+              <div className="routing-modal__group-header flex h-8 items-center gap-2 px-3 text-xs font-semibold text-muted">
+                <span className="routing-modal__group-icon inline-flex shrink-0">
+                  {renderGroupIcon(item.provId, item.name)}
+                </span>
+                <span className="routing-modal__group-name shrink-0 truncate">{item.name}</span>
+                {isAll ? (
+                  <span className="routing-modal__group-auth shrink-0 font-normal text-faint">
+                    {authText(item.authType)}
+                  </span>
+                ) : null}
+                {item.keyLabel ? (
+                  <span
+                    className="routing-modal__group-account badge is-accent inline-flex min-w-0 items-center gap-1"
+                    title={t('models.picker.account', { label: item.keyLabel })}
+                  >
+                    <KeyRound aria-hidden="true" className="size-3 shrink-0" />
+                    <span className="truncate">{item.keyLabel}</span>
+                  </span>
+                ) : null}
+                {props.agentName && !item.provId.startsWith('custom:') ? (
+                  <button
+                    type="button"
+                    className="routing-modal__group-refresh icon-btn ml-auto size-6"
+                    disabled={refreshingProvId !== null}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleRefreshGroup(item.provId, item.name, item.authType);
+                    }}
+                    aria-label={t('models.picker.refreshModels', { name: item.name })}
+                    title={t('models.picker.refreshModels', { name: item.name })}
+                  >
+                    <RefreshCw
+                      aria-hidden="true"
+                      className={cx(
+                        'size-3',
+                        refreshingProvId === item.provId &&
+                          'routing-modal__group-refresh-icon--spinning animate-spin',
+                      )}
+                    />
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              renderModelRow(item.provId, item.model)
+            )
+          }
+        </VirtualList>
+      ) : (
+        <div className="routing-modal__list">
+          <div className="routing-modal__empty empty">
+            <p className="text-sm">{emptyMessage}</p>
+            {!search.trim() && !showFreeOnly && props.onConnectProviders ? (
+              <Button size="sm" onClick={() => props.onConnectProviders?.()}>
+                {t('models.picker.connectProvider')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (props.embedded) return body;
   return (
     <Modal
       open
@@ -620,150 +942,7 @@ export default function ModelPickerModal(props: Props) {
         </span>
       }
     >
-      <div className="routing-modal flex flex-col gap-3">
-        {showTabs ? (
-          <Tabs
-            className="!mb-0"
-            items={tabItems}
-            value={activeTab}
-            onChange={(key: PickerTab) => {
-              setActiveTab(key);
-              if (key !== 'api_key') setShowFreeOnly(false);
-            }}
-          />
-        ) : null}
-
-        {showSearch ? (
-          <div className="routing-modal__search-wrap search-bar">
-            <Search aria-hidden="true" />
-            <input
-              ref={searchRef}
-              className="routing-modal__search field !w-full"
-              type="text"
-              placeholder={t('models.searchPlaceholder')}
-              aria-label={t('models.searchLabel')}
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-            />
-          </div>
-        ) : null}
-
-        <div className="routing-modal__filter-bar flex flex-wrap items-center justify-between gap-2">
-          <div className="routing-modal__filter-left flex items-center gap-2">
-            {isPaid ? (
-              <button
-                type="button"
-                className={pillClass(showFreeOnly)}
-                aria-pressed={showFreeOnly}
-                onClick={() => setShowFreeOnly(!showFreeOnly)}
-              >
-                {t('models.picker.freeOnly')}
-              </button>
-            ) : null}
-          </div>
-          <div className="routing-modal__filter-right flex flex-wrap items-center gap-2">
-            {availableCapabilities.map((cap) => (
-              <button
-                key={cap}
-                type="button"
-                className={pillClass(requiredCapabilities.has(cap))}
-                aria-pressed={requiredCapabilities.has(cap)}
-                onClick={() => toggleCapability(cap)}
-              >
-                <span
-                  className="routing-modal__filter-pill-icon inline-flex"
-                  dangerouslySetInnerHTML={{ __html: CAPABILITY_ICONS[cap] }}
-                />
-                {CAPABILITY_LABELS[cap]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {groupedModels.length > 0 ? (
-          <div
-            className={cx(
-              'routing-modal__table-head hidden border-b border-line pb-2 pl-8 pr-3 text-xs font-medium uppercase tracking-wide text-faint',
-              'sm:grid',
-              ROW_COLUMNS,
-            )}
-            aria-hidden="true"
-          >
-            <span>{t('models.picker.colModel')}</span>
-            <span>{t('models.picker.colCapabilities')}</span>
-            <span>{t('models.picker.colInput')}</span>
-            <span>{t('models.picker.colOutput')}</span>
-            <span className="sm:text-right">{t('models.picker.colPrice')}</span>
-          </div>
-        ) : null}
-
-        {pickerItems.length > 0 ? (
-          <VirtualList
-            // Remount on a filter change: VirtualList's shrink-clamp reads the
-            // pre-reset offset and would undo the resetKey jump to the top.
-            key={pickerResetKey}
-            className="routing-modal__list -mx-1 max-h-[55vh] overflow-y-auto px-1"
-            items={pickerItems}
-            itemHeight={pickerItemHeight}
-            resetKey={pickerResetKey}
-          >
-            {(item) =>
-              item.kind === 'header' ? (
-                <div className="routing-modal__group-header flex h-8 items-center gap-2 px-3 text-xs font-semibold text-muted">
-                  <span className="routing-modal__group-icon inline-flex shrink-0">
-                    {renderGroupIcon(item.provId, item.name)}
-                  </span>
-                  <span className="routing-modal__group-name truncate">{item.name}</span>
-                  {isAll ? (
-                    <span className="routing-modal__group-auth shrink-0 font-normal text-faint">
-                      {item.authType === 'subscription'
-                        ? t('models.picker.subscription')
-                        : item.authType === 'local'
-                          ? t('models.picker.local')
-                          : t('models.picker.usageBased')}
-                    </span>
-                  ) : null}
-                  {props.agentName && !item.provId.startsWith('custom:') ? (
-                    <button
-                      type="button"
-                      className="routing-modal__group-refresh icon-btn ml-auto size-6"
-                      disabled={refreshingProvId !== null}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleRefreshGroup(item.provId, item.name, item.authType);
-                      }}
-                      aria-label={t('models.picker.refreshModels', { name: item.name })}
-                      title={t('models.picker.refreshModels', { name: item.name })}
-                    >
-                      <RefreshCw
-                        aria-hidden="true"
-                        className={cx(
-                          'size-3',
-                          refreshingProvId === item.provId &&
-                            'routing-modal__group-refresh-icon--spinning animate-spin',
-                        )}
-                      />
-                    </button>
-                  ) : null}
-                </div>
-              ) : (
-                renderModelRow(item.provId, item.model)
-              )
-            }
-          </VirtualList>
-        ) : (
-          <div className="routing-modal__list">
-            <div className="routing-modal__empty empty">
-              <p className="text-sm">{emptyMessage}</p>
-              {!search.trim() && !showFreeOnly && props.onConnectProviders ? (
-                <Button size="sm" onClick={() => props.onConnectProviders?.()}>
-                  {t('models.picker.connectProvider')}
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        )}
-      </div>
+      {body}
     </Modal>
   );
 }

@@ -16,11 +16,11 @@ vi.mock('../../src/components/ProviderIcon.js', () => ({
   customProviderLogo: () => null,
 }));
 
-let fallbackProps: Record<string, unknown> = {};
-vi.mock('../../src/components/FallbackList.js', () => ({
+let managerProps: Record<string, any> | null = null;
+vi.mock('../../src/components/ModelChainManager.js', () => ({
   default: (props: Record<string, unknown>) => {
-    fallbackProps = props;
-    return <div data-testid="fallback-list" />;
+    managerProps = props;
+    return <div role="dialog" aria-label="model manager" />;
   },
 }));
 
@@ -71,7 +71,7 @@ function renderCard(overrides: Partial<VirtualModel> = {}, extra: Record<string,
 describe('VirtualModelCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fallbackProps = {};
+    managerProps = null;
   });
 
   it('titles the card with the bare name and shows the primary and the fallbacks', () => {
@@ -80,9 +80,7 @@ describe('VirtualModelCard', () => {
     expect(screen.getByText('deepseek/flash')).toBeTruthy();
     expect(screen.queryByText('model: "deepseek/flash"')).toBeNull();
     expect(screen.getByText('deepseek-chat')).toBeTruthy();
-    expect(screen.getByTestId('fallback-list')).toBeTruthy();
-    expect(fallbackProps.fallbacks).toEqual(['gpt-5.5']);
-    expect(fallbackProps.modelParamsScope).toBe('virtual:vm-1');
+    expect(screen.getByText('gpt-5.5')).toBeTruthy();
   });
 
   it('keeps the switches out of the card', () => {
@@ -131,17 +129,16 @@ describe('VirtualModelCard', () => {
 
   it('persists the chain through the virtual model API', async () => {
     renderCard();
-    const persist = fallbackProps.persistFallbacks as (
-      a: string,
-      t: string,
-      m: string[],
-      r?: unknown,
-    ) => Promise<unknown>;
-    await persist('x', 'y', ['m'], undefined);
-    expect(mockSetFallbacks).toHaveBeenCalledWith('demo', 'vm-1', ['m'], undefined);
-    await (fallbackProps.persistClearFallbacks as () => Promise<unknown>)();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage' }));
+    const save = managerProps!.onSave as (routes: unknown[]) => Promise<void>;
+    const fallback = { provider: 'openai', authType: 'api_key', model: 'm' };
+    await save([{ provider: 'deepseek', authType: 'api_key', model: 'deepseek-chat' }, fallback]);
+    expect(mockSetFallbacks).toHaveBeenCalledWith('demo', 'vm-1', ['m'], [fallback]);
+    await save([{ provider: 'deepseek', authType: 'api_key', model: 'deepseek-chat' }]);
     expect(mockClearFallbacks).toHaveBeenCalledWith('demo', 'vm-1');
-    // No Reset on virtual model cards: models are removed one by one.
+    await save([]);
+    expect(mockClearOverride).toHaveBeenCalledWith('demo', 'vm-1');
+    // No Reset on virtual model cards: the chain is edited in the manager.
     expect(screen.queryByText('Reset')).toBeNull();
   });
 });

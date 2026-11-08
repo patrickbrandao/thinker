@@ -80,6 +80,8 @@ export interface DiscoveredModel {
   supportedEndpoints?: readonly string[];
   qualityScore: number;
   authType?: AuthType;
+  /** Labels of the connections (accounts) whose cached list holds this model, by priority. */
+  keyLabels?: string[];
   /** Custom providers only: the display name the user gave the provider. */
   providerName?: string;
   /**

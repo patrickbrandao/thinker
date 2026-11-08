@@ -122,6 +122,11 @@ export default {
     included: 'Included in subscription',
     priceInOut: '{{ input }} in · {{ output }} out',
     unavailable: '{{ capability }} unavailable',
+    allAccounts: 'All accounts',
+    searchRegexPlaceholder: 'Search models, providers or accounts (regex)...',
+    searchRegexHint: 'Accepts regular expressions, case-insensitive. E.g. ^gpt-5, flash|pro, free$',
+    accountFilter: 'Filter by account',
+    account: 'Account: {{ label }}',
   },
   vm: {
     nameTaken: 'Another virtual model on this harness already uses this name',

@@ -115,8 +115,11 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
         await setVirtualModelOverride(props.agentName, vm.id, model, provider, authType, keyLabel),
       );
       reload();
-    } catch {
-      // fetchMutate already showed the backend message.
+    } catch (err) {
+      // fetchMutate already showed the backend message; callers that save a
+      // whole chain (the model manager) need the failure to roll back.
+      reload();
+      throw err;
     }
   };
 
@@ -184,7 +187,7 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
       {props.leading || items.length > 0 ? (
         <div
           ref={listRef}
-          className="routing-cards virtual-model-list grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
+          className="routing-cards virtual-model-list grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(280px,340px))]"
           role="list"
         >
           {props.leading ? <div role="listitem">{props.leading}</div> : null}

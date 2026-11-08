@@ -442,6 +442,8 @@ export interface AvailableModel {
   model_name: string;
   provider: string;
   auth_type?: AuthType;
+  /** Labels of the accounts (connections) that list this model, primary key first. */
+  key_labels?: string[];
   input_price_per_token: number | null;
   output_price_per_token: number | null;
   /** Per-request USD cost for per-request subscriptions (e.g. OpenCode Go). */
