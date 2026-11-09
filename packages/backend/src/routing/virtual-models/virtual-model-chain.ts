@@ -16,6 +16,7 @@ import {
   routeMatches,
 } from '../routing-core/route-helpers';
 import { effectiveRoutesForResponseMode } from '../routing-core/response-mode-guard';
+import { publishedContextWindow } from './published-context';
 
 /** One step of a virtual model's chain (ADR 0004, section 4). */
 export interface VirtualModelChainEntry {
@@ -243,9 +244,11 @@ export function snapshotRouteState(route: ModelRoute, snapshot: RouteSnapshot): 
     (m) => !route.authType || !m.authType || m.authType === route.authType,
   );
   if (connectionModels.length === 0) return coldRouteState(route, providerNames, snapshot);
-  const windows = connectionModels.filter((m) => m.id === route.model).map((m) => m.contextWindow);
-  if (windows.length === 0) return { state: 'unavailable' };
-  const known = windows.filter((w) => Number.isFinite(w) && w > 0);
+  const matches = connectionModels.filter((m) => m.id === route.model);
+  if (matches.length === 0) return { state: 'unavailable' };
+  const known = matches
+    .map((m) => publishedContextWindow(m, connectionModels))
+    .filter((w): w is number => w !== null);
   return { state: 'available', contextWindow: known.length > 0 ? Math.min(...known) : null };
 }
 

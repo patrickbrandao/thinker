@@ -189,9 +189,12 @@ describe('route-credentials', () => {
         rawApiKey: 'sk-live',
         resourceUrl: undefined,
         providerRegion: 'us',
+        providerBaseUrl: null,
+        providerBaseUrlAllowsPrivate: true,
         tenantProviderId: 'up-1',
         keyLabel: 'Work',
         streamWarmupMs: null,
+        streamIdleTimeoutMs: null,
       });
     });
 

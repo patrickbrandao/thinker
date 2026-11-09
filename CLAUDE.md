@@ -23,6 +23,7 @@ Do the work yourself by default; it is usually faster than delegating. Use a sub
 | Need | Agent |
 |---|---|
 | Upstream changes / should we port X? | `manifest-tracker` |
+| LiteLLM: features, comparison, how does LiteLLM do X? | `litellm-expert` |
 | Large cross-cutting design | `architect` |
 | NestJS / TypeORM / auth / proxy code | `backend-dev` |
 | React dashboard | `frontend-dev` |
@@ -31,14 +32,23 @@ Do the work yourself by default; it is usually faster than delegating. Use a sub
 | Review, only when the user asks | `reviewer` |
 | CI, image, releases | `devops` |
 | PT-BR docs and release notes | `docs-ptbr` |
+| Current rules of one external system (provider access mode, local runtime, harness) | its researcher: `api-*`, `sub-*`, `local-*`, `harness-*` |
 
 New agents may be created when useful; register them in [`docs/agentes.md`](docs/agentes.md).
+
+## External systems
+
+Thinker follows rules it doesn't own: API providers, subscription backends, local runtimes and harnesses all change often. Each one has a spec in [`docs/externos/`](docs/externos/README.md), kept current by a dedicated read-only researcher agent (procedure in [`.claude/external-research.md`](.claude/external-research.md)).
+
+- Before changing code that talks to or depends on an external system, read its dossier. Treat its "Contrato" section as the source of truth over your training data.
+- If the dossier is a skeleton (`revisado_em: null`), older than 30 days, or doesn't answer what the change needs, run that entity's researcher first (several in parallel when the change spans entities), then implement.
+- Researchers never commit. Review their dossier diffs and ship them, alone (`docs(externos): ...`) or with the change that used them. Their gap issues carry the label `externo`.
 
 ## Ground rules
 
 - **Language:** code, identifiers, comments and commits in English. Documentation under `docs/` and release notes in Portuguese (PT-BR). The dashboard UI stays in English.
 - **Naming:** the product is Thinker. Env vars `THINKER_*`, key prefix `thk_`, CLI `thinker`, Docker image `tmsoftbrasil/thinker`, default port `2099`. Never add new `manifest`/`mnfst` identifiers.
-- **No phone-home:** the product makes no outbound calls of its own. Outbound traffic goes only to configured providers, plus the public catalogs of [ADR 0003](docs/adr/0003-excecao-catalogos-publicos.md) (openrouter.ai, models.dev, and the OpenCode Go doc on raw.githubusercontent.com), all disabled by `THINKER_CATALOG_SYNC=false`.
+- **No phone-home:** the product makes no outbound calls of its own. Outbound traffic goes only to configured providers, plus the public catalogs of [ADR 0003](docs/adr/0003-excecao-catalogos-publicos.md) (openrouter.ai and models.dev), both disabled by `THINKER_CATALOG_SYNC=false`. OpenCode's own catalog on opencode.ai is provider traffic, fetched only with an OpenCode provider registered ([ADR 0009](docs/adr/0009-opencode-catalogo-proprio-e-modelos-gratuitos.md)).
 - **Git:** Conventional Commits. `scripts/ship.sh` pushes straight to `main`; if branch protection rejects the push, it opens a PR and squash-merges it right away. Never force-push.
 - **Docker images:** publish from the local Docker, using the Docker Hub account it is logged into (`tmsoftbrasil`), with the local builder `desktop-linux`. Don't wait for or depend on CI secrets, and never use a remote builder.
 - **Secrets:** never handle real tokens or keys. Never run `docker login` or read Docker credentials; the maintainer keeps the local session logged in.

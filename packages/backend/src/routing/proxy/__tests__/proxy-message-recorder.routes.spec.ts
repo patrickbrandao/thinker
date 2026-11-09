@@ -41,16 +41,13 @@ describe('ProxyMessageRecorder.recordFailedFallbacks — per-failure auth_type',
           }),
         ),
     } as never;
-    const opencodeGoCatalog = {
-      getCostPerRequest: jest.fn().mockReturnValue(null),
-      resolveCostPerRequest: jest.fn().mockResolvedValue(null),
-    } as never;
+    const opencodeCatalog = { costInputs: jest.fn().mockResolvedValue(null) } as never;
     recorder = new ProxyMessageRecorder(
       repo,
       pricingCache,
       eventBus,
       customProviders,
-      opencodeGoCatalog,
+      opencodeCatalog,
     );
   });
 

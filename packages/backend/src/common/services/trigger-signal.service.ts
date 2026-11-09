@@ -23,6 +23,10 @@ export type TriggerSignal =
       tenantProviderId: string | null;
       provider: string | null;
       keyLabel: string | null;
+      /** Model of the attempt (alerts: model errors). */
+      model?: string | null;
+      /** `provider`, `transport` or `thinker`. */
+      errorOrigin?: string | null;
       ok: boolean;
       httpStatus: number | null;
       errorCode: string | null;
@@ -50,6 +54,24 @@ export type TriggerSignal =
       agentName: string;
       displayName: string;
       userId: string | null;
+    }
+  | {
+      /** An alert (system event) that is also a workspace trigger event. */
+      kind: 'system';
+      tenantId: string;
+      eventId: string;
+      type: string;
+      level: string;
+      title: string;
+      message: string;
+      entityType: string | null;
+      entityId: string | null;
+      entityName: string | null;
+      actorUserId: string | null;
+      actorIp: string | null;
+      /** Trigger that must not receive the event (its own failure). */
+      excludeTriggerId: string | null;
+      vars: Record<string, string>;
     };
 
 @Injectable()

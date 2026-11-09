@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindOptionsWhere, EntityManager } from 'typeorm';
+import { supportsAccountBaseUrl } from '../account-base-url';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
@@ -17,12 +18,14 @@ import { AgentMessage } from '../../entities/agent-message.entity';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { RoutingCacheService } from './routing-cache.service';
 import { randomUUID } from 'crypto';
+import { isSharedFreeKey } from '../../common/constants/subscription-clients';
 import {
   encrypt,
   decryptWithAny,
   getEncryptionSecret,
   getDecryptionSecrets,
 } from '../../common/utils/crypto.util';
+import { isRevealableAuthType, looksLikeTokenBlob } from '../../common/utils/provider-key-mask';
 import {
   isThinkerUsableProvider,
   isSupportedSubscriptionProvider,
@@ -409,9 +412,23 @@ export class ProviderService {
     // migration backfilled every pre-existing row with label='Default', so
     // this lookup is unambiguous (the unique index guarantees at most one
     // 'Default' row per tuple).
-    const existing = await repo.findOne({
-      where: { tenant_id: tenantId, provider, auth_type: effectiveAuthType, label: DEFAULT_LABEL },
-    });
+    //
+    // Connections renamed to `<provider>-N` no longer carry 'Default', so
+    // without one the unlabeled path updates the primary connection
+    // (lowest priority) instead of adding a second one.
+    const existing =
+      (await repo.findOne({
+        where: {
+          tenant_id: tenantId,
+          provider,
+          auth_type: effectiveAuthType,
+          label: DEFAULT_LABEL,
+        },
+      })) ??
+      (await repo.findOne({
+        where: { tenant_id: tenantId, provider, auth_type: effectiveAuthType },
+        order: { priority: 'ASC' },
+      }));
     const resolvedRegion = await this.resolveProviderRegion(
       provider,
       effectiveAuthType,
@@ -446,7 +463,11 @@ export class ProviderService {
       created_by_user_id: createdByUserId ?? null,
       provider,
       auth_type: effectiveAuthType,
-      label: DEFAULT_LABEL,
+      // Local runners keep one 'Default' row (normalizeLabel refuses names).
+      label:
+        effectiveAuthType === 'local'
+          ? DEFAULT_LABEL
+          : await this.nextConnectionLabel(tenantId, provider, manager),
       priority: 0,
       api_key_encrypted: apiKeyEncrypted,
       key_prefix: keyPrefix,
@@ -516,7 +537,9 @@ export class ProviderService {
     // If the same API key value already exists (active or inactive), update
     // that row instead of creating a duplicate. This handles OAuth reconnects
     // where the token is the same but nextOAuthLabel() generated a new label.
-    if (apiKey) {
+    // A provider's shared free key (OpenCode's `public`) identifies no account,
+    // so every new label with it is its own connection.
+    if (apiKey && !isSharedFreeKey(provider, apiKey)) {
       const sameKey = existingRows.find(
         (r) => !!r.api_key_encrypted && this.decryptOrNull(r.api_key_encrypted) === apiKey,
       );
@@ -629,6 +652,62 @@ export class ProviderService {
     return target.expiresAt > Date.now() ? target.label : undefined;
   }
 
+  /**
+   * The full API key of one connection, for the owner-only reveal endpoint.
+   * Tenant-scoped by id; subscription credentials (OAuth token blobs, pasted
+   * tokens) are never returned. The caller checks the role and logs the reveal.
+   */
+  async revealApiKey(
+    tenantId: string,
+    connectionId: string,
+  ): Promise<{ row: TenantProvider; apiKey: string }> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    if (!isRevealableAuthType(row.auth_type)) {
+      throw new BadRequestException({
+        message: 'Subscription credentials cannot be revealed.',
+        code: 'credential_not_revealable',
+      });
+    }
+    if (!row.api_key_encrypted) {
+      throw new NotFoundException({
+        message: 'This connection has no stored key.',
+        code: 'no_stored_key',
+      });
+    }
+    const apiKey = this.decryptOrNull(row.api_key_encrypted);
+    if (apiKey === null) {
+      throw new ConflictException({
+        message: 'The stored key could not be decrypted with the current encryption key.',
+        code: 'key_not_decryptable',
+      });
+    }
+    if (looksLikeTokenBlob(apiKey)) {
+      throw new BadRequestException({
+        message: 'Subscription credentials cannot be revealed.',
+        code: 'credential_not_revealable',
+      });
+    }
+    return { row, apiKey };
+  }
+
+  async setStreamIdleTimeout(
+    tenantId: string,
+    connectionId: string,
+    streamIdleTimeoutMs: number | null,
+  ): Promise<TenantProvider> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    row.stream_idle_timeout_ms = streamIdleTimeoutMs;
+    row.updated_at = new Date().toISOString();
+    await this.providerRepo.save(row);
+    return row;
+  }
+
   async setStreamWarmup(
     tenantId: string,
     connectionId: string,
@@ -639,6 +718,33 @@ export class ProviderService {
     });
     if (!row) throw new NotFoundException('Provider connection not found');
     row.stream_warmup_ms = streamWarmupMs;
+    row.updated_at = new Date().toISOString();
+    await this.providerRepo.save(row);
+    return row;
+  }
+
+  /**
+   * Set or clear (null) an API-key connection's base URL. The caller has
+   * normalized and SSRF-checked it (routing/account-base-url.ts).
+   */
+  async setBaseUrl(
+    tenantId: string,
+    connectionId: string,
+    baseUrl: string | null,
+    /** What the private-URL policy allowed the caller (ADR 0006 item 7). */
+    allowPrivate = true,
+  ): Promise<TenantProvider> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    if (baseUrl !== null && !supportsAccountBaseUrl(row.provider, row.auth_type)) {
+      throw new BadRequestException(
+        'Only API-key connections of a built-in provider take a base URL',
+      );
+    }
+    row.base_url = baseUrl;
+    row.allow_private_destination = baseUrl === null ? true : allowPrivate;
     row.updated_at = new Date().toISOString();
     await this.providerRepo.save(row);
     return row;
@@ -834,7 +940,7 @@ export class ProviderService {
       created_by_user_id: createdByUserId ?? null,
       provider,
       auth_type: 'subscription',
-      label: DEFAULT_LABEL,
+      label: await this.nextConnectionLabel(tenantId, provider),
       priority: 0,
       api_key_encrypted: null,
       key_prefix: null,
@@ -1484,23 +1590,44 @@ export class ProviderService {
    * falls through to the legacy single-key upsert (creating "Default"). When
    * a "Default" row already exists, returns "Key 2", "Key 3", etc.
    */
+  /**
+   * The label for a new subscription connection: the re-auth target when one
+   * is armed, else `<provider>-N` with the lowest N free among the provider's
+   * connections of any auth type (a removed `anthropic-1` is suggested again).
+   */
   async nextOAuthLabel(tenantId: string, provider: string): Promise<string | undefined> {
     const reauthLabel = this.takeReauthTarget(tenantId, provider);
     if (reauthLabel) return reauthLabel;
-    const existing = await this.providerRepo.find({
-      where: {
-        tenant_id: tenantId,
-        provider,
-        auth_type: 'subscription' as AuthType,
-        is_active: true,
-      },
-    });
-    if (existing.length === 0) return undefined;
-    const lower = new Set(existing.map((r) => r.label.toLowerCase()));
-    for (let n = existing.length + 1; n < 100; n++) {
-      const candidate = `Key ${n}`;
-      if (!lower.has(candidate.toLowerCase())) return candidate;
-    }
-    return `Key ${existing.length + 1}`;
+    return this.nextConnectionLabel(tenantId, provider);
   }
+
+  /**
+   * The name for a new connection: `<provider>-N` (`custom-N` for custom
+   * providers) with the lowest N no connection of that provider uses, across
+   * every auth type. Removing `anthropic-1` frees the name for the next one.
+   */
+  async nextConnectionLabel(
+    tenantId: string,
+    provider: string,
+    manager?: EntityManager,
+  ): Promise<string> {
+    const existing = await this.tenantProviderRepo(manager).find({
+      where: { tenant_id: tenantId, provider },
+      select: { label: true },
+    });
+    return nextConnectionLabelFrom(
+      provider,
+      existing.map((r) => r.label),
+    );
+  }
+}
+
+/** Lowest free `<prefix>-N` among `labels` (case-insensitive). */
+export function nextConnectionLabelFrom(provider: string, labels: string[]): string {
+  const lower = provider.toLowerCase();
+  const prefix = lower.startsWith('custom:') ? 'custom' : lower;
+  const taken = new Set(labels.map((l) => l.toLowerCase()));
+  let n = 1;
+  while (taken.has(`${prefix}-${n}`)) n++;
+  return `${prefix}-${n}`;
 }

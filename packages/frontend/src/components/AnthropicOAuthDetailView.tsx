@@ -10,6 +10,7 @@ import {
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
+import AuthUrlFallback from './AuthUrlFallback.js';
 import { Button } from './ui.js';
 import { SubscriptionAccountList, renameSubscriptionKey } from './OAuthDetailView.js';
 
@@ -27,6 +28,8 @@ interface Props {
   addKeyOpen?: boolean;
   setAddKeyOpen?: (open: boolean) => void;
   activeKeys?: RoutingProvider[];
+  /** Only add a new connection: no account list, and success closes the host. */
+  newConnection?: boolean;
 }
 
 /**
@@ -40,35 +43,36 @@ export default function AnthropicOAuthDetailView(props: Props) {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [addingAccount, setAddingAccount] = useState(false);
+  // Set when the browser blocked the sign-in tab: the URL to open by hand.
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
   const latest = useRef(props);
   latest.current = props;
 
   const activeKeys = props.activeKeys ?? [];
   const isMultiKey = activeKeys.length > 1;
-  const showConnectFlow = !props.connected || addingAccount;
+  const showConnectFlow = props.newConnection || !props.connected || addingAccount;
   const via = props.provDef.subscriptionLabel ?? t('providerSetup.shared.subscriptionLower');
 
   const handleSignIn = async () => {
     setError(null);
     // Open synchronously while the click still has user activation. Browsers
     // can block a window opened after the OAuth start request completes.
+    // A blocked popup (null) doesn't stop the flow: the view shows the URL to
+    // open elsewhere, and the code is pasted back below as usual.
     const popup = window.open('about:blank', '_blank');
-    if (!popup) {
-      toast.error(t('providerSetup.shared.popupBlocked'));
-      if (latest.current.connected) setAddingAccount(false);
-      return;
-    }
     // The blank page is same-origin, so remove its access to the dashboard
     // before navigating it to Anthropic.
-    popup.opener = null;
+    if (popup) popup.opener = null;
+    setBlockedUrl(null);
 
     latest.current.setBusy(true);
     try {
       const { url, state: authState } = await startAnthropicOAuth(latest.current.agentName);
       setState(authState);
-      if (!popup.closed) popup.location.replace(url);
+      if (!popup) setBlockedUrl(url);
+      else if (!popup.closed) popup.location.replace(url);
     } catch {
-      popup.close();
+      popup?.close();
       if (latest.current.connected) setAddingAccount(false);
       // error toast from fetchMutate
     } finally {
@@ -89,7 +93,7 @@ export default function AnthropicOAuthDetailView(props: Props) {
   // Restore any pending OAuth flow so the paste field still works after the
   // modal was closed mid-dance.
   useEffect(() => {
-    if (props.connected) return;
+    if (props.connected && !props.newConnection) return;
     let cancelled = false;
     getAnthropicOAuthPending(props.agentName)
       .then(({ state: pending }) => {
@@ -128,6 +132,7 @@ export default function AnthropicOAuthDetailView(props: Props) {
       setInput('');
       setState(null);
       latest.current.onUpdate();
+      if (latest.current.newConnection) latest.current.onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('providerSetup.anthropic.exchangeFailed'));
     } finally {
@@ -168,6 +173,7 @@ export default function AnthropicOAuthDetailView(props: Props) {
           <Button block busy={props.busy} onClick={() => void handleSignIn()}>
             {t('providerSetup.anthropic.signIn')}
           </Button>
+          {blockedUrl ? <AuthUrlFallback url={blockedUrl} /> : null}
         </div>
 
         <div className="flex flex-col gap-2">

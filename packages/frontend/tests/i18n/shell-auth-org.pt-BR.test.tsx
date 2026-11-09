@@ -103,7 +103,8 @@ describe('shell, auth and organization screens in pt-BR', () => {
 
   it('renders the sign-in page in Portuguese', async () => {
     inRouter(<Login />, '/login');
-    expect(screen.getByText('Que bom ver você de novo')).toBeTruthy();
+    // The page shows only the logo mark, no welcome heading.
+    expect(screen.getByRole('img', { name: 'Thinker' })).toBeTruthy();
     expect(screen.getByPlaceholderText('Digite sua senha')).toBeTruthy();
     expect(screen.getByText('Esqueceu a senha?')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Entrar' })).toBeTruthy();
@@ -141,6 +142,8 @@ describe('shell, auth and organization screens in pt-BR', () => {
     expect(screen.getByRole('link', { name: 'Por uso' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Assinaturas' })).toBeTruthy();
     expect(screen.getByText('PROVEDORES')).toBeTruthy();
+    expect(screen.getByText('CLIENTES')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Harnesses' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Recolher menu' })).toBeTruthy();
   });
 
@@ -181,7 +184,7 @@ describe('shell, auth and organization screens in pt-BR', () => {
     inRouter(<AlertsMenu />);
     const bell = await screen.findByRole('button', { name: 'Alertas, 1 novos' });
     fireEvent.click(bell);
-    expect(await screen.findByText('Ver requisições com falha')).toBeTruthy();
+    expect(await screen.findByText('Ver todos os alertas')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Marcar todos como vistos' }));
     expect(await screen.findByText('Últimas 24 horas')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Alertas' })).toBeTruthy();

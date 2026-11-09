@@ -13,6 +13,7 @@ COPY package.json package-lock.json turbo.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/frontend/package.json packages/frontend/
 COPY packages/backend/package.json packages/backend/
+COPY packages/cli/package.json packages/cli/
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 
@@ -22,7 +23,13 @@ COPY packages/shared packages/shared
 COPY packages/frontend packages/frontend
 COPY packages/backend packages/backend
 COPY packages/thinker packages/thinker
+COPY packages/cli packages/cli
 RUN npx turbo build --filter=thinker-backend --filter=thinker-frontend --filter=thinker-shared
+# The `thinker` CLI (only Node built-ins at runtime). Distroless has no
+# /usr/bin/env, so the launcher's shebang points at the runtime's node.
+RUN npm run build -w thinker-cli && mkdir -p /app/cli-bin && \
+    printf '#!/nodejs/bin/node\nrequire("/app/packages/cli/bin/thinker.js");\n' > /app/cli-bin/thinker && \
+    chmod 755 /app/cli-bin/thinker
 # Build-day OpenRouter/models.dev prices for THINKER_CATALOG_SYNC=false (#73,
 # ADR 0003 catalogs, fetched only here). Never fails the build;
 # --build-arg THINKER_PRICING_SNAPSHOT=false skips it.
@@ -89,21 +96,33 @@ ENV BIND_ADDRESS=0.0.0.0
 ENV PORT=2099
 # Expose the distroless node binary on PATH so `node` in docker-compose
 # healthchecks (and anything else invoked with a bare command name) resolves.
-ENV PATH=/nodejs/bin:$PATH
+ENV PATH=/app/cli-bin:/nodejs/bin:$PATH
 
-COPY --from=prod-deps --chown=nonroot:nonroot /app/node_modules node_modules
-COPY --from=prod-deps --chown=nonroot:nonroot /app/packages/backend/node_modules packages/backend/node_modules
+# Application code stays owned by root (read-only for the nonroot runtime
+# user), so a write bug in the app cannot rewrite node_modules, dist or the
+# CLI launcher even outside the read-only compose; only the data directory
+# below belongs to nonroot.
+COPY --from=prod-deps /app/node_modules node_modules
+COPY --from=prod-deps /app/packages/backend/node_modules packages/backend/node_modules
 COPY --from=prod-deps --chown=nonroot:nonroot /app/request-recordings /data/request-recordings
-COPY --from=prod-deps --chown=nonroot:nonroot /app/package.json package.json
-COPY --from=build --chown=nonroot:nonroot /app/packages/shared/dist packages/shared/dist
-COPY --from=build --chown=nonroot:nonroot /app/packages/backend/dist packages/backend/dist
-COPY --from=build --chown=nonroot:nonroot /app/packages/frontend/dist packages/frontend/dist
-COPY --chown=nonroot:nonroot packages/shared/package.json packages/shared/
-COPY --chown=nonroot:nonroot packages/backend/package.json packages/backend/
+COPY --from=prod-deps /app/package.json package.json
+COPY --from=build /app/packages/shared/dist packages/shared/dist
+COPY --from=build /app/packages/backend/dist packages/backend/dist
+COPY --from=build /app/packages/frontend/dist packages/frontend/dist
+COPY packages/shared/package.json packages/shared/
+COPY packages/backend/package.json packages/backend/
+COPY packages/thinker/package.json packages/thinker/
+COPY --from=build /app/packages/cli/bin packages/cli/bin
+COPY --from=build /app/packages/cli/dist packages/cli/dist
+COPY --from=build /app/packages/cli/package.json packages/cli/
+COPY --from=build /app/cli-bin cli-bin
+# `docker run tmsoftbrasil/thinker thinker <command>`: the entrypoint is node,
+# so "thinker" resolves to this file (the same launcher; node skips the shebang).
+COPY --from=build /app/cli-bin/thinker thinker
 # Thinker's license (it keeps the upstream copyright notice) and the
 # notices of every bundled third-party package.
-COPY --chown=nonroot:nonroot LICENSE LICENSE
-COPY --from=prod-deps --chown=nonroot:nonroot /app/THIRD_PARTY_NOTICES THIRD_PARTY_NOTICES
+COPY LICENSE LICENSE
+COPY --from=prod-deps /app/THIRD_PARTY_NOTICES THIRD_PARTY_NOTICES
 
 EXPOSE 2099
 

@@ -388,6 +388,9 @@ export class CustomProviderService {
       name: dto.name,
       alias,
       base_url: baseUrl,
+      // What the private-URL policy allowed the registrant: checked again at
+      // every connection, so a later DNS change cannot reach the LAN.
+      allow_private_destination: urlPolicy(urlOpts).allowPrivate,
       // Local servers speak OpenAI Chat Completions under `/v1`.
       api_kind: localType ? 'openai' : (dto.api_kind ?? 'openai'),
       local_type: localType,
@@ -500,6 +503,7 @@ export class CustomProviderService {
         throw new BadRequestException((err as Error).message);
       }
       cp.base_url = nextBaseUrl;
+      cp.allow_private_destination = urlPolicy(urlOpts).allowPrivate;
     }
 
     if (dto.api_kind !== undefined && !cp.local_type) {
@@ -578,6 +582,17 @@ export class CustomProviderService {
       const primary = await this.primaryConnection(tenantId, id);
       if (primary) {
         await this.providerService.setStreamWarmup(tenantId, primary.id, dto.stream_warmup_ms);
+        this.routingCache.invalidateTenant(tenantId);
+      }
+    }
+    if (dto.stream_idle_timeout_ms !== undefined) {
+      const primary = await this.primaryConnection(tenantId, id);
+      if (primary) {
+        await this.providerService.setStreamIdleTimeout(
+          tenantId,
+          primary.id,
+          dto.stream_idle_timeout_ms,
+        );
         this.routingCache.invalidateTenant(tenantId);
       }
     }
@@ -680,11 +695,11 @@ export class CustomProviderService {
       // ensures a hostile server can't redirect the probe to a destination
       // that would bypass validation.
       // codeql[js/request-forgery]
-      const res = await ssrfSafeFetch(url, {
-        headers,
-        signal: controller.signal,
-        redirect: 'error',
-      });
+      const res = await ssrfSafeFetch(
+        url,
+        { headers, signal: controller.signal, redirect: 'error' },
+        urlPolicy(urlOpts),
+      );
       if (!res.ok) {
         throw new BadRequestException(classifyProbeError({ url, status: res.status }).message);
       }
@@ -730,7 +745,9 @@ export class CustomProviderService {
     }
     try {
       // codeql[js/request-forgery] — operator-chosen local server, see probeModels.
-      return await probeLocalServer(type, config, apiKey, (url, init) => ssrfSafeFetch(url, init));
+      return await probeLocalServer(type, config, apiKey, (url, init) =>
+        ssrfSafeFetch(url, init, urlPolicy(urlOpts)),
+      );
     } catch (err) {
       if (err instanceof LocalProbeError) throw new BadRequestException(err.message);
       throw err;

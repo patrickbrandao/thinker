@@ -5,6 +5,8 @@ import type {
   SyslogFormat,
   SyslogSeverity,
   SyslogTransport,
+  GelfTransport,
+  GelfCompression,
   TriggerEventStatus,
   TriggerEventType,
   TriggerType,
@@ -14,7 +16,7 @@ import type {
 import { fetchJson, fetchMutate } from './core.js';
 import type { Egress, EgressHop } from './proxies.js';
 
-/** Workspace delivery targets (e-mail, webhook, Telegram, syslog) and their delivery log. */
+/** Workspace delivery targets (e-mail, webhook, Telegram, syslog, GELF, RELP) and their delivery log. */
 
 export interface EmailTriggerConfig {
   provider: EmailTriggerProvider;
@@ -58,11 +60,43 @@ export interface SyslogTriggerConfig {
   severities: Record<string, SyslogSeverity>;
 }
 
+export interface RelpTriggerConfig {
+  host: string;
+  port: number;
+  format: SyslogFormat;
+  facility: SyslogFacility;
+  app_name: string;
+  message: string;
+  severities: Record<string, SyslogSeverity>;
+}
+
+export interface GelfTriggerConfig {
+  transport: GelfTransport;
+  host?: string;
+  port?: number;
+  url?: string;
+  compression: GelfCompression;
+  source: string | null;
+  short_message: string;
+  full_message: string;
+  severities: Record<string, SyslogSeverity>;
+}
+
 export type TriggerConfigView =
-  EmailTriggerConfig | WebhookTriggerConfigView | TelegramTriggerConfig | SyslogTriggerConfig;
+  | EmailTriggerConfig
+  | WebhookTriggerConfigView
+  | TelegramTriggerConfig
+  | SyslogTriggerConfig
+  | RelpTriggerConfig
+  | GelfTriggerConfig;
 
 export type TriggerConfigWrite =
-  EmailTriggerConfig | WebhookTriggerConfigWrite | TelegramTriggerConfig | SyslogTriggerConfig;
+  | EmailTriggerConfig
+  | WebhookTriggerConfigWrite
+  | TelegramTriggerConfig
+  | SyslogTriggerConfig
+  | RelpTriggerConfig
+  | GelfTriggerConfig;
 
 export interface TriggerView {
   id: string;

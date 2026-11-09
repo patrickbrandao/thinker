@@ -52,16 +52,10 @@ describe('AgentDetail', () => {
     expect(document.title).toBe('my-agent | Thinker');
   });
 
-  it('renders a back-link to /harnesses', () => {
+  it('leaves the back-link and the title to the top bar breadcrumb', () => {
     const { container } = renderAt('/harnesses/my-agent');
-    const backLink = container.querySelector('a[href="/harnesses"]') as HTMLAnchorElement;
-    expect(backLink).not.toBeNull();
-    expect(backLink.textContent).toContain('Harnesses');
-  });
-
-  it('renders an H1 with the agent name', () => {
-    const { container } = renderAt('/harnesses/my-agent');
-    expect(container.querySelector('h1')?.textContent?.trim()).toBe('my-agent');
+    expect(container.querySelector('a[href="/harnesses"]')).toBeNull();
+    expect(container.querySelector('h1')).toBeNull();
   });
 
   it('renders a tablist with exactly 8 tabs', () => {
@@ -183,7 +177,7 @@ describe('AgentDetail', () => {
   it('decodes URL-encoded agent names in title', () => {
     const { container } = renderAt('/harnesses/my%20agent');
     expect(document.title).toBe('my agent | Thinker');
-    expect(container.querySelector('h1')?.textContent?.trim()).toBe('my agent');
+    expect(tabsOf(container).length).toBe(8);
   });
 
   it('does not show platform icon when agentPlatformIcon returns undefined', () => {
@@ -204,31 +198,17 @@ describe('AgentDetail', () => {
     expect(document.title).toBe('My Cool Agent | Thinker');
   });
 
-  it('renders the H1 with the display name when agentDisplayName is set', () => {
-    mockAgentDisplayName = 'My Cool Agent';
-    const { container } = renderAt('/harnesses/my-agent');
-    expect(container.querySelector('h1')?.textContent?.trim()).toBe('My Cool Agent');
-  });
-
   it('falls back to decoded slug in title when agentDisplayName is null', () => {
     renderAt('/harnesses/my-agent');
     expect(document.title).toBe('my-agent | Thinker');
   });
-
-  it('renders the H1 with the decoded slug when agentDisplayName is null', () => {
-    const { container } = renderAt('/harnesses/my-agent');
-    expect(container.querySelector('h1')?.textContent?.trim()).toBe('my-agent');
-  });
 });
 
 describe('AgentDetail with platform icon', () => {
-  it('renders the platform icon and H1 when agentPlatformIcon is set', () => {
+  it('does not repeat the platform icon below the top bar', () => {
     mockPlatformIcon = '/icons/robot.svg';
     mockAgentDisplayName = null;
     const { container } = renderAt('/harnesses/my-agent');
-    const img = container.querySelector('img');
-    expect(img).not.toBeNull();
-    expect(img!.getAttribute('src')).toBe('/icons/robot.svg');
-    expect(container.querySelector('h1')?.textContent?.trim()).toBe('my-agent');
+    expect(container.querySelector('img')).toBeNull();
   });
 });

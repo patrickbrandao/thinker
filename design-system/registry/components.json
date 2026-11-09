@@ -306,6 +306,22 @@
         "shell.css"
       ]
     },
+    "alerts-section": {
+      "classes": [
+        "alerts-section"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "alerts-table": {
+      "classes": [
+        "alerts-table"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "app": {
       "classes": [
         "app"
@@ -636,13 +652,16 @@
       ],
       "files": [
         "base.css",
+        "canvas.css",
         "shell.css"
       ]
     },
     "floating-window": {
       "classes": [
         "floating-window",
-        "floating-window--wide"
+        "floating-window--fit",
+        "floating-window--wide",
+        "floating-window--xwide"
       ],
       "files": [
         "shell.css"
@@ -742,6 +761,14 @@
       ],
       "files": [
         "shell.css"
+      ]
+    },
+    "has-badge": {
+      "classes": [
+        "has-badge"
+      ],
+      "files": [
+        "canvas.css"
       ]
     },
     "hint": {
@@ -1058,6 +1085,14 @@
         "base.css"
       ]
     },
+    "is-round": {
+      "classes": [
+        "is-round"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "is-selected": {
       "classes": [
         "is-selected"
@@ -1067,9 +1102,33 @@
         "canvas.css"
       ]
     },
+    "is-selecting": {
+      "classes": [
+        "is-selecting"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
+    "is-sink": {
+      "classes": [
+        "is-sink"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "is-success": {
       "classes": [
         "is-success"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "is-unread": {
+      "classes": [
+        "is-unread"
       ],
       "files": [
         "shell.css"
@@ -1149,6 +1208,22 @@
         "shell.css"
       ]
     },
+    "login-form": {
+      "classes": [
+        "login-form"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "login-mark": {
+      "classes": [
+        "login-mark"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "logo-dark": {
       "classes": [
         "logo-dark"
@@ -1165,12 +1240,28 @@
         "shell.css"
       ]
     },
+    "logo-text": {
+      "classes": [
+        "logo-text"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "logo-word": {
       "classes": [
         "logo-word"
       ],
       "files": [
         "shell.css"
+      ]
+    },
+    "lucide": {
+      "classes": [
+        "lucide"
+      ],
+      "files": [
+        "canvas.css"
       ]
     },
     "menu": {
@@ -1267,6 +1358,14 @@
       ],
       "files": [
         "base.css"
+      ]
+    },
+    "n8n-badge": {
+      "classes": [
+        "n8n-badge"
+      ],
+      "files": [
+        "canvas.css"
       ]
     },
     "n8n-box": {
@@ -1525,6 +1624,14 @@
         "base.css"
       ]
     },
+    "provider-type-card": {
+      "classes": [
+        "provider-type-card"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
     "react-flow": {
       "classes": [
         "react-flow",
@@ -1536,7 +1643,8 @@
         "react-flow__edge-textbg",
         "react-flow__handle",
         "react-flow__minimap",
-        "react-flow__node"
+        "react-flow__node",
+        "react-flow__pane"
       ],
       "files": [
         "canvas.css"
@@ -1564,6 +1672,14 @@
       ],
       "files": [
         "base.css"
+      ]
+    },
+    "scroll-section": {
+      "classes": [
+        "scroll-section"
+      ],
+      "files": [
+        "shell.css"
       ]
     },
     "search-bar": {
@@ -1694,6 +1810,14 @@
         "canvas.css"
       ]
     },
+    "stage-range": {
+      "classes": [
+        "stage-range"
+      ],
+      "files": [
+        "canvas.css"
+      ]
+    },
     "stage-wrap": {
       "classes": [
         "stage-wrap"
@@ -1762,6 +1886,22 @@
     "tab": {
       "classes": [
         "tab"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "tabbed-window": {
+      "classes": [
+        "tabbed-window"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "tabbed-window-tabs": {
+      "classes": [
+        "tabbed-window-tabs"
       ],
       "files": [
         "shell.css"
@@ -1868,6 +2008,22 @@
     "topbar-version": {
       "classes": [
         "topbar-version"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "trigger-editor": {
+      "classes": [
+        "trigger-editor"
+      ],
+      "files": [
+        "shell.css"
+      ]
+    },
+    "trigger-template": {
+      "classes": [
+        "trigger-template"
       ],
       "files": [
         "shell.css"
@@ -2009,7 +2165,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1008
+      "line": 1073
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2018,7 +2174,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1008
+      "line": 1073
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2027,21 +2183,21 @@
       "prop": "padding",
       "value": "6px 8px",
       "file": "shell.css",
-      "line": 1017
+      "line": 1082
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-5px",
       "file": "shell.css",
-      "line": 1183
+      "line": 1248
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "5px",
       "file": "shell.css",
-      "line": 1184
+      "line": 1249
     }
   ],
   "ghostRules": [
@@ -2052,8 +2208,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1001,
-      "losesTo": "shell.css:1008"
+      "line": 1066,
+      "losesTo": "shell.css:1073"
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2062,8 +2218,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1001,
-      "losesTo": "shell.css:1008"
+      "line": 1066,
+      "losesTo": "shell.css:1073"
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2072,24 +2228,24 @@
       "prop": "padding",
       "value": "0 10px",
       "file": "shell.css",
-      "line": 1013,
-      "losesTo": "shell.css:1017"
+      "line": 1078,
+      "losesTo": "shell.css:1082"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-2px",
       "file": "shell.css",
-      "line": 1139,
-      "losesTo": "shell.css:1183"
+      "line": 1204,
+      "losesTo": "shell.css:1248"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "2px",
       "file": "shell.css",
-      "line": 1141,
-      "losesTo": "shell.css:1184"
+      "line": 1206,
+      "losesTo": "shell.css:1249"
     }
   ],
   "componentSheets": {
@@ -2105,8 +2261,8 @@
   "stats": {
     "tokens": 58,
     "darkOverrides": 50,
-    "blocks": 206,
-    "classes": 222,
+    "blocks": 225,
+    "classes": 244,
     "canonicalRules": 5,
     "ghostRules": 5
   }

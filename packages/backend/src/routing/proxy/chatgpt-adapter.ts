@@ -137,6 +137,13 @@ export function toResponsesRequest(
     const format = toResponsesTextFormat(body.response_format);
     if (format) request.text = { format };
   }
+  // Only OpenAI infrastructure knows `text.verbosity` (gated with the effort).
+  if (options.mapReasoningEffort && typeof body.verbosity === 'string') {
+    request.text = {
+      ...(isObjectRecord(request.text) ? request.text : {}),
+      verbosity: body.verbosity,
+    };
+  }
 
   if (Array.isArray(body.tools)) {
     request.tools = convertTools(body.tools as Record<string, unknown>[]);

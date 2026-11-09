@@ -113,16 +113,18 @@ describe('AnthropicOAuthDetailView', () => {
     expect(screen.getByLabelText('Anthropic authorization code')).toBeDefined();
   });
 
-  it('shows a toast without starting OAuth when the popup is blocked', async () => {
+  it('starts OAuth and shows the URL to open by hand when the popup is blocked', async () => {
+    mockStartAnthropicOAuth.mockResolvedValue({ url: 'https://claude.ai/oauth', state: 'abc' });
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
 
     renderView();
     fireEvent.click(screen.getByText('Sign in with Claude'));
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith(expect.stringMatching(/Popup was blocked/));
+      expect(screen.getByText('https://claude.ai/oauth')).toBeDefined();
     });
-    expect(mockStartAnthropicOAuth).not.toHaveBeenCalled();
+    expect(mockStartAnthropicOAuth).toHaveBeenCalled();
+    expect(mockToastError).not.toHaveBeenCalled();
     openSpy.mockRestore();
   });
 

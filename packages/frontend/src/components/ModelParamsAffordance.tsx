@@ -22,6 +22,11 @@ export function resetRouteSpecsCache() {
 }
 function routeHasSpecs(agentName: string, provider: string, authType: AuthType, model: string) {
   const key = [agentName, provider, authType, model].join('\u0000');
+  // Every OpenRouter API-key route has the provider routing params (P8), even
+  // a model the modelparams catalog doesn't know: no need to ask.
+  if (provider.toLowerCase() === 'openrouter' && authType === 'api_key') {
+    return Promise.resolve(true);
+  }
   let hit = hasSpecsCache.get(key);
   if (!hit) {
     hit = getModelParamSpecs(agentName, provider, authType, model).then(

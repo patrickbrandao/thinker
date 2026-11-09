@@ -35,3 +35,37 @@ export function parseWarmupSeconds(raw: string): number | null | undefined {
   }
   return Math.round(seconds * 1000);
 }
+
+/**
+ * Stream idle timeout override: the longest pause allowed between two chunks
+ * of a streaming response before the attempt fails. Same shape as the warm-up:
+ * the UI edits seconds, the API stores ms (1000..3600000, null inherits).
+ */
+export const MIN_STREAM_IDLE_SECONDS = 1;
+export const MAX_STREAM_IDLE_SECONDS = 3600;
+
+/** Validation message for an out-of-range idle timeout, in the active language. */
+export function streamIdleError(): string {
+  return t('routing.warmupError', {
+    min: MIN_STREAM_IDLE_SECONDS,
+    max: MAX_STREAM_IDLE_SECONDS,
+  });
+}
+
+/** Stored ms to the text shown in the seconds input ('' when unset). */
+export const idleMsToSecondsInput = warmupMsToSecondsInput;
+
+/** Seconds input to ms for the API: null for empty, undefined when invalid. */
+export function parseIdleSeconds(raw: string): number | null | undefined {
+  const text = raw.trim();
+  if (text === '') return null;
+  const seconds = Number(text);
+  if (
+    !Number.isFinite(seconds) ||
+    seconds < MIN_STREAM_IDLE_SECONDS ||
+    seconds > MAX_STREAM_IDLE_SECONDS
+  ) {
+    return undefined;
+  }
+  return Math.round(seconds * 1000);
+}

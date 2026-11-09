@@ -45,6 +45,17 @@ const data: Topology = {
     },
   ],
   proxies: [{ id: 'proxy:p1', profileId: 'p1', name: 'Office', ...usage(3, 2) }],
+  servers: [
+    {
+      id: 'server:s1',
+      proxyId: 's1',
+      name: 'Squid',
+      host: '10.0.0.1',
+      port: 3128,
+      enabled: true,
+      ...usage(3, 2),
+    },
+  ],
   egress: [{ id: 'internet', ...usage(3, 2) }],
   links: [
     {
@@ -96,6 +107,15 @@ const data: Topology = {
     },
     {
       source: 'proxy:p1',
+      target: 'server:s1',
+      kind: 'egress',
+      requests: 3,
+      errors: 2,
+      costUsd: 0,
+      recent: 1,
+    },
+    {
+      source: 'server:s1',
       target: 'internet',
       kind: 'egress',
       requests: 3,
@@ -114,7 +134,16 @@ describe('buildTopologyGraph', () => {
     expect(x('client:10.0.0.5')).toBeLessThan(x('harness:a'));
     expect(x('harness:a')).toBeLessThan(x('connection:c1'));
     expect(x('connection:c1')).toBeLessThan(x('proxy:p1'));
-    expect(x('proxy:p1')).toBeLessThan(x('internet'));
+    expect(x('proxy:p1')).toBeLessThan(x('server:s1'));
+    expect(x('server:s1')).toBeLessThan(x('internet'));
+  });
+
+  it('draws the end of the chain round and the proxy server with its address', () => {
+    const graph = buildTopologyGraph(data);
+    const node = (id: string) => graph.nodes.find((n) => n.id === id)!.data;
+    expect(node('internet').round).toBe(true);
+    expect(node('server:s1').round).toBeFalsy();
+    expect(node('server:s1').subtitle).toBe('10.0.0.1:3128');
   });
 
   it('keeps saved positions', () => {
@@ -162,7 +191,7 @@ describe('buildTopologyGraph', () => {
     expect(edge('client:10.0.0.5>harness:a').arrow).toBe(true);
     expect(edge('harness:a>connection:c1').arrow).toBe(false);
     expect(edge('client:10.0.0.5>harness:a').width).toBeCloseTo(6.4);
-    expect(edge('proxy:p1>internet').width).toBeCloseTo(4);
+    expect(edge('proxy:p1>server:s1').width).toBeCloseTo(4);
     expect(edge('harness:a>connection:c1').width).toBeCloseTo(1.6);
   });
 
@@ -171,6 +200,19 @@ describe('buildTopologyGraph', () => {
     expect(ids).toContain('proxy:p1');
     expect(ids).not.toContain('harness:b');
     expect(ids).not.toContain('connection:c2');
+  });
+
+  it('counts the requests in flight on each lit line in live', () => {
+    const edges = buildTopologyGraph(data, { live: true }).edges;
+    const edge = (id: string) => edges.find((e) => e.id === id)?.data;
+    // Lit (in flight or just ended): the count is what still waits for an answer.
+    expect(edge('client:10.0.0.5>harness:a')).toMatchObject({ label: '2', idle: false });
+    // Just ended, nothing waiting: lit without a count.
+    expect(edge('harness:a>connection:c1')).toMatchObject({ label: undefined, idle: false });
+    expect(edge('harness:a>connection:c2')).toMatchObject({ idle: true });
+    expect(buildTopologyGraph(data, { live: true }).nodes).toHaveLength(
+      buildTopologyGraph(data).nodes.length,
+    );
   });
 });
 

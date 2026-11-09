@@ -5,6 +5,7 @@ import type { Cache } from 'cache-manager';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { AgentsController } from './agents.controller';
+import { MIN_ROLE_KEY } from '../../common/decorators/roles.decorator';
 import { TimeseriesQueriesService } from '../services/timeseries-queries.service';
 import { AgentLifecycleService } from '../services/agent-lifecycle.service';
 import { AgentDuplicationService } from '../services/agent-duplication.service';
@@ -756,5 +757,15 @@ describe('AgentsController', () => {
     await expect(ctrl.createAgent(userCtx as never, { name: 'My Agent' } as never)).rejects.toThrow(
       QueryFailedError,
     );
+  });
+});
+
+describe('AgentsController roles', () => {
+  it('requires member to reveal a full agent key, even though it is a GET', () => {
+    const handler = AgentsController.prototype.getAgentKey;
+    expect(Reflect.getMetadata(MIN_ROLE_KEY, handler)).toEqual({
+      role: 'member',
+      includeReads: true,
+    });
   });
 });

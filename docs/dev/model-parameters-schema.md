@@ -54,6 +54,8 @@ Rules:
 - `params` is the non-empty list of parameters for that exact route.
 - `path` is a dot path into stored params and outbound request params.
 - `type` is semantic data type, not a UI control kind.
+  One of `boolean`, `enum`, `integer`, `number`, `string`, `string_list`
+  (an array of non-empty strings, up to 64 items of 120 characters).
 - `label` is user-facing copy.
 - `description` is developer-facing explanatory copy for the raw parameter.
 - `default` is the provider default Thinker should display when known.
@@ -61,6 +63,9 @@ Rules:
 - `range` describes numeric bounds and optional step.
 - `group` is a semantic grouping for ordering and display.
 - `applicability` is optional; omitted means always available.
+- `clientOwnsRoot` is optional (Thinker-added params only, never from the
+  modelparams catalog): when the client request already carries the path's
+  root object, no configured value under that root is merged in.
 - Do not add ad hoc rule fields such as `conflictsWith`, `disabledWhen`,
   `ui`, or provider-specific metadata. Express availability through
   `applicability`.
@@ -151,6 +156,7 @@ The outbound proxy merge:
 
 1. expands needed nested defaults for configured nested roots
 2. merges configured Thinker values last, so Thinker values win for the same provider path
+   (except `clientOwnsRoot` params, skipped when the client sent the root object)
 3. omits params that are not applicable under the final effective values
 
 Client request body values that do not overlap configured Thinker model
@@ -171,3 +177,11 @@ Add new schema syntax only when a provider rule cannot be represented with:
 When extending the language, update the executable validator and add tests for
 both accepted and rejected shapes in
 `packages/shared/__tests__/provider-params-spec.spec.ts`.
+
+## Thinker-Added Params
+
+Thinker appends params the modelparams catalog does not carry:
+
+- OpenRouter provider routing (`provider.*`, group `provider_routing`,
+  `clientOwnsRoot`), for every OpenRouter API-key model:
+  `packages/backend/src/routing/routing-core/openrouter-provider-routing.ts`.

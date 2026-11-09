@@ -1,4 +1,6 @@
+import { Audit } from '../alerts/audit.decorator';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -51,17 +53,28 @@ export class OrganizationsController {
     };
   }
 
+  @Audit({ entity: 'workspace', action: 'created' })
   @Post()
   @InstanceAdminOnly()
   create(@TenantCtx() ctx: TenantContext, @Body() body: { name: string }) {
     return this.organizations.create(body?.name, requireUser(ctx));
   }
 
+  @Audit({
+    entity: 'workspace',
+    action: 'updated',
+    lookup: { table: 'tenants', nameColumn: 'name', tenantScoped: false },
+  })
   @Patch(':id')
   rename(@TenantCtx() ctx: TenantContext, @Param('id') id: string, @Body() body: { name: string }) {
     return this.organizations.rename(requireUser(ctx), id, body?.name);
   }
 
+  @Audit({
+    entity: 'workspace',
+    action: 'deleted',
+    lookup: { table: 'tenants', nameColumn: 'name', tenantScoped: false },
+  })
   @Delete(':id')
   async remove(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
     await this.organizations.deactivate(requireUser(ctx), id);
@@ -73,6 +86,11 @@ export class OrganizationsController {
     return this.organizations.getLogRetention(requireUser(ctx), id);
   }
 
+  @Audit({
+    entity: 'workspace',
+    action: 'updated',
+    lookup: { table: 'tenants', nameColumn: 'name', tenantScoped: false },
+  })
   @Patch(':id/log-retention')
   setLogRetention(
     @TenantCtx() ctx: TenantContext,
@@ -87,6 +105,7 @@ export class OrganizationsController {
     return { members: await this.organizations.listMembers(requireUser(ctx), id) };
   }
 
+  @Audit({ entity: 'member', action: 'created' })
   @Post(':id/members')
   addMember(
     @TenantCtx() ctx: TenantContext,
@@ -96,6 +115,12 @@ export class OrganizationsController {
     return this.organizations.addMember(requireUser(ctx), id, body ?? ({} as never));
   }
 
+  @Audit({
+    entity: 'member',
+    action: 'updated',
+    idParam: 'userId',
+    lookup: { table: 'user', nameColumn: 'email', tenantScoped: false },
+  })
   @Patch(':id/members/:userId')
   async changeRole(
     @TenantCtx() ctx: TenantContext,
@@ -108,6 +133,12 @@ export class OrganizationsController {
     };
   }
 
+  @Audit({
+    entity: 'member',
+    action: 'deleted',
+    idParam: 'userId',
+    lookup: { table: 'user', nameColumn: 'email', tenantScoped: false },
+  })
   @Delete(':id/members/:userId')
   async removeMember(
     @TenantCtx() ctx: TenantContext,
@@ -146,7 +177,10 @@ export class MeAccountController {
   @Put('active-organization')
   async setActive(@TenantCtx() ctx: TenantContext, @Body() body: { organizationId: string }) {
     const userId = requireUser(ctx);
-    await this.organizations.roleOf(userId, body?.organizationId);
+    if (typeof body?.organizationId !== 'string' || !body.organizationId) {
+      throw new BadRequestException('organizationId is required');
+    }
+    await this.organizations.roleOf(userId, body.organizationId);
     await this.accounts.setActiveOrganization(userId, body.organizationId);
     return { ok: true };
   }
@@ -175,6 +209,7 @@ export class AdminUsersController {
     };
   }
 
+  @Audit({ entity: 'user', action: 'created' })
   @Post()
   async create(
     @TenantCtx() ctx: TenantContext,
@@ -187,12 +222,21 @@ export class AdminUsersController {
       role?: string;
     },
   ) {
+    // Validate the membership first: the temporary password is shown once,
+    // so a bad organization or role must fail before the account exists.
+    if (body?.organizationId) {
+      await this.organizations.assertCanAddMember(
+        requireUser(ctx),
+        body.organizationId,
+        body.role ?? 'member',
+      );
+    }
     const { account, temporaryPassword } = await this.accounts.createAccount(
       body?.email ?? '',
       body?.name ?? '',
       body?.isInstanceAdmin === true,
     );
-    if (body.organizationId) {
+    if (body?.organizationId) {
       await this.organizations.addExistingMember(
         requireUser(ctx),
         body.organizationId,
@@ -203,11 +247,21 @@ export class AdminUsersController {
     return { user: account, temporaryPassword };
   }
 
+  @Audit({
+    entity: 'user',
+    action: 'updated',
+    lookup: { table: 'user', nameColumn: 'email', tenantScoped: false },
+  })
   @Post(':id/reset-password')
   async resetPassword(@Param('id') id: string) {
     return { temporaryPassword: await this.accounts.resetPassword(id) };
   }
 
+  @Audit({
+    entity: 'user',
+    action: 'updated',
+    lookup: { table: 'user', nameColumn: 'email', tenantScoped: false },
+  })
   @Patch(':id')
   async update(@Param('id') id: string, @Body() body: { isInstanceAdmin: boolean }) {
     return { user: await this.accounts.setInstanceAdmin(id, body?.isInstanceAdmin === true) };

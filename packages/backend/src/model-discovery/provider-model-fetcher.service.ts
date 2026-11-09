@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DiscoveredModel, FetcherConfig, DEFAULT_CONTEXT_WINDOW } from './model-fetcher';
+import { DiscoveredModel, FetcherConfig, contextWindowFields } from './model-fetcher';
+import { rebaseUrl } from '../routing/account-base-url';
+import { validatePublicUrl } from '../common/utils/url-validation';
 import { parseModalities } from './model-capabilities';
 import { OLLAMA_CLOUD_HOST, OLLAMA_HOST } from '../common/constants/ollama';
 import {
@@ -8,6 +10,9 @@ import {
   CODEX_CLI_VERSION,
   COPILOT_EDITOR_VERSION,
   COPILOT_PLUGIN_VERSION,
+  GROK_CLI_HEADERS,
+  GROK_CLI_PROXY_BASE,
+  OPENCODE_FREE_KEY,
   buildClaudeCodeSubscriptionHeaders,
 } from '../common/constants/subscription-clients';
 import {
@@ -28,7 +33,11 @@ import {
 import { getZaiCodingPlanBaseUrl, normalizeZaiCodingPlanBaseUrl } from '../routing/zai-region';
 import { buildLocalServerHeaders, getLocalServerBaseUrl } from '../common/constants/local-servers';
 import { MINIMAX_BASE_URLS } from '../routing/oauth/minimax/minimax-oauth-helpers';
-import { OpencodeGoCatalogService } from './opencode-go-catalog.service';
+import {
+  OpencodeCatalogService,
+  type OpencodeCatalogEntry,
+  type OpencodeCatalogProvider,
+} from './opencode-catalog.service';
 import { PROVIDER_ENDPOINTS } from '../routing/proxy/provider-endpoints';
 import {
   buildKiroHeaders,
@@ -45,6 +54,7 @@ import {
   type ModelModality,
 } from 'thinker-shared';
 import { outboundFetch } from '../common/outbound/outbound-proxy';
+import { ssrfSafeFetch } from '../common/utils/ssrf-safe-fetch';
 
 const FETCH_TIMEOUT_MS = 5000;
 const ANTHROPIC_DEFAULT_CONTEXT = 200000;
@@ -63,9 +73,8 @@ const HUGGING_FACE_MODELS_URL = 'https://router.huggingface.co/v1/models';
 const FIREWORKS_MODELS_PAGE_SIZE = 200;
 const FIREWORKS_MODELS_MAX_PAGES = 20;
 const NOUS_PORTAL_MODELS_URL = 'https://inference-api.nousresearch.com/v1/models';
-const OPENCODE_GO_MODELS_URL = 'https://opencode.ai/zen/go/v1/models';
-const PIONEER_MODELS_URL = 'https://api.pioneer.ai/v1/models';
-const PIONEER_BASE_MODELS_URL = 'https://api.pioneer.ai/base-models';
+const PIONEER_MODELS_URL = 'https://api.fastino.ai/v1/models';
+const PIONEER_BASE_MODELS_URL = 'https://api.fastino.ai/v1/base-models';
 const META_MODELS_URL = 'https://api.meta.ai/v1/models';
 // Same host the ClinePass inference endpoint uses, so discovery only talks to
 // the provider the operator configured (ADR 0003).
@@ -79,7 +88,7 @@ interface ModelParserConfig<T> {
   filter: (entry: T) => boolean;
   getId: (entry: T) => string;
   getDisplayName: (entry: T, id: string) => string;
-  contextWindow?: number | ((entry: T) => number);
+  contextWindow?: number | ((entry: T) => number | null | undefined);
   contextWindowSource?: (entry: T) => DiscoveredModel['contextWindowSource'];
   inputPricePerToken?: number | null;
   outputPricePerToken?: number | null;
@@ -108,8 +117,9 @@ function createModelParser<T>(
       .map((m: unknown) => {
         const entry = m as T;
         const id = config.getId(entry);
-        const ctxVal = config.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
-        const contextWindowSource = config.contextWindowSource?.(entry);
+        const ctxVal = config.contextWindow;
+        const ctx = contextWindowFields(typeof ctxVal === 'function' ? ctxVal(entry) : ctxVal);
+        const contextWindowSource = ctx.contextWindowSource ?? config.contextWindowSource?.(entry);
         const supportedEndpoints = config.supportedEndpoints?.(entry);
         const inputModalities = resolvePerEntry(config.inputModalities, entry);
         const outputModalities = resolvePerEntry(config.outputModalities, entry);
@@ -117,7 +127,7 @@ function createModelParser<T>(
           id,
           displayName: config.getDisplayName(entry, id),
           provider,
-          contextWindow: typeof ctxVal === 'function' ? ctxVal(entry) : ctxVal,
+          contextWindow: ctx.contextWindow,
           ...(contextWindowSource ? { contextWindowSource } : {}),
           inputPricePerToken: config.inputPricePerToken ?? null,
           outputPricePerToken: config.outputPricePerToken ?? null,
@@ -166,6 +176,8 @@ interface PioneerBaseModelEntry {
   output_price_per_million?: number | null;
   supports_inference?: boolean;
   is_chat_model?: boolean;
+  /** `decoder` (chat), `encoder`, `systemone`, ... */
+  task_type?: string;
   supports_image_input?: boolean;
 }
 
@@ -228,7 +240,7 @@ const parsePioneer = createModelParser<PioneerModelEntry>({
   filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
   getId: (entry) => entry.id,
   getDisplayName: (entry, id) => entry.display_name || id,
-  contextWindow: (entry) => entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => entry.context_length,
 });
 
 function perMillionToPerToken(value: number | null | undefined): number | null {
@@ -266,6 +278,16 @@ function parseHuggingFace(body: unknown, provider: string): DiscoveredModel[] {
     if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
     const fastest = fastestLiveHuggingFaceProvider(entry.providers);
     if (!fastest) return [];
+    // `:fastest` may land on a provider that publishes no price or context;
+    // estimate from another live provider rather than show the model as free
+    // (api-huggingface G2).
+    const live = (Array.isArray(entry.providers) ? entry.providers : []).filter(
+      (p): p is HuggingFaceProviderEntry => !!p && typeof p === 'object' && p.status === 'live',
+    );
+    const priced = fastest.pricing ? fastest : live.find((p) => p.pricing);
+    const contextLength =
+      fastest.context_length ??
+      live.find((p) => typeof p.context_length === 'number')?.context_length;
 
     const inputModalities = parseModalities(entry.architecture?.input_modalities);
     const outputModalities = parseModalities(entry.architecture?.output_modalities);
@@ -281,9 +303,9 @@ function parseHuggingFace(body: unknown, provider: string): DiscoveredModel[] {
         id: entry.id,
         displayName: entry.id,
         provider,
-        contextWindow: fastest.context_length ?? DEFAULT_CONTEXT_WINDOW,
-        inputPricePerToken: perMillionToPerToken(fastest.pricing?.input),
-        outputPricePerToken: perMillionToPerToken(fastest.pricing?.output),
+        ...contextWindowFields(contextLength),
+        inputPricePerToken: perMillionToPerToken(priced?.pricing?.input),
+        outputPricePerToken: perMillionToPerToken(priced?.pricing?.output),
         capabilityReasoning: false,
         capabilityCode: fastest.supports_tools === true,
         capabilities,
@@ -311,7 +333,14 @@ function enrichPioneerModels(
   models: DiscoveredModel[],
   catalog: Map<string, PioneerBaseModelEntry>,
 ): DiscoveredModel[] {
-  return models.map((model) => {
+  // Only `decoder` base models answer chat completions (encoders, GLiDE
+  // `systemone`); models absent from the catalog (fine-tunes) stay (api-pioneer G4).
+  const chat = models.filter((model) => {
+    const base = catalog.get(model.id);
+    if (!base) return true;
+    return typeof base.task_type !== 'string' || base.task_type === 'decoder';
+  });
+  return chat.map((model) => {
     const base = catalog.get(model.id);
     if (!base) return model;
     return {
@@ -331,14 +360,14 @@ const parseCommandCode = createModelParser<CommandCodeModelEntry>({
   filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
   getId: (entry) => `commandcode/${entry.id}`,
   getDisplayName: (entry, id) => entry.name || id,
-  contextWindow: (entry) => entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => entry.context_length,
   capabilityCode: true,
 });
 
-const parseBytePlusCodingPlan = (body: unknown, provider: string): DiscoveredModel[] => {
-  const known = new Set(getSubscriptionKnownModels('byteplus') ?? []);
-  return parseOpenAI(body, provider).filter((model) => known.has(model.id));
-};
+// `/api/coding/v3/models` is already scoped to the plan, so everything it lists
+// is usable; `knownModels` is only the fallback when the listing fails (sub-byteplus G1).
+const parseBytePlusCodingPlan = (body: unknown, provider: string): DiscoveredModel[] =>
+  parseOpenAI(body, provider);
 
 const parseQwenTokenPlan = createModelParser<OpenAIModelEntry>({
   arrayKey: 'data',
@@ -351,6 +380,9 @@ const parseQwenTokenPlan = createModelParser<OpenAIModelEntry>({
 });
 
 const XIAOMI_MIMO_CONTEXT_WINDOWS = new Map<string, number>([
+  ['mimo-v2.6-pro', 1048576],
+  ['mimo-v2.6-flash', 1048576],
+  ['mimo-v2.6-pro-ultraspeed', 1048576],
   ['mimo-v2.5-pro', 1048576],
   ['mimo-v2-pro', 1048576],
   ['mimo-v2.5', 1048576],
@@ -363,7 +395,7 @@ const parseXiaomiMimo = createModelParser<OpenAIModelEntry>({
   filter: (entry) => typeof entry.id === 'string' && entry.id.startsWith('mimo-v'),
   getId: (entry) => entry.id,
   getDisplayName: (_entry, id) => id,
-  contextWindow: (entry) => XIAOMI_MIMO_CONTEXT_WINDOWS.get(entry.id) ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => XIAOMI_MIMO_CONTEXT_WINDOWS.get(entry.id),
   capabilityCode: true,
 });
 
@@ -422,15 +454,15 @@ export const UNIVERSAL_NON_CHAT_RE =
  */
 export const PROVIDER_NON_CHAT: Record<string, RegExp> = {
   openai:
-    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|^gpt-3\.5-turbo-instruct|audio|^chatgpt-image|^gpt-image-|search-api)/i,
+    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|^gpt-3\.5-turbo-instruct|audio|^chatgpt-image|^gpt-image-|search-api|^gpt-live-)/i,
   'openai-subscription':
-    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|audio|^chatgpt-image|^gpt-image-)/i,
+    /(?:moderation|davinci|babbage|^text-|realtime|-transcribe|^sora|audio|^chatgpt-image|^gpt-image-|^gpt-live-)/i,
   // `flash-lite-preview-MM-YYYY` matches deprecated dated snapshots
   // (e.g. gemini-2.5-flash-lite-preview-09-2025). The unsuffixed
   // `gemini-3.1-flash-lite-preview` is the canonical preview alias and
   // must NOT be filtered.
   gemini:
-    /(?:^aqs-|nano-banana|^deep-research|computer-use|^lyria|^gemini-2\.0-flash-lite$|flash-lite-preview-\d{2}-\d{4}$|robotics)/i,
+    /(?:^aqs-|nano-banana|^deep-research|computer-use|^lyria|^gemini-2\.0-flash-lite$|flash-lite-preview-\d{2}-\d{4}$|robotics|^gemini-omni|transcribe)/i,
   // Vertex serves the same non-chat families as the Gemini API, plus Imagen
   // and Veo under their own names.
   vertex:
@@ -455,11 +487,13 @@ export const PROVIDER_NON_CHAT: Record<string, RegExp> = {
     /(?:flux|cosmos|detector|gliner|calibration|embed|retriever|parse|tts|translate|safety|guard|reward|nvclip|vila|neva)/i,
   xiaomi: /(?:asr|tts)/i,
   'xiaomi-subscription': /(?:asr|tts)/i,
-  'qwen-subscription': /(?:^qwen-image-|^wan.*image)/i,
+  'qwen-subscription': /(?:^qwen-image-|^wan.*(?:image|video)|^happyhorse-|^qwen-audio-)/i,
   xai: /imagine/i,
+  // The Coding Plan listing also carries image/video generators.
+  byteplus: /(?:seedream|seedance|seededit|-t2i|-i2v|-t2v)/i,
   copilot: /accounts\/[^/]+\/routers\//i,
   bedrock: /(?:^|[./])voxtral-/i,
-  pioneer: /(?:gliner|gliguard|privacy-filter|^fastino\/)/i,
+  pioneer: /(?:gliner|gliguard|privacy-filter)/i,
 };
 
 /**
@@ -483,6 +517,28 @@ export const PROVIDER_BLOCKLIST: Record<string, ReadonlySet<string>> = {
 };
 
 /** Filter models that are not compatible with chat completions. */
+/**
+ * Model retirements with a known date, per provider (api-vertex G2). After the
+ * date the id answers 404, so discovery stops offering it.
+ */
+const PROVIDER_RETIREMENTS: Record<string, Record<string, string>> = {
+  vertex: {
+    'gemini-2.0-flash': '2026-06-01',
+    'gemini-2.0-flash-lite': '2026-06-01',
+    'gemini-2.5-pro': '2026-10-20',
+    'gemini-2.5-flash': '2026-10-20',
+    'gemini-2.5-flash-lite': '2026-10-20',
+    'gemini-3.6-flash': '2026-11-19',
+    'gemini-3.7-flash': '2027-01-28',
+    'gemini-2.5-flash-image': '2027-03-15',
+  },
+};
+
+function isRetired(configKey: string, modelId: string, now = Date.now()): boolean {
+  const date = PROVIDER_RETIREMENTS[configKey]?.[modelId.replace(/^google\//, '')];
+  return !!date && Date.parse(`${date}T00:00:00Z`) <= now;
+}
+
 export function filterNonChatModels(
   models: DiscoveredModel[],
   configKey: string,
@@ -491,6 +547,7 @@ export function filterNonChatModels(
   const blocklist = PROVIDER_BLOCKLIST[configKey];
   return models.filter((m) => {
     if (UNIVERSAL_NON_CHAT_RE.test(m.id)) return false;
+    if (isRetired(configKey, m.id)) return false;
     if (providerFilter && providerFilter.test(m.id)) return false;
     if (blocklist && blocklist.has(m.id)) return false;
     return true;
@@ -521,7 +578,11 @@ const parseMistral = createModelParser<MistralModelEntry>({
   arrayKey: 'data',
   filter: (entry) => {
     if (typeof entry.id !== 'string' || entry.id.length === 0) return false;
-    if (entry.deprecation != null) return false;
+    // Deprecated models keep answering until retirement (api-mistral G3).
+    if (entry.deprecation != null) {
+      const retiresAt = Date.parse(String(entry.deprecation));
+      if (!Number.isFinite(retiresAt) || retiresAt <= Date.now()) return false;
+    }
     if (entry.capabilities && entry.capabilities.completion_chat === false) return false;
     return true;
   },
@@ -538,14 +599,39 @@ interface AnthropicModelEntry {
   id: string;
   display_name?: string;
   type?: string;
+  /** Per-model input window (api-anthropic G1). */
+  max_input_tokens?: number;
+  lifecycle?: string;
 }
 
 const parseAnthropic = createModelParser<AnthropicModelEntry>({
   arrayKey: 'data',
-  filter: (entry) => typeof entry.id === 'string' && entry.type === 'model',
+  filter: (entry) =>
+    typeof entry.id === 'string' && entry.type === 'model' && entry.lifecycle !== 'retired',
   getId: (entry) => entry.id,
   getDisplayName: (entry, id) => entry.display_name || id,
-  contextWindow: ANTHROPIC_DEFAULT_CONTEXT,
+  contextWindow: (entry) =>
+    typeof entry.max_input_tokens === 'number' && entry.max_input_tokens > 0
+      ? entry.max_input_tokens
+      : ANTHROPIC_DEFAULT_CONTEXT,
+});
+
+interface GroqModelEntry extends OpenAIModelEntry {
+  context_window?: number;
+}
+
+// Groq's /models carries the window per model (api-groq G2).
+const parseGroq = createModelParser<GroqModelEntry>({
+  arrayKey: 'data',
+  filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
+  getId: (entry) => entry.id,
+  getDisplayName: (_entry, id) => id,
+  contextWindow: (entry) =>
+    typeof entry.context_window === 'number' && entry.context_window > 0
+      ? entry.context_window
+      : undefined,
+  inputModalities: (entry) => parseModalities(entry.input_modalities),
+  outputModalities: (entry) => parseModalities(entry.output_modalities),
 });
 
 interface GeminiModelEntry {
@@ -553,6 +639,7 @@ interface GeminiModelEntry {
   displayName?: string;
   supportedGenerationMethods?: string[];
   inputTokenLimit?: number;
+  thinking?: boolean;
 }
 
 const GEMINI_VERSION_SUFFIX_RE = /-\d{3}$/;
@@ -578,7 +665,7 @@ function parseGemini(body: unknown, provider: string): DiscoveredModel[] {
         contextWindow: entry.inputTokenLimit ?? GEMINI_DEFAULT_CONTEXT,
         inputPricePerToken: null,
         outputPricePerToken: null,
-        capabilityReasoning: false,
+        capabilityReasoning: entry.thinking === true,
         capabilityCode: false,
         qualityScore: 3,
       };
@@ -597,9 +684,10 @@ function parseGemini(body: unknown, provider: string): DiscoveredModel[] {
 interface OpenRouterModelEntry {
   id: string;
   name?: string;
+  expiration_date?: string | null;
   context_length?: number;
   architecture?: { input_modalities?: string[]; output_modalities?: string[] };
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: OpenRouterStylePricing;
 }
 
 interface FireworksModelEntry {
@@ -616,7 +704,7 @@ const parseFireworks = createModelParser<FireworksModelEntry>({
     typeof entry.name === 'string' && entry.name.length > 0 && entry.supportsServerless !== false,
   getId: (entry) => entry.name,
   getDisplayName: (entry, id) => entry.displayName || id,
-  contextWindow: (entry) => entry.contextLength ?? DEFAULT_CONTEXT_WINDOW,
+  contextWindow: (entry) => entry.contextLength,
   capabilityCode: (entry) => entry.supportsTools === true,
 });
 
@@ -631,6 +719,11 @@ function parseOpenRouter(body: unknown, provider: string): DiscoveredModel[] {
       // never through the synchronous chat completions proxy — listing them
       // advertises models that are guaranteed to 404.
       if (entry.id.endsWith(':batch')) return false;
+      // Models past `expiration_date` are retired (api-nous G2).
+      if (typeof entry.expiration_date === 'string') {
+        const expiresAt = Date.parse(entry.expiration_date);
+        if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) return false;
+      }
       const output = entry.architecture?.output_modalities?.map((o) => o.toLowerCase());
       if (output && output.length > 0 && !output.every((o) => o === 'text')) {
         return false;
@@ -647,11 +740,12 @@ function parseOpenRouter(body: unknown, provider: string): DiscoveredModel[] {
         id: entry.id,
         displayName: entry.name || entry.id,
         provider,
-        contextWindow: entry.context_length ?? DEFAULT_CONTEXT_WINDOW,
+        ...contextWindowFields(entry.context_length),
         inputPricePerToken:
           prompt !== null && Number.isFinite(prompt) && prompt >= 0 ? prompt : null,
         outputPricePerToken:
           completion !== null && Number.isFinite(completion) && completion >= 0 ? completion : null,
+        ...openRouterCachePrices(entry.pricing),
         capabilityReasoning: false,
         capabilityCode: false,
         ...(inputModalities ? { inputModalities } : {}),
@@ -661,13 +755,38 @@ function parseOpenRouter(body: unknown, provider: string): DiscoveredModel[] {
     });
 }
 
+/** OpenRouter-style `pricing` (Kilo, Nous, OpenRouter): per-token strings. */
+interface OpenRouterStylePricing {
+  prompt?: string;
+  completion?: string;
+  input_cache_read?: string;
+  input_cache_write?: string;
+}
+
+/** Cache read/write rates of an OpenRouter-style `pricing` (api-kilo G1, api-nous G1). */
+function openRouterCachePrices(
+  pricing: OpenRouterStylePricing | undefined,
+): Pick<DiscoveredModel, 'cacheReadPricePerToken' | 'cacheWritePricePerToken'> {
+  const read = Number(pricing?.input_cache_read);
+  const write = Number(pricing?.input_cache_write);
+  return {
+    ...(pricing?.input_cache_read && Number.isFinite(read) && read >= 0
+      ? { cacheReadPricePerToken: read }
+      : {}),
+    ...(pricing?.input_cache_write && Number.isFinite(write) && write >= 0
+      ? { cacheWritePricePerToken: write }
+      : {}),
+  };
+}
+
 interface KiloModelEntry {
   id: string;
+  expiration_date?: string | null;
   name?: string;
   context_length?: number;
   architecture?: { output_modalities?: string[] };
   top_provider?: { context_length?: number };
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: OpenRouterStylePricing;
   supported_parameters?: string[];
 }
 
@@ -678,6 +797,11 @@ function parseKilo(body: unknown, provider: string): DiscoveredModel[] {
     .filter((m: unknown) => {
       const entry = m as KiloModelEntry;
       if (typeof entry.id !== 'string' || entry.id.length === 0) return false;
+      // Expired models are retired by the gateway (api-kilo G2).
+      if (typeof entry.expiration_date === 'string') {
+        const expiresAt = Date.parse(entry.expiration_date);
+        if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) return false;
+      }
       const output = entry.architecture?.output_modalities?.map((o) => o.toLowerCase());
       if (output && output.length > 0 && !output.every((o) => o === 'text')) {
         return false;
@@ -693,12 +817,12 @@ function parseKilo(body: unknown, provider: string): DiscoveredModel[] {
         id: entry.id,
         displayName: entry.name || entry.id,
         provider,
-        contextWindow:
-          entry.context_length ?? entry.top_provider?.context_length ?? DEFAULT_CONTEXT_WINDOW,
+        ...contextWindowFields(entry.context_length ?? entry.top_provider?.context_length),
         inputPricePerToken:
           prompt !== null && Number.isFinite(prompt) && prompt >= 0 ? prompt : null,
         outputPricePerToken:
           completion !== null && Number.isFinite(completion) && completion >= 0 ? completion : null,
+        ...openRouterCachePrices(entry.pricing),
         capabilityReasoning:
           supported.includes('reasoning') || supported.includes('include_reasoning'),
         capabilityCode: supported.includes('tools'),
@@ -706,6 +830,32 @@ function parseKilo(body: unknown, provider: string): DiscoveredModel[] {
       };
     });
 }
+
+interface LmStudioModelEntry extends OpenAIModelEntry {
+  type?: string;
+  max_context_length?: number;
+  loaded_context_length?: number;
+  capabilities?: string[];
+}
+
+/** LM Studio `/api/v0/models`: chat models (`llm`, `vlm`) with their windows. */
+const parseLmStudio = createModelParser<LmStudioModelEntry>({
+  arrayKey: 'data',
+  filter: (entry) =>
+    typeof entry.id === 'string' &&
+    entry.id.length > 0 &&
+    (entry.type === undefined || entry.type === 'llm' || entry.type === 'vlm'),
+  getId: (entry) => entry.id,
+  getDisplayName: (_entry, id) => id,
+  contextWindow: (entry) =>
+    (typeof entry.loaded_context_length === 'number' && entry.loaded_context_length > 0
+      ? entry.loaded_context_length
+      : undefined) ??
+    (typeof entry.max_context_length === 'number' && entry.max_context_length > 0
+      ? entry.max_context_length
+      : undefined),
+  capabilityCode: (entry) => entry.capabilities?.includes('tool_use') === true,
+});
 
 interface OllamaModelEntry {
   name: string;
@@ -822,10 +972,9 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
       defaultPricing && longContextTier && longContextThreshold
         ? { thresholdTokens: longContextThreshold, ...longContextTier }
         : null;
-    const contextWindow =
-      copilotContextMax(tokenPrices?.long_context) ??
-      longContextThreshold ??
-      DEFAULT_CONTEXT_WINDOW;
+    const contextFields = contextWindowFields(
+      copilotContextMax(tokenPrices?.long_context) ?? longContextThreshold,
+    );
     const supportedEndpoints = getStringArray(entry.supported_endpoints);
 
     return [
@@ -833,7 +982,7 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
         id: `copilot/${entry.id}`,
         displayName: entry.id,
         provider,
-        contextWindow,
+        ...contextFields,
         inputPricePerToken: defaultPricing?.inputPricePerToken ?? 0,
         outputPricePerToken: defaultPricing?.outputPricePerToken ?? 0,
         ...(defaultPricing?.cacheReadPricePerToken !== undefined
@@ -851,20 +1000,6 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
     ];
   });
 }
-
-/* ── OpenCode Zen (aggregator, OpenAI-compatible /models) ── */
-
-// Prefix every Zen catalog entry with `opencode-zen/` so the discovered model
-// remains an explicit route through the Zen gateway. Forwarding strips the
-// prefix before calling Zen, while provider inference and legacy provider-less
-// lookups can still distinguish Zen models from the same native IDs exposed by
-// directly-connected providers.
-const parseOpencodeZen = createModelParser<OpenAIModelEntry>({
-  arrayKey: 'data',
-  filter: (entry) => typeof entry.id === 'string' && entry.id.length > 0,
-  getId: (entry) => `opencode-zen/${entry.id}`,
-  getDisplayName: (entry) => entry.id,
-});
 
 /* ── Provider configs ── */
 
@@ -907,7 +1042,7 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
   groq: {
     endpoint: 'https://api.groq.com/openai/v1/models',
     buildHeaders: bearerHeaders,
-    parse: parseOpenAI,
+    parse: parseGroq,
   },
   huggingface: {
     endpoint: HUGGING_FACE_MODELS_URL,
@@ -959,6 +1094,11 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     buildHeaders: bearerHeaders,
     parse: parseOpenAI,
   },
+  'xai-subscription': {
+    endpoint: `${GROK_CLI_PROXY_BASE}/v1/models`,
+    buildHeaders: (token: string) => ({ ...bearerHeaders(token), ...GROK_CLI_HEADERS }),
+    parse: parseOpenAI,
+  },
   minimax: {
     endpoint: `${MINIMAX_BASE_URLS.global}/v1/models`,
     buildHeaders: bearerHeaders,
@@ -998,7 +1138,8 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     parse: parseQwenTokenPlan,
   },
   zai: {
-    endpoint: 'https://open.bigmodel.cn/api/paas/v4/models',
+    // Same host as inference: global keys belong to api.z.ai (api-zai G1).
+    endpoint: 'https://api.z.ai/api/paas/v4/models',
     buildHeaders: bearerHeaders,
     parse: parseOpenAI,
   },
@@ -1028,9 +1169,9 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     parse: parseOpenAI,
   },
   gemini: {
-    endpoint: (key: string) =>
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
-    buildHeaders: () => ({}),
+    // The key rides in `x-goog-api-key`, never in the URL (api-gemini G7).
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+    buildHeaders: (key: string) => ({ 'x-goog-api-key': key }),
     parse: parseGemini,
   },
   openrouter: {
@@ -1048,11 +1189,12 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     buildHeaders: bearerHeaders,
     parse: parseOllama,
   },
-  // LM Studio and llama-server list loaded models on OpenAI's `/v1/models`.
+  // LM Studio's REST `/api/v0/models` carries type, context and state, which
+  // OpenAI's `/v1/models` lacks (local-lmstudio G1); llama-server lists on `/v1/models`.
   lmstudio: {
-    endpoint: () => `${getLocalServerBaseUrl('lmstudio')}/v1/models`,
+    endpoint: () => `${getLocalServerBaseUrl('lmstudio')}/api/v0/models`,
     buildHeaders: buildLocalServerHeaders,
-    parse: parseOpenAI,
+    parse: parseLmStudio,
   },
   llamacpp: {
     endpoint: () => `${getLocalServerBaseUrl('llamacpp')}/v1/models`,
@@ -1070,16 +1212,19 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     }),
     parse: parseCopilot,
   },
-  'opencode-zen': {
-    endpoint: 'https://opencode.ai/zen/v1/models',
-    buildHeaders: bearerHeaders,
-    parse: parseOpencodeZen,
-  },
 };
 
-const OPENCODE_GO_CONTEXT_WINDOW = 200000;
-
 export interface ProviderModelFetchOptions {
+  /**
+   * The connection's own base URL and the official one it replaces: a models
+   * URL under the official base moves under the connection's base.
+   */
+  accountBaseUrl?: {
+    base: string;
+    official: string | null;
+    /** False: refuse private/LAN addresses too (ADR 0006 item 7). Default true. */
+    allowPrivate?: boolean;
+  };
   forceRefresh?: boolean;
   /**
    * Bedrock only: the connection's last discovered models. Their CRIS profiles
@@ -1094,8 +1239,8 @@ export class ProviderModelFetcherService {
 
   constructor(
     @Optional()
-    @Inject(OpencodeGoCatalogService)
-    private readonly opencodeGoCatalog: OpencodeGoCatalogService | null = null,
+    @Inject(OpencodeCatalogService)
+    private readonly opencodeCatalog: OpencodeCatalogService | null = null,
   ) {}
 
   async fetch(
@@ -1123,8 +1268,10 @@ export class ProviderModelFetcherService {
       configKey = 'qwen-subscription';
     } else if (configKey === 'zai' && authType === 'subscription') {
       configKey = 'zai-subscription';
-    } else if (configKey === 'opencode-go') {
-      return this.fetchOpencodeGoModels(apiKey, options?.forceRefresh === true);
+    } else if (configKey === 'xai' && authType === 'subscription') {
+      configKey = 'xai-subscription';
+    } else if (configKey === 'opencode' || configKey === 'opencode-go') {
+      return this.fetchOpencodeModels(configKey, apiKey, options?.forceRefresh === true);
     } else if (configKey === 'cline-pass') {
       return this.fetchClinePassModels();
     } else if (configKey === 'gemini' && authType === 'subscription') {
@@ -1191,6 +1338,20 @@ export class ProviderModelFetcherService {
       }
     }
 
+    if (options?.accountBaseUrl) {
+      url = rebaseUrl(url, options.accountBaseUrl.official, options.accountBaseUrl.base);
+      try {
+        await validatePublicUrl(url, {
+          allowPrivate: options.accountBaseUrl.allowPrivate !== false,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Ignoring model discovery on a blocked base URL: ${(err as Error).message}`,
+        );
+        return [];
+      }
+    }
+
     const headers = config.buildHeaders(apiKey, authType);
 
     if (configKey === 'bedrock') {
@@ -1209,7 +1370,21 @@ export class ProviderModelFetcherService {
       return [...mantleModels, ...crisProfiles.filter((profile) => !mantleIds.has(profile.id))];
     }
 
-    return this.fetchModelList(url, headers, config, apiKey, providerId, configKey);
+    if (configKey === 'lmstudio') {
+      return this.fetchLmStudioModels(config, url, apiKey, providerId);
+    }
+
+    return this.fetchModelList(
+      url,
+      headers,
+      config,
+      apiKey,
+      providerId,
+      configKey,
+      options?.accountBaseUrl
+        ? { allowPrivate: options.accountBaseUrl.allowPrivate !== false }
+        : undefined,
+    );
   }
 
   private async fetchModelList(
@@ -1219,31 +1394,78 @@ export class ProviderModelFetcherService {
     apiKey: string,
     providerId: string,
     configKey: string,
+    userBaseUrl?: { allowPrivate: boolean },
   ): Promise<DiscoveredModel[]> {
+    const body = await this.requestModelsJson(url, headers, apiKey, providerId, userBaseUrl);
+    if (body === undefined) return [];
+    return filterNonChatModels(config.parse(body, providerId), configKey);
+  }
+
+  /** The decoded JSON of a models endpoint, or `undefined` when it is unreachable or not OK. */
+  private async requestModelsJson(
+    url: string,
+    headers: Record<string, string>,
+    apiKey: string,
+    providerId: string,
+    userBaseUrl?: { allowPrivate: boolean },
+  ): Promise<unknown> {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      const res = await outboundFetch(url, {
-        headers,
-        signal: controller.signal,
-      });
+      // A base URL the user typed gets the proxy's SSRF guard: the connection
+      // is pinned to the validated address (cloud metadata refused at connect
+      // time) and redirects are refused, like provider-client does.
+      const init: RequestInit = { headers, signal: controller.signal };
+      const res = userBaseUrl
+        ? await ssrfSafeFetch(url, { ...init, redirect: 'error' }, userBaseUrl)
+        : await outboundFetch(url, init);
       clearTimeout(timeout);
 
       if (!res.ok) {
         this.logger.warn(
-          `Provider ${providerId} returned ${res.status} from ${url.replace(apiKey, '***')}`,
+          `Provider ${providerId} returned ${res.status} from ${apiKey ? url.replace(apiKey, '***') : url}`,
         );
-        return [];
+        return undefined;
       }
 
-      const body = await res.json();
-      return filterNonChatModels(config.parse(body, providerId), configKey);
+      return await res.json();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Failed to fetch models from ${providerId}: ${message}`);
-      return [];
+      return undefined;
     }
+  }
+
+  /**
+   * LM Studio: the REST `/api/v0/models` (type, context, tool use) first. A
+   * server that does not expose it (older LM Studio, or a proxy that only
+   * forwards the OpenAI-compatible `/v1`; also a 2xx that is not a model list)
+   * still lists its models on
+   * `/v1/models`, so discovery never ends up empty just because the richer
+   * endpoint is missing (local-lmstudio G1: "with fallback to /v1/models").
+   */
+  private async fetchLmStudioModels(
+    config: FetcherConfig,
+    url: string,
+    apiKey: string,
+    providerId: string,
+  ): Promise<DiscoveredModel[]> {
+    const headers = config.buildHeaders(apiKey);
+    const rich = await this.requestModelsJson(url, headers, apiKey, providerId);
+    // A 2xx that is not a model list (a proxy answering every path alike) is as
+    // unusable as a 404.
+    if (Array.isArray((rich as { data?: unknown } | undefined)?.data)) {
+      return filterNonChatModels(config.parse(rich, providerId), 'lmstudio');
+    }
+    const openai = await this.requestModelsJson(
+      `${getLocalServerBaseUrl('lmstudio')}/v1/models`,
+      headers,
+      apiKey,
+      providerId,
+    );
+    if (openai === undefined) return [];
+    return filterNonChatModels(parseOpenAI(openai, providerId), 'lmstudio');
   }
 
   /**
@@ -1401,69 +1623,24 @@ export class ProviderModelFetcherService {
     }
   }
 
-  private async fetchOpencodeGoModels(
+  /**
+   * OpenCode and OpenCode Go publish their catalogs with protocol and list
+   * prices at `/inference[/go]/v1/models`. The free key (`public`) reaches
+   * only the models without a price, so a keyless OpenCode lists just those.
+   */
+  private async fetchOpencodeModels(
+    provider: OpencodeCatalogProvider,
     apiKey: string,
     forceRefresh = false,
   ): Promise<DiscoveredModel[]> {
-    const live = await this.fetchOpencodeGoLiveModels(apiKey);
-    if (live.length > 0) return live;
-    return this.fetchOpencodeGoDocsCatalog(forceRefresh);
-  }
-
-  private async fetchOpencodeGoLiveModels(apiKey: string): Promise<DiscoveredModel[]> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const res = await outboundFetch(OPENCODE_GO_MODELS_URL, {
-        headers: apiKey ? bearerHeaders(apiKey) : {},
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        this.logger.warn(`OpenCode Go returned ${res.status} from ${OPENCODE_GO_MODELS_URL}`);
-        return [];
-      }
-
-      const body = await res.json();
-      const models = parseOpenAI(body, 'opencode-go').map((model) => {
-        const id = `opencode-go/${model.id}`;
-        return {
-          ...model,
-          id,
-          displayName: id,
-          provider: 'opencode-go',
-          contextWindow: OPENCODE_GO_CONTEXT_WINDOW,
-          inputPricePerToken: 0,
-          outputPricePerToken: 0,
-          capabilityReasoning: true,
-          capabilityCode: true,
-        };
-      });
-      return filterNonChatModels(models, 'opencode-go');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Failed to fetch OpenCode Go models: ${message}`);
-      return [];
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  private async fetchOpencodeGoDocsCatalog(forceRefresh = false): Promise<DiscoveredModel[]> {
-    if (!this.opencodeGoCatalog) return [];
+    if (!this.opencodeCatalog) return [];
     const entries = forceRefresh
-      ? await this.opencodeGoCatalog.refresh()
-      : await this.opencodeGoCatalog.list();
-    return entries.map((entry) => ({
-      id: `opencode-go/${entry.id}`,
-      displayName: entry.displayName,
-      provider: 'opencode-go',
-      contextWindow: OPENCODE_GO_CONTEXT_WINDOW,
-      inputPricePerToken: 0,
-      outputPricePerToken: 0,
-      capabilityReasoning: true,
-      capabilityCode: true,
-      qualityScore: 3,
-    }));
+      ? await this.opencodeCatalog.refresh(provider)
+      : await this.opencodeCatalog.list(provider);
+    const freeOnly = provider === 'opencode' && apiKey === OPENCODE_FREE_KEY;
+    return entries
+      .filter((entry) => !freeOnly || entry.free)
+      .map((entry) => opencodeDiscoveredModel(provider, entry));
   }
 
   private async fetchKiroModels(apiKey: string): Promise<DiscoveredModel[]> {
@@ -1517,13 +1694,14 @@ export class ProviderModelFetcherService {
   }
 
   private async fetchClinePassModels(): Promise<DiscoveredModel[]> {
-    const contextWindow =
-      getSubscriptionCapabilities('cline-pass')?.maxContextWindow ?? DEFAULT_CONTEXT_WINDOW;
+    const contextFields = contextWindowFields(
+      getSubscriptionCapabilities('cline-pass')?.maxContextWindow,
+    );
     const toDiscovered = (id: string): DiscoveredModel => ({
       id,
       displayName: id,
       provider: 'cline-pass',
-      contextWindow,
+      ...contextFields,
       inputPricePerToken: null,
       outputPricePerToken: null,
       capabilityReasoning: true,
@@ -1573,4 +1751,36 @@ export class ProviderModelFetcherService {
       clearTimeout(timeout);
     }
   }
+}
+
+function opencodeDiscoveredModel(
+  provider: OpencodeCatalogProvider,
+  entry: OpencodeCatalogEntry,
+): DiscoveredModel {
+  const inputModalities = entry.inputModalities.some((m) => m.startsWith('image'))
+    ? (['text', 'image'] as const)
+    : (['text'] as const);
+  return {
+    id: `${provider}/${entry.id}`,
+    displayName: entry.name,
+    provider,
+    ...contextWindowFields(entry.contextWindow),
+    ...(provider === 'opencode-go'
+      ? // A subscription: quota cost is recorded per request, not shown as a price.
+        { inputPricePerToken: 0, outputPricePerToken: 0 }
+      : {
+          inputPricePerToken: entry.inputPricePerToken,
+          outputPricePerToken: entry.outputPricePerToken,
+        }),
+    ...(provider !== 'opencode-go' && entry.cacheReadPricePerToken != null
+      ? { cacheReadPricePerToken: entry.cacheReadPricePerToken }
+      : {}),
+    ...(provider !== 'opencode-go' && entry.cacheWritePricePerToken != null
+      ? { cacheWritePricePerToken: entry.cacheWritePricePerToken }
+      : {}),
+    capabilityReasoning: entry.reasoning,
+    capabilityCode: true,
+    inputModalities,
+    qualityScore: 3,
+  };
 }

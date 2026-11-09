@@ -28,7 +28,7 @@ const KNOWN_PROVIDERS = [
   'xiaomi',
   'zai',
   'opencode-go',
-  'opencode-zen',
+  'opencode',
 ];
 
 describe('providerIcon', () => {
@@ -44,7 +44,7 @@ describe('providerIcon', () => {
     const { container } = render(<div>{providerIcon('thinker')}</div>);
     const img = container.querySelector('img');
     expect(img).not.toBeNull();
-    expect(img?.getAttribute('src')).toBe('/brand/thinker-mark.svg?v=1');
+    expect(img?.getAttribute('src')).toBe('/brand/thinker-mark.png?v=2');
     expect(img?.getAttribute('alt')).toBe('Thinker');
   });
 

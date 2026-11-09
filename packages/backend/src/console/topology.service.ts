@@ -1,20 +1,56 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import type { ModelRoute } from 'thinker-shared';
+import { PENDING_STATUS, type ModelRoute } from 'thinker-shared';
 import { ERROR_MESSAGE_STATUSES } from '../analytics/services/query-helpers';
 import { getGlobalProxyConfig } from '../common/outbound/outbound-proxy';
 import { authKindOf, defaultTargetOf } from '../proxy-servers/proxy-egress.service';
+import { defaultAccountBaseUrl } from '../routing/account-base-url';
 
-export const TOPOLOGY_RANGES = { '1h': 1, '24h': 24, '7d': 24 * 7, '30d': 24 * 30 } as const;
-export type TopologyRange = keyof typeof TOPOLOGY_RANGES;
+/** Units of a range (`<n>m`, `<n>h`, `<n>d`): minutes per step and the largest count. */
+export const TOPOLOGY_UNITS = {
+  m: { minutes: 1, max: 120 },
+  h: { minutes: 60, max: 24 },
+  d: { minutes: 60 * 24, max: 60 },
+} as const;
+/**
+ * A recent window such as `5m`, `24h` or `7d`, or `live`: only requests still
+ * being processed, and those that ended in the last few seconds.
+ */
+export type TopologyRange = `${number}${keyof typeof TOPOLOGY_UNITS}` | 'live' | 'interval';
+/** Bounds of the `interval` range. */
+export interface TopologyInterval {
+  from: Date;
+  to: Date;
+}
+/** How long a finished request keeps its path lit in `live`. */
+const LIVE_LINGER = "interval '3 seconds'";
+/** Oldest request `live` still waits on: older pending rows are taken as stale. */
+const LIVE_MAX_MINUTES = 60;
+
+/** Bounds of an `interval` range, or undefined unless both are dates and start precedes end. */
+export function topologyInterval(from?: string, to?: string): TopologyInterval | undefined {
+  const start = from ? new Date(from) : null;
+  const end = to ? new Date(to) : null;
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+  return start < end ? { from: start, to: end } : undefined;
+}
+
+/** Minutes of a range, or null when it is malformed or out of bounds. */
+export function topologyMinutes(range: string): number | null {
+  const match = /^([1-9]\d{0,2})([mhd])$/.exec(range);
+  if (!match) return null;
+  const unit = TOPOLOGY_UNITS[match[2] as keyof typeof TOPOLOGY_UNITS];
+  const count = Number(match[1]);
+  return count <= unit.max ? count * unit.minutes : null;
+}
 
 export interface Usage {
   requests: number;
   errors: number;
   costUsd: number;
   tokens: number;
-  /** Requests of the last minute, whatever the window (sizes the links). */
+  /** Requests of the last minute, whatever the window (sizes the links); in `live`, those in flight. */
   recent: number;
 }
 
@@ -44,6 +80,8 @@ export interface TopologyProvider extends Usage {
   name: string;
   label: string;
   active: boolean;
+  /** Runtime of a local server added as a custom provider (lmstudio, ollama, llamacpp). */
+  localType: string | null;
 }
 
 /** An outbound proxy profile, or the global proxy of the environment (`profileId` null). */
@@ -51,6 +89,16 @@ export interface TopologyProxy extends Usage {
   id: string;
   profileId: string | null;
   name: string;
+}
+
+/** A proxy server a profile sends through (shared by every profile that lists it). */
+export interface TopologyServer extends Usage {
+  id: string;
+  proxyId: string;
+  name: string;
+  host: string | null;
+  port: number | null;
+  enabled: boolean;
 }
 
 /**
@@ -62,6 +110,12 @@ export type EgressId = 'internet' | 'gateway' | 'local';
 
 export interface TopologyEgress extends Usage {
   id: EgressId;
+}
+
+/** A host the traffic finally reaches (`api.anthropic.com`, `192.168.0.10:11434`), shared by the connections that use it. */
+export interface TopologyDestination extends Usage {
+  id: string;
+  host: string;
 }
 
 export type LinkKind = 'client' | 'primary' | 'fallback' | 'usage' | 'egress';
@@ -81,7 +135,7 @@ export interface TopologyLink {
   requests: number;
   errors: number;
   costUsd: number;
-  /** Requests of the last minute. */
+  /** Requests of the last minute; in `live`, those in flight. */
   recent: number;
   models?: TopologyLinkModel[];
 }
@@ -92,7 +146,9 @@ export interface Topology {
   harnesses: TopologyHarness[];
   providers: TopologyProvider[];
   proxies: TopologyProxy[];
+  servers: TopologyServer[];
   egress: TopologyEgress[];
+  destinations: TopologyDestination[];
   links: TopologyLink[];
   /** Positions the user saved on the canvas, by node id. */
   positions: Record<string, { x: number; y: number }>;
@@ -113,6 +169,18 @@ export const harnessNodeId = (agentId: string) => `harness:${agentId}`;
 export const connectionNodeId = (id: string) => `connection:${id}`;
 export const profileNodeId = (id: string) => `proxy:${id}`;
 export const GLOBAL_PROXY_NODE = 'proxy:global';
+export const serverNodeId = (id: string) => `server:${id}`;
+export const destinationNodeId = (host: string) => `dest:${host}`;
+
+/** Host (with a non-default port) of a URL, lowercased; null when it does not parse. */
+export function urlHost(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).host.toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
 
 /** Link kinds ranked: a link drawn for several reasons takes the strongest. */
 const KIND_RANK: Record<LinkKind, number> = {
@@ -141,6 +209,8 @@ interface ConnectionRow {
   auth_type: string | null;
   label: string;
   is_active: boolean;
+  base_url?: string | null;
+  region?: string | null;
 }
 
 interface UsageRow {
@@ -157,10 +227,21 @@ interface UsageRow {
   recent_requests: number;
   cost: string | number | null;
   tokens: string | number | null;
-  direct_attempts: number;
-  direct_errors: number;
-  direct_recent: number;
-  direct_cost: string | number | null;
+}
+
+/** Attempts of a connection by where they left (`agent_messages.egress`). */
+interface EgressRow {
+  tenant_provider_id: string | null;
+  provider: string | null;
+  auth_type: string | null;
+  kind: string | null;
+  proxy_id: string | null;
+  name: string | null;
+  attempts: number;
+  errors: number;
+  recent: number;
+  cost: string | number | null;
+  failed_hops: number;
 }
 
 /**
@@ -175,8 +256,42 @@ interface UsageRow {
 export class TopologyService {
   constructor(@InjectDataSource() private readonly ds: DataSource) {}
 
-  async build(tenantId: string, range: TopologyRange): Promise<Topology> {
-    const hours = TOPOLOGY_RANGES[range];
+  async build(
+    tenantId: string,
+    range: TopologyRange,
+    interval?: TopologyInterval,
+  ): Promise<Topology> {
+    const live = range === 'live';
+    const between = range === 'interval' && interval ? interval : null;
+    const minutes = live ? LIVE_MAX_MINUTES : (topologyMinutes(range) ?? 24 * 60);
+    // Rows of the window, and the ones counted as `recent`. In `live` the window
+    // is what is in flight or ended within the linger, and `recent` counts what
+    // is still waiting for an answer.
+    // In `interval` ($2 the start, $4 the end) a request counts when it started
+    // or ended inside the bounds; one that started over an hour earlier is left out.
+    const inWindow = (t = '') =>
+      between
+        ? `${t}timestamp >= $2::timestamptz - interval '1 hour' AND ${t}timestamp <= $4::timestamptz
+           AND (${t}timestamp >= $2::timestamptz
+                OR ${t}timestamp + make_interval(secs => COALESCE(${t}duration_ms, 0) / 1000.0)
+                   >= $2::timestamptz)`
+        : live
+          ? `${t}timestamp >= now() - make_interval(mins => $2)
+           AND (${t}status = '${PENDING_STATUS}'
+                OR ${t}timestamp + make_interval(secs => COALESCE(${t}duration_ms, 0) / 1000.0)
+                   >= now() - ${LIVE_LINGER})`
+          : `${t}timestamp >= now() - make_interval(mins => $2)`;
+    const params = between
+      ? [
+          tenantId,
+          between.from.toISOString(),
+          [...ERROR_MESSAGE_STATUSES],
+          between.to.toISOString(),
+        ]
+      : [tenantId, minutes, [...ERROR_MESSAGE_STATUSES]];
+    const recentOnly = live
+      ? `status = '${PENDING_STATUS}'`
+      : `timestamp >= now() - interval '1 minute'`;
     const [
       agents,
       virtuals,
@@ -184,8 +299,11 @@ export class TopologyService {
       connections,
       customs,
       profiles,
+      bindings,
+      servers,
       assignments,
       usage,
+      egressUsage,
       callers,
       saved,
     ] = await Promise.all([
@@ -221,13 +339,16 @@ export class TopologyService {
         [tenantId],
       ) as Promise<Array<Pick<RouteRow, 'agent_id' | 'override_route' | 'fallback_routes'>>>,
       this.ds.query(
-        `SELECT id, provider, auth_type, label, is_active
+        `SELECT id, provider, auth_type, label, is_active, base_url, region
              FROM tenant_providers WHERE tenant_id = $1 ORDER BY provider, priority, label`,
         [tenantId],
       ) as Promise<ConnectionRow[]>,
-      this.ds.query(`SELECT id, name, local_type FROM custom_providers WHERE tenant_id = $1`, [
-        tenantId,
-      ]) as Promise<Array<{ id: string; name: string; local_type: string | null }>>,
+      this.ds.query(
+        `SELECT id, name, local_type, base_url FROM custom_providers WHERE tenant_id = $1`,
+        [tenantId],
+      ) as Promise<
+        Array<{ id: string; name: string; local_type: string | null; base_url: string | null }>
+      >,
       this.ds.query(
         `SELECT p.id, p.name,
                   COALESCE(bool_or(b.proxy_id IS NOT NULL), false) AS has_proxy,
@@ -241,6 +362,18 @@ export class TopologyService {
         [tenantId],
       ) as Promise<Array<{ id: string; name: string; has_proxy: boolean; has_direct: boolean }>>,
       this.ds.query(
+        `SELECT target_id AS profile_id, proxy_id FROM proxy_bindings
+            WHERE tenant_id = $1 AND target_type = 'profile' AND proxy_id IS NOT NULL
+            ORDER BY target_id, position`,
+        [tenantId],
+      ) as Promise<Array<{ profile_id: string; proxy_id: string }>>,
+      this.ds.query(
+        `SELECT id, name, host, port, enabled FROM proxy_servers WHERE tenant_id = $1`,
+        [tenantId],
+      ) as Promise<
+        Array<{ id: string; name: string; host: string; port: number; enabled: boolean }>
+      >,
+      this.ds.query(
         `SELECT target_type, target_id, mode, profile_id FROM proxy_assignments
             WHERE tenant_id = $1 AND target_type IN ('provider', 'connection')`,
         [tenantId],
@@ -252,42 +385,71 @@ export class TopologyService {
                   count(*)::int AS attempts,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
                   count(*) FILTER (WHERE status = ANY($3))::int AS errors,
-                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute')::int
-                    AS recent_attempts,
-                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute'
-                                     AND superseded = false)::int AS recent_requests,
+                  count(*) FILTER (WHERE ${recentOnly})::int AS recent_attempts,
+                  count(*) FILTER (WHERE ${recentOnly} AND superseded = false)::int
+                    AS recent_requests,
                   COALESCE(sum(cost_usd), 0) AS cost,
-                  COALESCE(sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens,
-                  -- Attempts that left straight from the instance (a profile's Direct item).
-                  count(*) FILTER (WHERE egress->>'kind' = 'direct')::int AS direct_attempts,
-                  count(*) FILTER (WHERE egress->>'kind' = 'direct' AND status = ANY($3))::int
-                    AS direct_errors,
-                  count(*) FILTER (WHERE egress->>'kind' = 'direct'
-                                     AND timestamp >= now() - interval '1 minute')::int
-                    AS direct_recent,
-                  COALESCE(sum(cost_usd) FILTER (WHERE egress->>'kind' = 'direct'), 0)
-                    AS direct_cost
+                  COALESCE(sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens
              FROM agent_messages
             WHERE tenant_id = $1 AND agent_id IS NOT NULL
-              AND timestamp >= now() - make_interval(hours => $2)
+              AND ${inWindow()}
             GROUP BY agent_id, virtual_model_id, tenant_provider_id, provider, auth_type, model`,
-        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+        params,
       ) as Promise<UsageRow[]>,
-      // The proxy stamps the client address into caller_attribution (JSON text).
+      // Where each attempt left: a proxy server, a profile's Direct item or the
+      // global proxy. Failed hops (a proxy refused, fell to the next) count apart.
       this.ds.query(
-        `SELECT agent_id, ip,
+        `SELECT tenant_provider_id, provider, auth_type,
+                  egress->>'kind' AS kind, egress->>'proxy_id' AS proxy_id,
+                  max(egress->>'name') AS name,
+                  count(*)::int AS attempts,
+                  count(*) FILTER (WHERE status = ANY($3))::int AS errors,
+                  count(*) FILTER (WHERE ${recentOnly})::int AS recent,
+                  COALESCE(sum(cost_usd), 0) AS cost,
+                  0 AS failed_hops
+             FROM agent_messages
+            WHERE tenant_id = $1 AND agent_id IS NOT NULL AND egress IS NOT NULL
+              AND ${inWindow()}
+            GROUP BY tenant_provider_id, provider, auth_type, egress->>'kind', egress->>'proxy_id'
+           UNION ALL
+           SELECT m.tenant_provider_id, m.provider, m.auth_type, 'proxy', h->>'proxy_id',
+                  max(h->>'name'), 0, 0, 0, 0, count(*)::int
+             FROM agent_messages m, jsonb_array_elements(m.egress_hops) h
+            WHERE m.tenant_id = $1 AND m.agent_id IS NOT NULL
+              AND jsonb_typeof(m.egress_hops) = 'array'
+              AND ${inWindow('m.')}
+              AND h->>'kind' = 'proxy' AND h->>'proxy_id' IS NOT NULL
+              AND h->>'result' NOT IN ('ok', 'skipped_disabled')
+            GROUP BY m.tenant_provider_id, m.provider, m.auth_type, h->>'proxy_id'`,
+        params,
+      ) as Promise<EgressRow[]>,
+      // The proxy stamps the client address into caller_attribution (JSON text).
+      // In `live` it comes from the Request, written pending at ingress, so the
+      // client's line lights up before any provider is called.
+      this.ds.query(
+        live
+          ? `SELECT agent_id, ip,
+                    count(*)::int AS requests,
+                    count(*) FILTER (WHERE status = ANY($3))::int AS errors,
+                    count(*) FILTER (WHERE ${recentOnly})::int AS recent
+               FROM (SELECT agent_id, status, timestamp, duration_ms,
+                            substring(caller_attribution::text from '"clientIp":"([^"]+)"') AS ip
+                       FROM requests
+                      WHERE tenant_id = $1 AND agent_id IS NOT NULL AND ${inWindow()}) m
+              WHERE ip IS NOT NULL
+              GROUP BY agent_id, ip`
+          : `SELECT agent_id, ip,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
                   count(*) FILTER (WHERE status = ANY($3) AND superseded = false)::int AS errors,
-                  count(*) FILTER (WHERE timestamp >= now() - interval '1 minute'
-                                     AND superseded = false)::int AS recent
+                  count(*) FILTER (WHERE ${recentOnly} AND superseded = false)::int AS recent
              FROM (SELECT agent_id, superseded, status, timestamp,
                           substring(caller_attribution from '"clientIp":"([^"]+)"') AS ip
                      FROM agent_messages
                     WHERE tenant_id = $1 AND agent_id IS NOT NULL
-                      AND timestamp >= now() - make_interval(hours => $2)) m
+                      AND ${inWindow()}) m
             WHERE ip IS NOT NULL
             GROUP BY agent_id, ip`,
-        [tenantId, hours, [...ERROR_MESSAGE_STATUSES]],
+        params,
       ) as Promise<
         Array<{ agent_id: string; ip: string; requests: number; errors: number; recent: number }>
       >,
@@ -319,6 +481,7 @@ export class TopologyService {
         name: customById.get(c.provider.toLowerCase())?.name ?? c.provider,
         label: c.label,
         active: c.is_active,
+        localType: customById.get(c.provider.toLowerCase())?.local_type ?? null,
         ...zero(),
       });
     }
@@ -389,7 +552,17 @@ export class TopologyService {
     }
 
     // Traffic of the window; a row without a connection falls on the first match.
-    const directOf = new Map<string, Usage>();
+    const providerOf = (row: Pick<UsageRow, 'tenant_provider_id' | 'provider' | 'auth_type'>) =>
+      row.provider
+        ? ((row.tenant_provider_id
+            ? providers.get(connectionNodeId(row.tenant_provider_id))
+            : null) ??
+          connectionsOf({
+            provider: row.provider,
+            authType: row.auth_type,
+            model: '',
+          } as ModelRoute)[0])
+        : undefined;
     for (const row of usage) {
       const harness = harnesses.get(harnessNodeId(row.agent_id));
       if (!harness) continue;
@@ -401,25 +574,9 @@ export class TopologyService {
         recent: row.recent_requests,
       };
       add(harness, u);
-      if (!row.provider) continue;
-      const provider =
-        (row.tenant_provider_id ? providers.get(connectionNodeId(row.tenant_provider_id)) : null) ??
-        connectionsOf({
-          provider: row.provider,
-          authType: row.auth_type,
-          model: '',
-        } as ModelRoute)[0];
+      const provider = providerOf(row);
       if (!provider) continue;
       add(provider, { ...u, requests: row.attempts, recent: row.recent_attempts });
-      const direct = directOf.get(provider.id) ?? zero();
-      add(direct, {
-        requests: row.direct_attempts,
-        errors: row.direct_errors,
-        costUsd: Number(row.direct_cost) || 0,
-        tokens: 0,
-        recent: row.direct_recent,
-      });
-      directOf.set(provider.id, direct);
       const edge = link(harness.id, provider.id, 'usage');
       edge.requests += row.attempts;
       edge.recent += row.recent_attempts;
@@ -458,8 +615,6 @@ export class TopologyService {
     const assigned = new Map(assignments.map((a) => [`${a.target_type}:${a.target_id}`, a]));
     const profileById = new Map(profiles.map((p) => [p.id, p]));
     const globalProxy = getGlobalProxyConfig() !== null;
-    const proxies = new Map<string, TopologyProxy>();
-    const proxyDirect = new Map<string, Usage>();
     const egress = new Map<string, TopologyEgress>();
     const flow = (source: string, target: string, from: Usage) => {
       const edge = link(source, target, 'egress');
@@ -473,6 +628,58 @@ export class TopologyService {
       add(node, from);
       egress.set(id, node);
     };
+
+    // Where each connection's attempts left: `direct` or `server:<id>`.
+    const leftBy = new Map<string, Map<string, Usage>>();
+    const serverNames = new Map<string, string>();
+    /** Failed hops per server: they mark the server, never its way to the internet. */
+    const hopErrors = new Map<string, number>();
+    for (const row of egressUsage) {
+      const provider = providerOf(row);
+      if (!provider) continue;
+      const key =
+        row.kind === 'direct'
+          ? 'direct'
+          : row.kind === 'proxy' && row.proxy_id
+            ? serverNodeId(row.proxy_id)
+            : null;
+      if (!key) continue;
+      if (row.proxy_id && row.name) serverNames.set(row.proxy_id, row.name);
+      if (row.failed_hops > 0) hopErrors.set(key, (hopErrors.get(key) ?? 0) + row.failed_hops);
+      const split = leftBy.get(provider.id) ?? new Map<string, Usage>();
+      const u = split.get(key) ?? zero();
+      add(u, {
+        requests: row.attempts,
+        errors: row.errors + row.failed_hops,
+        costUsd: Number(row.cost) || 0,
+        tokens: 0,
+        recent: row.recent,
+      });
+      split.set(key, u);
+      leftBy.set(provider.id, split);
+    }
+
+    // The host each connection finally reaches: its own base URL, the custom
+    // provider's, else the provider's built-in (region-aware) endpoint.
+    const connectionById = new Map(connections.map((c) => [connectionNodeId(c.id), c]));
+    const destinations = new Map<string, TopologyDestination>();
+    const toDestination = (from: EgressId, p: TopologyProvider, u: Usage) => {
+      const c = connectionById.get(p.id);
+      const custom = customById.get(p.provider.toLowerCase());
+      const host = urlHost(
+        c?.base_url ||
+          (custom ? custom.base_url : defaultAccountBaseUrl(p.provider, p.authType, c?.region)),
+      );
+      if (!host) return;
+      const id = destinationNodeId(host);
+      const node = destinations.get(id) ?? { id, host, ...zero() };
+      add(node, u);
+      destinations.set(id, node);
+      flow(from, id, u);
+    };
+
+    const proxies = new Map<string, TopologyProxy>();
+    const proxySplit = new Map<string, Map<string, Usage>>();
     for (const p of providerList) {
       const kind = authKindOf(p.authType);
       const localType = customById.get(p.provider.toLowerCase())?.local_type ?? null;
@@ -495,8 +702,20 @@ export class TopologyService {
       if (!proxyId) {
         flow(p.id, end, p);
         reach(end, p);
+        toDestination(end, p, p);
         continue;
       }
+      // Through a proxy, attempts recorded as Direct left by the gateway; the rest by the internet.
+      const direct = hasItems ? leftBy.get(p.id)?.get('direct') : undefined;
+      if (direct && direct.requests > 0) toDestination('gateway', p, direct);
+      const viaProxy: Usage = { ...p, tokens: 0 };
+      if (direct) {
+        viaProxy.requests = Math.max(0, viaProxy.requests - direct.requests);
+        viaProxy.errors = Math.max(0, viaProxy.errors - direct.errors);
+        viaProxy.costUsd = Math.max(0, viaProxy.costUsd - direct.costUsd);
+        viaProxy.recent = Math.max(0, viaProxy.recent - direct.recent);
+      }
+      if (viaProxy.requests > 0 || !direct) toDestination('internet', p, viaProxy);
       const proxy = proxies.get(proxyId) ?? {
         id: proxyId,
         profileId: hasItems ? profile.id : null,
@@ -505,32 +724,100 @@ export class TopologyService {
       };
       add(proxy, p);
       proxies.set(proxyId, proxy);
-      const direct = proxyDirect.get(proxyId) ?? zero();
-      add(direct, directOf.get(p.id) ?? zero());
-      proxyDirect.set(proxyId, direct);
+      const split = proxySplit.get(proxyId) ?? new Map<string, Usage>();
+      for (const [key, u] of leftBy.get(p.id) ?? []) {
+        const total = split.get(key) ?? zero();
+        add(total, u);
+        split.set(key, total);
+      }
+      proxySplit.set(proxyId, split);
       flow(p.id, proxyId, p);
     }
-    // A profile sends through its proxies to the internet and, when its chain
-    // has a Direct item, straight out of the gateway; the split comes from where
-    // each attempt left (`agent_messages.egress`).
+
+    // A profile links to every proxy server of its chain, each server to the
+    // internet, and to the gateway when the chain has a Direct item. The split
+    // comes from where each attempt left (`agent_messages.egress`); attempts
+    // without that record fall on the first enabled server.
+    const serverById = new Map(servers.map((s) => [serverNodeId(s.id), s]));
+    const serverNodes = new Map<string, TopologyServer>();
+    const server = (id: string): TopologyServer => {
+      let node = serverNodes.get(id);
+      if (!node) {
+        const row = serverById.get(id);
+        const proxyId = id.slice('server:'.length);
+        node = {
+          id,
+          proxyId,
+          name: row?.name ?? serverNames.get(proxyId) ?? proxyId,
+          host: row?.host ?? null,
+          port: row?.port ?? null,
+          enabled: row?.enabled ?? false,
+          ...zero(),
+        };
+        serverNodes.set(id, node);
+      }
+      return node;
+    };
+    const boundTo = new Map<string, string[]>();
+    for (const b of bindings) {
+      boundTo.set(b.profile_id, [...(boundTo.get(b.profile_id) ?? []), serverNodeId(b.proxy_id)]);
+    }
+    const passed = new Map<string, Usage>();
     for (const proxy of proxies.values()) {
       const profile = proxy.profileId ? profileById.get(proxy.profileId) : undefined;
-      const direct = proxyDirect.get(proxy.id) ?? zero();
-      const viaProxy: Usage = {
-        requests: proxy.requests - direct.requests,
-        errors: Math.max(0, proxy.errors - direct.errors),
-        costUsd: Math.max(0, proxy.costUsd - direct.costUsd),
-        tokens: proxy.tokens,
-        recent: Math.max(0, proxy.recent - direct.recent),
-      };
-      if (!profile || profile.has_proxy || viaProxy.requests > 0) {
-        flow(proxy.id, 'internet', viaProxy);
-        reach('internet', viaProxy);
+      if (!profile) {
+        flow(proxy.id, 'internet', proxy);
+        reach('internet', proxy);
+        continue;
       }
-      if (profile?.has_direct || direct.requests > 0) {
+      const split = proxySplit.get(proxy.id) ?? new Map<string, Usage>();
+      const direct = split.get('direct') ?? zero();
+      const bound = boundTo.get(profile.id) ?? [];
+      const ids = [...new Set([...bound, ...[...split.keys()].filter((k) => k !== 'direct')])];
+      const rest: Usage = { ...proxy, tokens: 0 };
+      for (const u of split.values()) {
+        rest.requests -= u.requests;
+        rest.errors -= u.errors;
+        rest.costUsd -= u.costUsd;
+        rest.recent -= u.recent;
+      }
+      const first = bound.find((id) => serverById.get(id)?.enabled) ?? bound[0];
+      if (rest.requests > 0) {
+        const into = first ? (split.get(first) ?? zero()) : null;
+        const extra = {
+          requests: rest.requests,
+          errors: Math.max(0, rest.errors),
+          costUsd: Math.max(0, rest.costUsd),
+          tokens: 0,
+          recent: Math.max(0, rest.recent),
+        };
+        if (into && first) {
+          add(into, extra);
+          split.set(first, into);
+          if (!ids.includes(first)) ids.push(first);
+        } else {
+          flow(proxy.id, 'internet', extra);
+          reach('internet', extra);
+        }
+      }
+      for (const id of ids) {
+        const u = split.get(id) ?? zero();
+        add(server(id), u);
+        flow(proxy.id, id, u);
+        const through = passed.get(id) ?? zero();
+        add(through, u);
+        passed.set(id, through);
+      }
+      if (profile.has_direct || direct.requests > 0) {
         flow(proxy.id, 'gateway', direct);
         reach('gateway', direct);
       }
+    }
+    for (const node of serverNodes.values()) {
+      const through = passed.get(node.id) ?? zero();
+      const u = { ...through, errors: Math.max(0, through.errors - (hopErrors.get(node.id) ?? 0)) };
+      flow(node.id, 'internet', u);
+      reach('internet', u);
     }
 
     return {
@@ -539,7 +826,9 @@ export class TopologyService {
       harnesses: [...harnesses.values()],
       providers: providerList,
       proxies: [...proxies.values()].sort((a, b) => a.name.localeCompare(b.name)),
+      servers: [...serverNodes.values()].sort((a, b) => a.name.localeCompare(b.name)),
       egress: [...egress.values()],
+      destinations: [...destinations.values()].sort((a, b) => a.host.localeCompare(b.host)),
       links: [...links.values()],
       positions: Object.fromEntries(saved.map((r) => [r.node_id, { x: r.x, y: r.y }])),
     };

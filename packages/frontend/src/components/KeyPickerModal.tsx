@@ -1,6 +1,7 @@
 import type { RoutingProvider } from '../services/api.js';
 import { t } from '../i18n/index.js';
 import { Modal } from './ui.js';
+import { maskedKeyLabel } from '../services/key-mask.js';
 
 export interface KeyPickerModalProps {
   /** Display name of the provider (e.g. "Google"). */
@@ -41,9 +42,7 @@ export default function KeyPickerModal(props: KeyPickerModalProps) {
               onClick={() => props.onPick(k.label)}
             >
               <div className="font-medium text-ink">{k.label}</div>
-              <div className="font-mono text-xs text-muted">
-                {k.key_prefix ? `${k.key_prefix}${'•'.repeat(8)}` : '••••••••••••'}
-              </div>
+              <div className="font-mono text-xs text-muted">{maskedKeyLabel(k)}</div>
             </button>
           </li>
         ))}

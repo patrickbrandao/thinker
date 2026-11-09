@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/thinker-logo-dark.svg" />
-    <source media="(prefers-color-scheme: light)" srcset=".github/assets/thinker-logo.svg" />
-    <img src=".github/assets/thinker-logo.svg" alt="Thinker LLM Gateway" height="53" title="Thinker LLM Gateway"/>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/thinker-logo-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/thinker-logo.png" />
+    <img src=".github/assets/thinker-logo.png" alt="Thinker LLM Gateway" height="53" title="Thinker LLM Gateway"/>
   </picture>
 </p>
 <p align="center">
@@ -91,7 +91,7 @@ O Thinker conecta dezenas de provedores embutidos e qualquer endpoint customizad
 | [**LM Studio**](https://lmstudio.ai/)                                                    |    🖥️ Local     | —                            | Modelos GGUF locais, porta `1234`                                  |
 | [**llama.cpp**](https://github.com/ggml-org/llama.cpp)                                   |    🖥️ Local     | —                            | Modelos GGUF locais, porta `8080`                                  |
 | [**OpenRouter**](https://openrouter.ai/)                                                 |       ✅        | —                            | 300+ models across labs                                         |
-| [**OpenCode Zen**](https://opencode.ai/)                                                 |       ✅        | —                            | Curated Claude, GPT, DeepSeek, MiMo, Nemotron                   |
+| [**OpenCode**](https://opencode.ai/)                                                     |       ✅        | —                            | Pay-as-you-go Claude, GPT, Gemini and free models (no key)      |
 | [**Kilo**](https://kilo.ai/)                                                             |       ✅        | —                            | Kilo Gateway catalog                                            |
 | [**Cerebras**](https://www.cerebras.ai/)                                                 |       ✅        | —                            | GPT-OSS, GLM, Gemma on Cerebras inference                       |
 | [**Fireworks AI**](https://fireworks.ai/)                                                |       ✅        | —                            | DeepSeek V4, Kimi K2.7, Qwen 3.7, Nemotron                      |

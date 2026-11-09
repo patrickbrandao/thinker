@@ -8,6 +8,10 @@ import {
   type SyslogFormat,
   type SyslogSeverity,
   type SyslogTransport,
+  type GelfCompression,
+  type GelfTransport,
+  GELF_DEFAULT_PORT,
+  RELP_DEFAULT_PORT,
   type TriggerEventType,
   type TriggerType,
   type WebhookMethod,
@@ -16,6 +20,8 @@ import {
 import { t, type TranslationKey } from '../../i18n/index.js';
 import type {
   EmailTriggerConfig,
+  GelfTriggerConfig,
+  RelpTriggerConfig,
   SyslogTriggerConfig,
   TelegramTriggerConfig,
   TriggerConfigWrite,
@@ -30,6 +36,8 @@ export const SECRET_FIELDS: Record<TriggerType, Array<{ key: string; required: b
   webhook: [{ key: 'hmacSecret', required: false }],
   telegram: [{ key: 'botToken', required: true }],
   syslog: [],
+  gelf: [],
+  relp: [],
 };
 
 const EVENT_LABELS: Record<string, TranslationKey> = {
@@ -41,6 +49,18 @@ const EVENT_LABELS: Record<string, TranslationKey> = {
   'request.debug.failed': 'triggers.events.requestDebugFailed',
   'harness.created': 'triggers.events.harnessCreated',
   'harness.deleted': 'triggers.events.harnessDeleted',
+  'model.added': 'triggers.events.modelAdded',
+  'model.removed': 'triggers.events.modelRemoved',
+  'model.error': 'triggers.events.modelError',
+  'oauth.refresh_failed': 'triggers.events.oauthRefreshFailed',
+  'trigger.failed': 'triggers.events.triggerFailed',
+  'audit.created': 'triggers.events.auditCreated',
+  'audit.updated': 'triggers.events.auditUpdated',
+  'audit.deleted': 'triggers.events.auditDeleted',
+  'user.login': 'triggers.events.userLogin',
+  'user.logout': 'triggers.events.userLogout',
+  'user.login_failed': 'triggers.events.userLoginFailed',
+  'user.password_changed': 'triggers.events.userPasswordChanged',
   test: 'triggers.events.test',
 };
 
@@ -60,6 +80,10 @@ export function triggerTypeLabel(type: TriggerType | string, provider?: string):
       return t('triggers.types.telegram');
     case 'syslog':
       return t('triggers.types.syslog');
+    case 'gelf':
+      return t('triggers.types.gelf');
+    case 'relp':
+      return t('triggers.types.relp');
     default:
       return type;
   }
@@ -92,6 +116,8 @@ export const TRIGGER_KINDS = [
   'webhook',
   'telegram',
   'syslog',
+  'gelf',
+  'relp',
 ] as const;
 export type TriggerKind = (typeof TRIGGER_KINDS)[number];
 
@@ -102,6 +128,8 @@ const KIND_LABELS: Record<TriggerKind, TranslationKey> = {
   webhook: 'triggers.types.webhook',
   telegram: 'triggers.types.telegram',
   syslog: 'triggers.types.syslog',
+  gelf: 'triggers.types.gelf',
+  relp: 'triggers.types.relp',
 };
 
 export function kindLabel(kind: TriggerKind): string {
@@ -260,6 +288,19 @@ export interface TriggerForm {
     message: string;
     severities: Record<string, SyslogSeverity>;
   };
+  /** RELP: the syslog line options over plain TCP (`transport` unused). */
+  relp: TriggerForm['syslog'];
+  gelf: {
+    transport: GelfTransport;
+    host: string;
+    port: string;
+    url: string;
+    compression: GelfCompression;
+    source: string;
+    short_message: string;
+    full_message: string;
+    severities: Record<string, SyslogSeverity>;
+  };
   /** Typed secret values; blank keeps the stored one. */
   secrets: Record<string, string>;
   /** Secrets the user asked to remove. */
@@ -305,6 +346,27 @@ export function emptyForm(): TriggerForm {
       facility: 'user',
       app_name: 'thinker',
       message: DEFAULT_TRIGGER_TEMPLATES.syslog.message,
+      severities: { ...DEFAULT_SYSLOG_SEVERITIES },
+    },
+    relp: {
+      host: '',
+      port: String(RELP_DEFAULT_PORT),
+      transport: 'tcp',
+      format: 'rfc5424',
+      facility: 'user',
+      app_name: 'thinker',
+      message: DEFAULT_TRIGGER_TEMPLATES.relp.message,
+      severities: { ...DEFAULT_SYSLOG_SEVERITIES },
+    },
+    gelf: {
+      transport: 'udp',
+      host: '',
+      port: String(GELF_DEFAULT_PORT),
+      url: '',
+      compression: 'none',
+      source: '',
+      short_message: DEFAULT_TRIGGER_TEMPLATES.gelf.shortMessage,
+      full_message: DEFAULT_TRIGGER_TEMPLATES.gelf.fullMessage,
       severities: { ...DEFAULT_SYSLOG_SEVERITIES },
     },
     secrets: {},
@@ -379,6 +441,35 @@ export function formFromTrigger(trigger: TriggerView): TriggerForm {
       };
       break;
     }
+    case 'relp': {
+      const c = trigger.config as RelpTriggerConfig;
+      form.relp = {
+        host: c.host ?? '',
+        port: String(c.port ?? RELP_DEFAULT_PORT),
+        transport: 'tcp',
+        format: c.format,
+        facility: c.facility,
+        app_name: c.app_name ?? '',
+        message: c.message ?? '',
+        severities: { ...DEFAULT_SYSLOG_SEVERITIES, ...(c.severities ?? {}) },
+      };
+      break;
+    }
+    case 'gelf': {
+      const c = trigger.config as GelfTriggerConfig;
+      form.gelf = {
+        transport: c.transport,
+        host: c.host ?? '',
+        port: String(c.port ?? GELF_DEFAULT_PORT),
+        url: c.url ?? '',
+        compression: c.compression ?? 'none',
+        source: c.source ?? '',
+        short_message: c.short_message ?? '',
+        full_message: c.full_message ?? '',
+        severities: { ...DEFAULT_SYSLOG_SEVERITIES, ...(c.severities ?? {}) },
+      };
+      break;
+    }
   }
   return form;
 }
@@ -430,14 +521,16 @@ export function validateForm(form: TriggerForm, saved: TriggerView | null): Reco
       if (!form.telegram.chat_id.trim())
         errors['telegram.chat_id'] = t('triggers.editor.errors.chatIdRequired');
       break;
-    case 'syslog': {
-      if (!form.syslog.host.trim())
-        errors['syslog.host'] = t('triggers.editor.errors.hostRequired');
-      const port = Number(form.syslog.port);
-      if (!Number.isInteger(port) || port < 1 || port > 65535)
-        errors['syslog.port'] = t('triggers.editor.errors.portInvalid');
+    case 'syslog':
+    case 'relp':
+      checkHostPort(form[form.type], form.type, errors);
       break;
-    }
+    case 'gelf':
+      if (form.gelf.transport === 'http') {
+        if (!/^https?:\/\/\S+$/i.test(form.gelf.url.trim()))
+          errors['gelf.url'] = t('triggers.editor.errors.urlRequired');
+      } else checkHostPort(form.gelf, 'gelf', errors);
+      break;
   }
   for (const [key, bounds] of LIMIT_FIELDS) {
     const n = Number(form[key]);
@@ -445,6 +538,17 @@ export function validateForm(form: TriggerForm, saved: TriggerView | null): Reco
       errors[key] = t('triggers.editor.errors.outOfRange');
   }
   return errors;
+}
+
+function checkHostPort(
+  target: { host: string; port: string },
+  prefix: string,
+  errors: Record<string, string>,
+): void {
+  if (!target.host.trim()) errors[`${prefix}.host`] = t('triggers.editor.errors.hostRequired');
+  const port = Number(target.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    errors[`${prefix}.port`] = t('triggers.editor.errors.portInvalid');
 }
 
 function configFor(form: TriggerForm): TriggerConfigWrite {
@@ -488,6 +592,31 @@ function configFor(form: TriggerForm): TriggerConfigWrite {
         message: form.syslog.message,
         severities: form.syslog.severities,
       };
+    case 'relp':
+      return {
+        host: form.relp.host.trim(),
+        port: Number(form.relp.port),
+        format: form.relp.format,
+        facility: form.relp.facility,
+        app_name: form.relp.app_name.trim(),
+        message: form.relp.message,
+        severities: form.relp.severities,
+      };
+    case 'gelf': {
+      const http = form.gelf.transport === 'http';
+      return {
+        transport: form.gelf.transport,
+        ...(http
+          ? { url: form.gelf.url.trim() }
+          : { host: form.gelf.host.trim(), port: Number(form.gelf.port) }),
+        // TCP framing carries no compression.
+        compression: form.gelf.transport === 'tcp' ? 'none' : form.gelf.compression,
+        source: form.gelf.source.trim() || null,
+        short_message: form.gelf.short_message,
+        full_message: form.gelf.full_message,
+        severities: form.gelf.severities,
+      };
+    }
   }
 }
 

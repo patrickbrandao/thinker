@@ -217,10 +217,23 @@ export class OrganizationsService {
     memberId: string,
     roleInput: unknown,
   ): Promise<void> {
+    const role = await this.assertCanAddMember(userId, tenantId, roleInput);
+    await this.tenantCache.addMember(tenantId, memberId, role);
+  }
+
+  /**
+   * The checks of addExistingMember without the write, so a caller that
+   * creates the account first (admin user creation) can fail before it.
+   */
+  async assertCanAddMember(
+    userId: string,
+    tenantId: string,
+    roleInput: unknown,
+  ): Promise<OrganizationRole> {
     const callerRole = await this.require(userId, tenantId, 'admin');
     const role = assertRole(roleInput);
     this.assertCanGrant(callerRole, role);
-    await this.tenantCache.addMember(tenantId, memberId, role);
+    return role;
   }
 
   /** Every active membership, for the instance admin's user list. */
@@ -269,6 +282,12 @@ export class OrganizationsService {
     this.assertCanGrant(callerRole, current.role);
     if (current.role === 'owner') await this.assertNotLastOwner(tenantId);
     await this.memberRepo.delete({ tenant_id: tenantId, user_id: memberId });
+    // A removed creator no longer owns the organization: free the
+    // owner_user_id slot so ensureForUser gives them a new personal one.
+    await this.tenantRepo.update(
+      { id: tenantId, owner_user_id: memberId },
+      { owner_user_id: null },
+    );
     this.tenantCache.invalidate(memberId);
   }
 
@@ -286,7 +305,8 @@ export class OrganizationsService {
     return rows[0];
   }
 
-  private async require(
+  /** The caller's role in the organization, or 403 below `required` (ADR 0006). */
+  async require(
     userId: string,
     tenantId: string,
     required: OrganizationRole,

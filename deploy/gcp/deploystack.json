@@ -1,7 +1,7 @@
 {
   "title": "Thinker",
   "description": "Deploy Thinker on Google Cloud Run with Cloud SQL and durable Cloud Storage request recordings.",
-  "logo": "https://raw.githubusercontent.com/patrickbrandao/thinker/main/.github/assets/thinker-logo.svg",
+  "logo": "https://raw.githubusercontent.com/patrickbrandao/thinker/main/.github/assets/thinker-logo.png",
   "duration": 15,
   "documentationLink": "https://github.com/patrickbrandao/thinker/tree/main/deploy/gcp",
   "variables": [
@@ -26,7 +26,7 @@
       "name": "image_url",
       "prompt": "Thinker image",
       "type": "string",
-      "default": "docker.io/tmsoftbrasil/thinker:0.1"
+      "default": "docker.io/tmsoftbrasil/thinker:0.32"
     },
     {
       "name": "database_tier",

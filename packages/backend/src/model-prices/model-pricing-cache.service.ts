@@ -1,3 +1,4 @@
+import { PROVIDER_PRICE_SEEDS, priceSeedEntry } from './provider-price-seeds';
 import { Injectable, Logger, OnApplicationBootstrap, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -28,7 +29,15 @@ const CUSTOM_PROVIDER_LABEL = 'Custom';
  * midnight). Mirrors models.dev `cost.tiers[].tier.type = "time"`.
  */
 export interface PricingTimeTier {
+  /**
+   * `HH:MM-HH:MM` UTC windows. Empty means the whole day, for a tier bounded
+   * only by `from` / `until` (a price change on a known date).
+   */
   windows: readonly string[];
+  /** ISO date (inclusive) the tier starts applying. */
+  from?: string | null;
+  /** ISO date (exclusive) the tier stops applying. */
+  until?: string | null;
   /**
    * ISO weekdays (1 = Monday … 7 = Sunday) the windows apply on. Absent or
    * empty means every day. DeepSeek's peak hours are Monday through Friday.
@@ -49,6 +58,17 @@ export interface PricingEntry {
   cache_write_price_per_token?: number | null;
   /** Peak-hour price bands (e.g. DeepSeek V4); base prices apply outside them. */
   time_tiers?: readonly PricingTimeTier[] | null;
+  /**
+   * Rates for the whole request once its prompt exceeds `threshold_tokens`
+   * (OpenAI >272K, Gemini Pro >200K, OpenCode `overrides`).
+   */
+  long_context?: {
+    threshold_tokens: number;
+    input_price_per_token: number;
+    output_price_per_token: number;
+    cache_read_price_per_token?: number | null;
+    cache_write_price_per_token?: number | null;
+  } | null;
   display_name: string | null;
   /** True if confirmed via provider-native API, false if unverified, undefined if no data. */
   validated?: boolean;
@@ -81,7 +101,7 @@ export class ModelPricingCacheService implements OnApplicationBootstrap {
 
   /**
    * Display name → registry id, for callers holding a `PricingEntry.provider`
-   * rather than an id. Seven of them ("OpenCode Zen", "Google Vertex AI",
+   * rather than an id. Seven of them ("OpenCode", "Google Vertex AI",
    * "GitHub Copilot"…) match neither the id nor any alias, so without this they
    * would silently fall back to the shared entry — the exact mispricing the
    * scoped map exists to prevent.
@@ -207,6 +227,10 @@ export class ModelPricingCacheService implements OnApplicationBootstrap {
 
     // Overlay models.dev entries (curated, native IDs — preferred source)
     this.loadModelsDevEntries();
+
+    // Overlay the curated per-provider seeds (prices the catalogs lack or get
+    // wrong: long-context bands, dated price changes), scoped to their seller.
+    this.loadPriceSeeds();
 
     // Overlay user-defined custom provider pricing (from the custom_providers
     // table). Keyed by `custom:<uuid>/<model_name>` — the same identifier
@@ -336,6 +360,18 @@ export class ModelPricingCacheService implements OnApplicationBootstrap {
    * for the same model. models.dev uses native provider IDs so bare model
    * names match directly without prefix stripping.
    */
+  private loadPriceSeeds(): void {
+    for (const [providerId, models] of Object.entries(PROVIDER_PRICE_SEEDS)) {
+      const displayName = PROVIDER_BY_ID.get(providerId)?.displayName ?? providerId;
+      for (const [modelId, seed] of Object.entries(models)) {
+        this.providerScoped.set(
+          ModelPricingCacheService.scopedKey(providerId, modelId),
+          priceSeedEntry(modelId, displayName, seed),
+        );
+      }
+    }
+  }
+
   private loadModelsDevEntries(): void {
     if (!this.modelsDevSync) return;
 

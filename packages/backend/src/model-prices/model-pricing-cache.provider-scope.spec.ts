@@ -10,7 +10,7 @@ import { normalizeProviderName } from 'thinker-shared';
  *
  * 24 providers publish a `deepseek-v4-pro` record. The shared cache is keyed by
  * model name alone, so they all write to one key and the last one — OpenCode
- * Zen, which sits far later in the registry than DeepSeek — is the one that
+ * OpenCode, which sits far later in the registry than DeepSeek — is the one that
  * survives. Costing a DeepSeek request off that entry charges the user a
  * reseller's rate and drops DeepSeek's peak-hour schedule with it.
  */
@@ -71,7 +71,7 @@ describe('ModelPricingCacheService — pricing scoped to the provider that serve
       lookupModel: jest.fn().mockReturnValue(null),
       getModelsForProvider: jest.fn().mockImplementation((providerId: string) => {
         if (providerId === 'deepseek') return [DEEPSEEK_OWN];
-        if (providerId === 'opencode-zen') return [ZEN_RESALE];
+        if (providerId === 'opencode') return [ZEN_RESALE];
         if (providerId === 'anthropic') return [ANTHROPIC_DATED];
         if (providerId === 'opencode-go') return [GO_RESALE];
         return [];
@@ -98,10 +98,10 @@ describe('ModelPricingCacheService — pricing scoped to the provider that serve
   it('returns the reseller entry when no provider is named', async () => {
     await service.reload();
 
-    // Unscoped lookup is last-writer-wins. OpenCode Zen is registered after
+    // Unscoped lookup is last-writer-wins. OpenCode is registered after
     // DeepSeek, so this is the pre-existing behaviour, pinned deliberately.
     const entry = service.getByModel('deepseek-v4-pro');
-    expect(entry!.provider).toBe('OpenCode Zen');
+    expect(entry!.provider).toBe('OpenCode');
     expect(entry!.input_price_per_token).toBe(1.74 / 1_000_000);
   });
 
@@ -126,9 +126,9 @@ describe('ModelPricingCacheService — pricing scoped to the provider that serve
   it('gives the reseller its own flat rate with no borrowed schedule', async () => {
     await service.reload();
 
-    // OpenCode Zen bills a flat rate. DeepSeek's peak hours are not theirs.
-    const entry = service.getByModel('deepseek-v4-pro', 'opencode-zen');
-    expect(entry!.provider).toBe('OpenCode Zen');
+    // OpenCode bills a flat rate. DeepSeek's peak hours are not theirs.
+    const entry = service.getByModel('deepseek-v4-pro', 'opencode');
+    expect(entry!.provider).toBe('OpenCode');
     expect(entry!.input_price_per_token).toBe(1.74 / 1_000_000);
     expect(entry!.time_tiers).toBeUndefined();
   });
@@ -146,13 +146,13 @@ describe('ModelPricingCacheService — pricing scoped to the provider that serve
     // number beats no number at all.
     const entry = service.getByModel('deepseek-v4-pro', 'huggingface');
     expect(entry).toBeDefined();
-    expect(entry!.provider).toBe('OpenCode Zen');
+    expect(entry!.provider).toBe('OpenCode');
   });
 
   it('falls back to the shared entry when the provider is not in the registry', async () => {
     await service.reload();
 
-    expect(service.getByModel('deepseek-v4-pro', 'not-a-provider')!.provider).toBe('OpenCode Zen');
+    expect(service.getByModel('deepseek-v4-pro', 'not-a-provider')!.provider).toBe('OpenCode');
   });
 
   it('scopes OpenRouter entries to OpenRouter, never to the lab', async () => {
@@ -218,10 +218,10 @@ describe('ModelPricingCacheService — pricing scoped to the provider that serve
     await service.reload();
 
     // Callers that hold a `PricingEntry.provider` have the display name, not
-    // the registry id. `OpenCode Zen` and friends do not resolve by
+    // the registry id. `OpenCode` and friends do not resolve by
     // lowercasing alone.
     // `OpenCode Go` is not the shared winner, so only a real display-name
-    // resolution can return its rate rather than OpenCode Zen's.
+    // resolution can return its rate rather than OpenCode's.
     expect(service.getByModel('deepseek-v4-pro', 'OpenCode Go')!.input_price_per_token).toBe(
       0.9 / 1_000_000,
     );
@@ -270,7 +270,7 @@ describe('ModelPricingCacheService — pricing scoped to the provider that serve
     // a provider has delisted would keep being priced from a stale rate.
     const models = new Map<string, unknown[]>([
       ['deepseek', [DEEPSEEK_OWN]],
-      ['opencode-zen', [ZEN_RESALE]],
+      ['opencode', [ZEN_RESALE]],
     ]);
     const mockModelsDevSync = {
       lookupModel: jest.fn().mockReturnValue(null),
@@ -299,6 +299,6 @@ describe('ModelPricingCacheService — pricing scoped to the provider that serve
 
     // DeepSeek no longer sells it, so the scoped hit is gone and the shared
     // entry answers instead.
-    expect(service.getByModel('deepseek-v4-pro', 'deepseek')!.provider).toBe('OpenCode Zen');
+    expect(service.getByModel('deepseek-v4-pro', 'deepseek')!.provider).toBe('OpenCode');
   });
 });

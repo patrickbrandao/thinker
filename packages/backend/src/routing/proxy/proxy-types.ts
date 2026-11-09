@@ -85,6 +85,8 @@ export interface ProviderAttemptRef {
   finishRecording?: (response?: RecordingResponseBody | null) => Promise<void>;
   /** Where this provider call went out (Proxy Servers): set by ProviderClient. */
   egress?: { summary: EgressSummary | null; hops: EgressHop[] };
+  /** What the upstream says served the call (served-provider.ts). */
+  served?: { provider?: string; generationId?: string; model?: string };
 }
 
 export type StartProviderAttempt = (attempt: ProviderAttemptStart) => ProviderAttemptRef;
@@ -145,6 +147,8 @@ export interface ForwardOptions {
    * `cloudaicompanionProject` id assigned during `enrichBlob`.
    */
   providerResource?: string;
+  /** `apiKey` is an access token unwrapped from a stored OAuth login. */
+  oauthToken?: boolean;
   /** Persisted identity of this exact upstream call. */
   attempt?: ProviderAttemptRef;
   /** Outbound proxy scope of the connection serving this call. */

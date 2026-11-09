@@ -38,6 +38,12 @@ describe('validateApiKey', () => {
     expect(validateApiKey(ollama, '')).toEqual({ valid: true });
   });
 
+  it("accepts OpenCode's free key despite the minimum key length", () => {
+    const opencode = getProvider('opencode')!;
+    expect(validateApiKey(opencode, 'public')).toEqual({ valid: true });
+    expect(validateApiKey(opencode, 'short').valid).toBe(false);
+  });
+
   it('returns invalid when key is empty', () => {
     const openai = getProvider('openai')!;
     expect(validateApiKey(openai, '')).toEqual({
@@ -141,20 +147,21 @@ describe('validateApiKey', () => {
 
   it('validates Pioneer key prefix and length', () => {
     const pioneer = getProvider('pioneer')!;
-    expect(pioneer.keyPlaceholder).toBe('pio_sk_...');
+    expect(pioneer.keyPlaceholder).toBe('fast_sk_...');
     expect(validateApiKey(pioneer, '')).toEqual({
       valid: false,
       error: 'API key is required',
     });
     expect(validateApiKey(pioneer, 'sk-wrong-prefix-that-is-long-enough')).toEqual({
       valid: false,
-      error: 'Pioneer keys start with "pio_sk_"',
+      error: 'Fastino keys start with "fast_sk_"',
     });
     expect(validateApiKey(pioneer, 'pio_sk_short')).toEqual({
       valid: false,
       error: 'Key is too short (minimum 20 characters)',
     });
     expect(validateApiKey(pioneer, 'pio_sk_' + 'a'.repeat(20))).toEqual({ valid: true });
+    expect(validateApiKey(pioneer, 'fast_sk_' + 'a'.repeat(20))).toEqual({ valid: true });
   });
 
   it('validates AWS Bedrock raw bearer-token and legacy API-key lengths', () => {
@@ -382,10 +389,10 @@ describe('validateSubscriptionKey', () => {
 
   it('exposes the MiniMax Coding Plan token alternative on the provider def', () => {
     const minimax = getProvider('minimax')!;
-    expect(minimax.subscriptionTokenAlternative).toEqual({
+    expect(minimax.subscriptionTokenAlternative).toMatchObject({
       prefix: 'sk-cp-',
       placeholder: 'sk-cp-...',
-      dividerLabel: expect.stringContaining('Coding Plan token'),
+      tokenLabel: expect.stringContaining('Coding Plan token'),
     });
   });
 });
@@ -496,6 +503,9 @@ describe('PROVIDERS', () => {
     const meta = PROVIDERS.find((provider) => provider.id === 'meta')!;
     expect(meta.name).toBe('Meta');
     expect(meta.models.map((model) => model.value)).toEqual([
+      'muse-spark-1.3',
+      'muse-spark-1.3-contributor',
+      'muse-wonder-1.0',
       'muse-spark-1.2',
       'muse-spark-1.2-contributor',
       'muse-spark-1.1',
@@ -568,7 +578,9 @@ describe('PROVIDERS', () => {
     expect(commandcode.subscriptionCredentialKind).toBe('api-key');
     expect(commandcode.subscriptionLabel).toBe('Command Code subscription');
     expect(commandcode.subscriptionKeyPlaceholder).toBe('Paste your Command Code API key');
-    expect(commandcode.subscriptionRequirementNote).toBe('Requires Command Code Pro or higher.');
+    expect(commandcode.subscriptionRequirementNote).toBe(
+      'Requires a Command Code plan with API access (any plan except Go).',
+    );
     expect(commandcode.subscriptionSignInUrl).toBeUndefined();
     expect(commandcode.subscriptionSignInLabel).toBeUndefined();
     expect(commandcode.subscriptionSignInHint).toBeUndefined();
@@ -618,11 +630,11 @@ describe('PROVIDERS', () => {
   it('Pioneer is an API-key provider with dynamic models', () => {
     const pioneer = PROVIDERS.find((p) => p.id === 'pioneer')!;
     expect(pioneer).toBeDefined();
-    expect(pioneer.name).toBe('Pioneer');
+    expect(pioneer.name).toBe('Fastino');
     expect(pioneer.supportsSubscription).toBeUndefined();
     expect(pioneer.subscriptionOnly).toBeUndefined();
-    expect(pioneer.keyPrefix).toBe('pio_sk_');
-    expect(pioneer.keyPlaceholder).toBe('pio_sk_...');
+    expect(pioneer.keyPrefix).toBe('fast_sk_');
+    expect(pioneer.keyPlaceholder).toBe('fast_sk_...');
     expect(pioneer.minKeyLength).toBe(20);
     expect(pioneer.models).toEqual([]);
   });
@@ -642,7 +654,7 @@ describe('PROVIDERS', () => {
   it('MiniMax supports subscription with device-code flow', () => {
     const minimax = PROVIDERS.find((p) => p.id === 'minimax')!;
     expect(minimax.supportsSubscription).toBe(true);
-    expect(minimax.subscriptionLabel).toBe('MiniMax Coding Plan');
+    expect(minimax.subscriptionLabel).toBe('MiniMax M Plan');
     expect(minimax.subscriptionAuthMode).toBe('device_code');
   });
 
@@ -827,7 +839,7 @@ describe('PROVIDERS', () => {
     expect(zai.supportsSubscription).toBe(true);
     expect(zai.subscriptionLabel).toBe('GLM Coding Plan');
     expect(zai.subscriptionAuthMode).toBe('token');
-    expect(zai.subscriptionKeyPlaceholder).toBe('Paste your Z.ai API key');
+    expect(zai.subscriptionKeyPlaceholder).toBe('Paste your GLM Coding Plan API key');
     expect(zai.subscriptionEndpointRegions).toEqual([
       { value: 'global', label: 'Outside China (api.z.ai)' },
       { value: 'cn', label: 'China Mainland (open.bigmodel.cn)' },
@@ -871,21 +883,19 @@ describe('PROVIDERS', () => {
   });
 
   it('provides an API key URL for Pioneer', () => {
-    expect(getRoutingProviderApiKeyUrl('pioneer')).toBe('https://pioneer.ai');
+    expect(getRoutingProviderApiKeyUrl('pioneer')).toBe('https://agent.fastino.ai');
   });
 
-  it('OpenCode Go is subscription-only with a sign-in URL', () => {
+  it('OpenCode Go is subscription-only with Console device login and an API-key alternative', () => {
     const og = PROVIDERS.find((p) => p.id === 'opencode-go')!;
     expect(og).toBeDefined();
     expect(og.supportsSubscription).toBe(true);
     expect(og.subscriptionOnly).toBe(true);
-    expect(og.subscriptionAuthMode).toBe('token');
+    expect(og.subscriptionAuthMode).toBe('device_code');
     expect(og.subscriptionLabel).toBe('OpenCode Go (beta)');
-    expect(og.subscriptionKeyPlaceholder).toBe('Paste your OpenCode API key');
-    expect(og.subscriptionSignInUrl).toBe('https://opencode.ai/auth');
-    expect(og.subscriptionSignInLabel).toBe('Sign in to OpenCode Go');
-    expect(og.subscriptionSignInHint).toMatch(/Sign in to OpenCode Go/);
-    expect(og.subscriptionSignInHint).not.toMatch(/Zen/i);
+    expect(og.subscriptionTokenAlternative?.prefix).toBe('');
+    expect(og.subscriptionTokenAlternative?.placeholder).toBe('Paste your OpenCode API key');
+    expect(og.subscriptionTokenAlternative?.tokenLabel).toBe('API key');
     expect(og.beta).toBe(true);
   });
 
@@ -894,18 +904,19 @@ describe('PROVIDERS', () => {
     expect(og.models).toEqual([]);
   });
 
-  it('OpenCode Zen is registered as an API-key provider with no subscription mode', () => {
-    const oz = PROVIDERS.find((p) => p.id === 'opencode-zen')!;
-    expect(oz).toBeDefined();
-    expect(oz.name).toBe('OpenCode Zen');
-    expect(oz.supportsSubscription).toBeUndefined();
-    expect(oz.subscriptionOnly).toBeUndefined();
-    expect(oz.deviceLogin).toBeUndefined();
-    expect(oz.models).toEqual([]);
+  it('OpenCode takes an API key (the free key `public` by default) or the Console device login', () => {
+    const oc = PROVIDERS.find((p) => p.id === 'opencode')!;
+    expect(oc).toBeDefined();
+    expect(oc.name).toBe('OpenCode');
+    expect(oc.supportsSubscription).toBe(true);
+    expect(oc.subscriptionAuthMode).toBe('device_code');
+    expect(oc.subscriptionOnly).toBeUndefined();
+    expect(oc.freeKey).toBe('public');
+    expect(oc.models).toEqual([]);
   });
 
-  it('OpenCode Zen exposes an API-key signup URL', () => {
-    expect(getRoutingProviderApiKeyUrl('opencode-zen')).toBe('https://opencode.ai/auth');
+  it('OpenCode exposes an API-key signup URL', () => {
+    expect(getRoutingProviderApiKeyUrl('opencode')).toBe('https://opencode.ai/auth');
   });
 
   it('Kiro is subscription-only with device-code OAuth flow and dynamic models', () => {
@@ -927,7 +938,7 @@ describe('PROVIDERS', () => {
     expect(getSubscriptionProviderKeyUrl('kiro')).toBe('https://app.kiro.dev');
   });
 
-  it('OpenCode Go subscription key is validated with generic min-length check', () => {
+  it('OpenCode Go pasted API key is validated with the provider key length', () => {
     const og = PROVIDERS.find((p) => p.id === 'opencode-go')!;
     expect(validateSubscriptionKey(og, '')).toEqual({
       valid: false,
@@ -935,7 +946,7 @@ describe('PROVIDERS', () => {
     });
     expect(validateSubscriptionKey(og, 'short')).toEqual({
       valid: false,
-      error: 'Token is too short (minimum 10 characters)',
+      error: 'Token is too short (minimum 20 characters)',
     });
     expect(validateSubscriptionKey(og, 'a-valid-opencode-token-1234')).toEqual({
       valid: true,

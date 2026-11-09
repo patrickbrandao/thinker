@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { alertCatalogFailure } from '../common/services/alert-sink';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { describeCatalogSyncSetting, isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { normalizeProviderName, type ModelCapability, type ModelModality } from 'thinker-shared';
@@ -44,7 +45,7 @@ const PROVIDER_ID_MAP: Readonly<Record<string, string>> = {
   copilot: 'github-copilot',
   groq: 'groq',
   'opencode-go': 'opencode-go',
-  'opencode-zen': 'opencode',
+  opencode: 'opencode',
   'ollama-cloud': 'ollama-cloud',
 };
 
@@ -193,19 +194,13 @@ const DEEPSEEK_FLASH_RATES: DeepSeekRateCard = {
   peak: { input: 0.3, output: 1.2, cacheRead: 0.006 },
 };
 
-/** V4 Pro, unchanged until it starts routing to Flash. */
+/** V4 Pro: its own card on the official pricing page (api-deepseek G1). */
 const DEEPSEEK_PRO_RATES: DeepSeekRateCard = {
   input: 0.66,
   output: 1.98,
   cacheRead: 0.022,
   peak: { input: 1.32, output: 3.96, cacheRead: 0.044 },
 };
-
-/**
- * 12:00 Beijing on 2026-09-14 = 04:00 UTC. From then, `deepseek-v4-pro` is
- * served by V4.1 Flash and billed on the Flash card.
- */
-const DEEPSEEK_PRO_FLASH_CUTOVER_MS = Date.parse('2026-09-14T04:00:00Z');
 
 /** GA id plus the retired aliases DeepSeek still accepts at Flash prices. */
 const DEEPSEEK_FLASH_MODEL_IDS: ReadonlySet<string> = new Set([
@@ -223,11 +218,9 @@ const DEEPSEEK_FLASH_CATALOG_STUB: RawModelsDevModel = {
   modalities: { input: ['text', 'image'], output: ['text'] },
 };
 
-function deepseekSeedRates(modelId: string, atMs = Date.now()): DeepSeekRateCard | undefined {
+function deepseekSeedRates(modelId: string): DeepSeekRateCard | undefined {
   if (DEEPSEEK_FLASH_MODEL_IDS.has(modelId)) return DEEPSEEK_FLASH_RATES;
-  if (modelId === 'deepseek-v4-pro') {
-    return atMs >= DEEPSEEK_PRO_FLASH_CUTOVER_MS ? DEEPSEEK_FLASH_RATES : DEEPSEEK_PRO_RATES;
-  }
+  if (modelId === 'deepseek-v4-pro') return DEEPSEEK_PRO_RATES;
   return undefined;
 }
 
@@ -846,11 +839,13 @@ export class ModelsDevSyncService implements OnModuleInit {
 
       if (!res.ok) {
         this.logger.error(`models.dev API returned ${res.status}`);
+        alertCatalogFailure('models.dev', `models.dev API returned HTTP ${res.status}`);
         return null;
       }
       return (await res.json()) as RawModelsDevResponse;
     } catch (err) {
       this.logger.error(`Failed to fetch models.dev data: ${err}`);
+      alertCatalogFailure('models.dev', `Failed to fetch models.dev data: ${err}`);
       return null;
     }
   }

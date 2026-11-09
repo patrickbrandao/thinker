@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { FlaskConical, Network, Trash2 } from 'lucide-react';
+import { FlaskConical, Trash2 } from 'lucide-react';
 import ErrorState from '../components/ErrorState.js';
 import LogRetentionSelect from '../components/LogRetentionSelect.js';
 import {
@@ -29,6 +29,7 @@ import {
 } from '../services/api/proxies.js';
 import { formatDateTime } from '../services/formatters.js';
 import { roleCan } from '../services/session-store.js';
+import { setPageBreadcrumb } from '../services/page-breadcrumb-store.js';
 import { toast } from '../services/toast-store.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
@@ -142,6 +143,12 @@ export default function ProxyServer() {
     enabled: !isNew && canManage,
   });
   const proxy = isNew ? null : (detail.data ?? null);
+  const crumb = proxy ? proxy.name : isNew ? t('proxies.form.createTitle') : null;
+  const crumbPath = `/proxy-servers/${proxyId}`;
+  useEffect(() => {
+    setPageBreadcrumb(crumb, crumbPath);
+    return () => setPageBreadcrumb(null);
+  }, [crumb, crumbPath]);
 
   const setTab = (next: Tab) => {
     const p = new URLSearchParams(params);
@@ -189,12 +196,7 @@ export default function ProxyServer() {
       <title>
         {t('common.pageTitle', { page: proxy ? proxy.name : t('proxies.form.createTitle') })}
       </title>
-      {back}
-      <div className="mb-4 mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="m-0 flex items-center gap-2">
-          <Network aria-hidden="true" className="size-5 text-muted" />
-          {proxy ? proxy.name : t('proxies.form.createTitle')}
-        </h1>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         {proxy ? (
           <>
             <ProxyStatusBadge status={proxy.status} />

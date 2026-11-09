@@ -1,9 +1,13 @@
+import { Audit } from '../alerts/audit.decorator';
 import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  Header,
   Inject,
+  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -27,8 +31,16 @@ import {
   RemoveProviderQueryDto,
   RenameProviderKeyDto,
   SetStreamWarmupDto,
+  SetStreamIdleDto,
+  SetBaseUrlDto,
 } from './dto/routing.dto';
 import { MinRole } from '../common/decorators/roles.decorator';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { providerKeyDisplay } from '../common/utils/provider-key-mask';
+import { canUsePrivateDestinations } from '../common/utils/private-url-policy';
+import { checkAccountBaseUrl, baseUrlFields } from './account-base-url-check';
+import { defaultAccountBaseUrl, supportsAccountBaseUrl } from './account-base-url';
+import { buildProviderModels } from './provider-models';
 
 /**
  * Tenant-level provider management endpoints.
@@ -49,6 +61,8 @@ import { MinRole } from '../common/decorators/roles.decorator';
 @MinRole('admin')
 @Controller('api/v1/providers')
 export class TenantProvidersController {
+  private readonly logger = new Logger(TenantProvidersController.name);
+
   constructor(
     @InjectRepository(TenantProvider)
     private readonly providerRepo: Repository<TenantProvider>,
@@ -58,6 +72,7 @@ export class TenantProvidersController {
     private readonly discoveryService: ModelDiscoveryService,
     private readonly routingCache: RoutingCacheService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly organizations: OrganizationsService,
   ) {}
 
   private requireTenant(ctx: TenantContext): string {
@@ -73,6 +88,42 @@ export class TenantProvidersController {
     this.routingCache.invalidateTenant(tenantId);
   }
 
+  /**
+   * Every model the workspace's connections offer (Providers → Models), with
+   * the accounts serving each one. Active connections only, unless
+   * `include_inactive=true`.
+   */
+  @Get('models')
+  async listModels(
+    @TenantCtx() ctx: TenantContext,
+    @Query('include_inactive') includeInactive?: string,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const [rows, customProviders] = await Promise.all([
+      this.providerRepo.find({ where: { tenant_id: tenantId } }),
+      this.customProviderService.list(tenantId),
+    ]);
+    return {
+      models: buildProviderModels(rows, customProviders, includeInactive === 'true'),
+    };
+  }
+
+  /** Official base URL of a provider (and region), for the base URL field's placeholder. */
+  @Get('default-base-url')
+  defaultBaseUrl(
+    @Query('provider') provider: string,
+    @Query('auth_type') authType?: string,
+    @Query('region') region?: string,
+  ) {
+    const supports = !!provider && supportsAccountBaseUrl(provider, authType || 'api_key');
+    return {
+      supports_base_url: supports,
+      default_base_url: supports
+        ? defaultAccountBaseUrl(provider, authType || 'api_key', region || null)
+        : null,
+    };
+  }
+
   @Post('refresh-models')
   async refreshModels(@TenantCtx() ctx: TenantContext) {
     const tenantId = this.requireTenant(ctx);
@@ -81,6 +132,12 @@ export class TenantProvidersController {
     return { ok: true };
   }
 
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    idParam: 'label',
+    nameParams: ['provider', 'label'],
+  })
   @Patch(':provider/keys/:label')
   async renameProviderKey(
     @TenantCtx() ctx: TenantContext,
@@ -106,7 +163,71 @@ export class TenantProvidersController {
     };
   }
 
+  /**
+   * Set or clear an API-key connection's base URL. Same URL rules as custom
+   * providers: SSRF validation with THINKER_PROVIDER_PRIVATE_URLS. Models are
+   * discovered again against the new URL.
+   */
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    lookup: { table: 'tenant_providers', nameColumn: 'label' },
+  })
+  @Patch('connections/:id/base-url')
+  async setBaseUrl(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: SetBaseUrlDto,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const baseUrl = await checkAccountBaseUrl(body.base_url, ctx);
+    const updated = await this.providerService.setBaseUrl(
+      tenantId,
+      id,
+      baseUrl,
+      canUsePrivateDestinations(ctx),
+    );
+    await this.invalidateTenantRouting(tenantId);
+    try {
+      await this.discoveryService.discoverModels(updated);
+    } catch {
+      // Non-fatal: "Refresh models" retries.
+    }
+    return {
+      id: updated.id,
+      base_url: updated.base_url ?? null,
+      default_base_url: defaultAccountBaseUrl(updated.provider, updated.auth_type, updated.region),
+    };
+  }
+
+  /** Set or clear a connection's stream idle timeout override. */
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    lookup: { table: 'tenant_providers', nameColumn: 'label' },
+  })
+  @Patch('connections/:id/stream-idle')
+  async setStreamIdle(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: SetStreamIdleDto,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const updated = await this.providerService.setStreamIdleTimeout(
+      tenantId,
+      id,
+      body.stream_idle_timeout_ms,
+    );
+    await this.invalidateTenantRouting(tenantId);
+    return { id: updated.id, stream_idle_timeout_ms: updated.stream_idle_timeout_ms };
+  }
+
   /** Set or clear a connection's stream warm-up override (#244). */
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    lookup: { table: 'tenant_providers', nameColumn: 'label' },
+  })
   @Patch('connections/:id/stream-warmup')
   async setStreamWarmup(
     @TenantCtx() ctx: TenantContext,
@@ -117,6 +238,31 @@ export class TenantProvidersController {
     const updated = await this.providerService.setStreamWarmup(tenantId, id, body.stream_warmup_ms);
     await this.invalidateTenantRouting(tenantId);
     return { id: updated.id, stream_warmup_ms: updated.stream_warmup_ms };
+  }
+
+  /**
+   * Reveal a connection's full API key. Owner only: the RolesGuard checks the
+   * role resolved for the request, and the membership is re-checked here so a
+   * credential without a user (or an internal context) never passes. OAuth and
+   * subscription credentials are refused. Every reveal is logged without the key.
+   */
+  @MinRole('owner')
+  @Post('connections/:id/reveal-key')
+  @Header('Cache-Control', 'no-store')
+  async revealKey(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
+    const tenantId = this.requireTenant(ctx);
+    if (!ctx.userId) {
+      throw new ForbiddenException({
+        message: 'Only an organization owner can reveal a provider key.',
+        code: 'insufficient_role',
+      });
+    }
+    await this.organizations.require(ctx.userId, tenantId, 'owner');
+    const { row, apiKey } = await this.providerService.revealApiKey(tenantId, id);
+    this.logger.log(
+      `Provider key revealed: user=${ctx.userId} tenant=${tenantId} connection=${row.id} provider=${row.provider}`,
+    );
+    return { id: row.id, api_key: apiKey };
   }
 
   /**
@@ -137,6 +283,7 @@ export class TenantProvidersController {
     return { ok: true };
   }
 
+  @Audit({ entity: 'connection', action: 'deleted', idParam: 'provider', nameParams: ['provider'] })
   @Delete(':provider')
   async removeProvider(
     @TenantCtx() ctx: TenantContext,
@@ -178,12 +325,18 @@ export class TenantProvidersController {
           id: string;
           label: string;
           key_prefix: string | null;
+          key_masked: string | null;
           priority: number;
           connected_at: string;
           models_fetched_at: string | null;
           cached_model_count: number;
           is_active: boolean;
           stream_warmup_ms: number | null;
+          stream_idle_timeout_ms: number | null;
+          region: string | null;
+          base_url: string | null;
+          default_base_url: string | null;
+          supports_base_url: boolean;
         }>;
         total_models: number;
       }
@@ -205,18 +358,21 @@ export class TenantProvidersController {
       const modelCount =
         customModelCount.get(p.provider) ??
         (Array.isArray(p.cached_models) ? p.cached_models.length : 0);
+      const display = providerKeyDisplay(p);
 
       if (existing) {
         existing.connections.push({
           id: p.id,
           label: p.label,
-          key_prefix: p.key_prefix,
+          ...display,
           priority: p.priority,
           connected_at: p.connected_at,
           models_fetched_at: p.models_fetched_at,
           cached_model_count: modelCount,
           is_active: p.is_active,
           stream_warmup_ms: p.stream_warmup_ms ?? null,
+          stream_idle_timeout_ms: p.stream_idle_timeout_ms ?? null,
+          ...baseUrlFields(p),
         });
         existing.total_models = Math.max(existing.total_models, modelCount);
       } else {
@@ -227,13 +383,15 @@ export class TenantProvidersController {
             {
               id: p.id,
               label: p.label,
-              key_prefix: p.key_prefix,
+              ...display,
               priority: p.priority,
               connected_at: p.connected_at,
               models_fetched_at: p.models_fetched_at,
               cached_model_count: modelCount,
               is_active: p.is_active,
               stream_warmup_ms: p.stream_warmup_ms ?? null,
+              stream_idle_timeout_ms: p.stream_idle_timeout_ms ?? null,
+              ...baseUrlFields(p),
             },
           ],
           total_models: modelCount,

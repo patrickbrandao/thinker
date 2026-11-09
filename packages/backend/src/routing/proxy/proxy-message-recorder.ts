@@ -13,6 +13,7 @@ import {
 } from 'thinker-shared';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { ThinkerRequest } from '../../entities/request.entity';
+import { detectHarnessSession } from './harness-session';
 import type { RequestTimeline } from './request-timeline';
 import {
   ModelPricingCacheService,
@@ -28,7 +29,7 @@ import { scrubSecrets } from '../../common/utils/secret-scrub';
 import { CallerAttribution } from './caller-classifier';
 import type { ProviderAttemptRef, ProviderAttemptStart, ProxyApiMode } from './proxy-types';
 import { CustomProviderService } from '../custom-provider/custom-provider.service';
-import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
+import { OpencodeCatalogService } from '../../model-discovery/opencode-catalog.service';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 import { isLocalOnlyProvider } from '../../common/utils/provider-availability';
 import { ProviderService } from '../routing-core/provider.service';
@@ -154,6 +155,8 @@ export interface CancelledRequestOpts {
   traceId?: string;
   /** API surface to retain when cancellation creates or repairs the Request. */
   apiMode?: ProxyApiMode;
+  /** Usage the provider already reported before the stream was cut. */
+  usage?: StreamUsage;
 }
 
 export interface FallbackSuccessOpts extends VirtualModelRef {
@@ -287,6 +290,7 @@ function buildRequestRow(
         : FAILED_WITHOUT_MESSAGE
       : null;
   const timestamp = attempt.timestamp ?? new Date().toISOString();
+  const session = detectHarnessSession(attempt.request_headers);
   return {
     id: requestId,
     tenant_id: ctx.tenantId,
@@ -295,7 +299,8 @@ function buildRequestRow(
     agent_name: ctx.agentName,
     trace_id: attempt.trace_id ?? null,
     session_key: attempt.session_key ?? null,
-    session_id: attempt.session_id ?? null,
+    session_id: attempt.session_id ?? session?.id ?? null,
+    parent_session_id: session?.parentId ?? null,
     timestamp,
     duration_ms: attempt.duration_ms ?? null,
     status,
@@ -356,6 +361,17 @@ function egressColumns(attempt: ProviderAttemptRef): Partial<AgentMessage> {
   };
 }
 
+/** What the upstream says served the attempt (served-provider.ts). */
+function servedColumns(attempt: ProviderAttemptRef): Partial<AgentMessage> {
+  const served = attempt.served;
+  if (!served) return {};
+  return {
+    ...(served.provider ? { served_provider: served.provider } : {}),
+    ...(served.generationId ? { upstream_generation_id: served.generationId } : {}),
+    ...(served.model ? { served_model: served.model } : {}),
+  };
+}
+
 @Injectable()
 export class ProxyMessageRecorder implements OnModuleDestroy {
   private readonly logger = new Logger(ProxyMessageRecorder.name);
@@ -370,7 +386,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     private readonly pricingCache: ModelPricingCacheService,
     private readonly eventBus: IngestEventBusService,
     private readonly customProviders: CustomProviderService,
-    private readonly opencodeGoCatalog: OpencodeGoCatalogService,
+    private readonly opencodeCatalog: OpencodeCatalogService,
     @Optional()
     private readonly providerService?: ProviderService,
     @Optional()
@@ -464,25 +480,31 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         ? await this.copilotTokenPricing(ctx, tenantProviderId, model, usage.prompt_tokens)
         : undefined;
 
+    const opencode = isCopilot ? null : await this.opencodeCatalog.costInputs(provider, model);
+    const catalogPricing = copilotPricing ?? opencode?.pricing;
+
     return computeTokenCost({
       inputTokens: usage?.prompt_tokens ?? 0,
       outputTokens: usage?.completion_tokens ?? 0,
       cacheReadTokens: usage?.cache_read_tokens ?? 0,
       cacheCreationTokens: usage?.cache_creation_tokens ?? 0,
+      cacheCreation1hTokens: usage?.cache_creation_1h_tokens ?? 0,
       model,
       // Priced on the raw keys: a custom provider's rates are stored under
       // `custom:<uuid>/<model>`, which is exactly what canonicalization strips.
       pricing:
-        copilotPricing ??
+        catalogPricing ??
         (!isCopilot && usage ? this.pricingCache.getByModel(model, provider) : undefined),
-      isSubscription: authType === 'subscription' && !copilotPricing,
+      isSubscription: authType === 'subscription' && !catalogPricing,
       isLocalProvider:
         authType === 'local' || isLocalOnlyProvider(canonicalProvider ?? provider ?? ''),
-      perRequestCostUsd: copilotPricing
-        ? null
-        : await this.perRequestSubscriptionCost(provider, authType, model),
-      // Copilot's usage.cost is a premium-request multiplier, not USD.
-      reportedCostUsd: isCopilot ? undefined : usage?.reported_cost_usd,
+      // Copilot's usage.cost is a premium-request multiplier, not USD, and
+      // ClinePass reports the upstream market price on a flat-fee plan
+      // (sub-cline-pass G2).
+      reportedCostUsd:
+        isCopilot || opencode?.ignoreReportedCost || isFlatFeeReportedCost(provider)
+          ? undefined
+          : usage?.reported_cost_usd,
       at,
     });
   }
@@ -517,7 +539,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         'agent_name',
         'trace_id',
         'session_key',
-        'session_id',
+        // Only a writer that saw the session headers may set it, never clear it.
+        ...(row.session_id == null ? [] : ['session_id', 'parent_session_id']),
         'duration_ms',
         'status',
         'error_message',
@@ -566,6 +589,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       tenantProviderId: row.tenant_provider_id ?? null,
       provider: row.provider ?? null,
       keyLabel: row.provider_key_label ?? null,
+      model: row.model ?? null,
+      errorOrigin: row.error_origin ?? null,
       ok: normalizeStatus(row.status ?? 'ok') === 'success',
       httpStatus: row.error_http_status ?? null,
       errorCode: row.error_code ?? null,
@@ -582,6 +607,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           ...row,
           ...attemptIdentity(attempt, attempt.attemptNumber),
           ...egressColumns(attempt),
+          ...servedColumns(attempt),
           duration_ms: Math.max(0, (attempt.completedAtMs ?? Date.now()) - attempt.startedAtMs),
         }
       : row;
@@ -688,7 +714,34 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
 
   /** Finish caller-disconnected work without attributing an error to Thinker or the provider. */
   async recordCancelledRequest(ctx: IngestionContext, opts: CancelledRequestOpts): Promise<void> {
+    // The provider bills what it already processed: keep the partial usage
+    // (and its cost) instead of recording a cancelled request as free.
+    const usage = opts.usage;
+    const model = opts.attemptStart?.model;
+    const costUsd =
+      usage && model
+        ? await this.computeCost(
+            ctx,
+            model,
+            opts.attemptStart?.provider,
+            opts.attemptStart?.authType,
+            usage,
+            opts.attemptStart?.tenantProviderId,
+            undefined,
+            opts.attempt ? new Date(opts.attempt.startedAt) : undefined,
+          ).catch(() => null)
+        : null;
+    const usageFields = usage
+      ? {
+          input_tokens: usage.prompt_tokens,
+          output_tokens: usage.completion_tokens,
+          cache_read_tokens: usage.cache_read_tokens ?? 0,
+          cache_creation_tokens: usage.cache_creation_tokens ?? 0,
+          cost_usd: costUsd,
+        }
+      : {};
     const row = buildMessageRow(ctx, {
+      ...usageFields,
       request_id: opts.requestId,
       ...attemptIdentity(opts.attempt, opts.attempt?.attemptNumber),
       timestamp: new Date().toISOString(),
@@ -763,6 +816,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
         duration_ms: Math.max(0, (attempt.completedAtMs ?? Date.now()) - attempt.startedAtMs),
         ...classified,
         ...egressColumns(attempt),
+        ...servedColumns(attempt),
       },
     );
   }
@@ -1305,31 +1359,15 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
   }
 
-  /**
-   * Resolve the per-request USD cost for subscription providers that bill
-   * against a dollar quota (today: OpenCode Go). Returns `null` for every
-   * other provider, leaving the existing "subscription → $0" path intact.
-   * Canonicalizes the provider through the registry so aliases (e.g.
-   * `opencodego`, `OpenCode-Go`) resolve identically. Awaits the catalog
-   * `list()` once if its in-memory index is still cold so the first request
-   * after a process restart doesn't undercount as $0.
-   */
-  private async perRequestSubscriptionCost(
-    provider: string | null | undefined,
-    authType: string | null | undefined,
-    model: string | null | undefined,
-  ): Promise<number | null> {
-    if (authType !== 'subscription') return null;
-    if (!provider) return null;
-    const canonical = PROVIDER_BY_ID_OR_ALIAS.get(provider.toLowerCase())?.id;
-    if (canonical !== 'opencode-go') return null;
-    return this.opencodeGoCatalog.resolveCostPerRequest(model);
-  }
-
   private evictExpiredCooldowns(): void {
     const now = Date.now();
     for (const [k, v] of this.rateLimitCooldown) {
       if (now - v >= this.RATE_LIMIT_COOLDOWN_MS) this.rateLimitCooldown.delete(k);
     }
   }
+}
+
+/** Providers whose reported `usage.cost` is a market price, not what the plan charged. */
+export function isFlatFeeReportedCost(provider: string | null | undefined): boolean {
+  return (provider ?? '').toLowerCase() === 'cline-pass';
 }

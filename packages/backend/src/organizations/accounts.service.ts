@@ -74,7 +74,11 @@ export class AccountsService {
     name: string,
     isInstanceAdmin = false,
   ): Promise<{ account: AccountRow; temporaryPassword: string }> {
-    const normalized = email.trim().toLowerCase();
+    const normalized = (typeof email === 'string' ? email : '').trim().toLowerCase();
+    // Better Auth rejects a bad email with an error Nest renders as 500.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || normalized.length > 254) {
+      throw new BadRequestException('A valid email is required.');
+    }
     if (await this.findByEmail(normalized)) {
       throw new ConflictException('An account with this email already exists.');
     }
@@ -116,8 +120,14 @@ export class AccountsService {
       );
     }
     await this.setFlags(userId, { must_change_password: true });
-    // Sessions opened with the old password end now.
+    // Sessions opened with the old password end now, and so do the account's
+    // `thinker login` tokens. Admin keys (thk_adm_) survive, but no key
+    // authenticates until the temporary password is changed.
     await this.ds.query(`DELETE FROM session WHERE "userId" = $1`, [userId]);
+    await this.ds.query(
+      `DELETE FROM api_keys WHERE created_by_user_id = $1 AND key_prefix LIKE 'thk\\_pat\\_%'`,
+      [userId],
+    );
     return temporaryPassword;
   }
 

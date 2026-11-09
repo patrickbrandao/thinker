@@ -416,12 +416,19 @@ export class TriggersService {
       add('e.event_type = ?', q.event_type);
     }
     if (q.agent_name) add('e.agent_name = ?', q.agent_name);
-    if (q.before && !Number.isNaN(Date.parse(q.before))) add('e.created_at < ?', q.before);
+    // `before` is the created_at of the last row the client has, which the
+    // API serialises at millisecond precision while the column keeps
+    // microseconds. Compare at the client's precision and include the
+    // boundary: rows of that same millisecond would otherwise never be
+    // listed. The client drops the rows it already has by id.
+    if (q.before && !Number.isNaN(Date.parse(q.before))) {
+      add(`date_trunc('milliseconds', e.created_at) <= ?::timestamptz`, q.before);
+    }
     const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
     const events = await this.ds.query(
       `SELECT ${EVENT_COLUMNS} FROM trigger_events e
         WHERE ${where.join(' AND ')}
-        ORDER BY e.created_at DESC
+        ORDER BY e.created_at DESC, e.id DESC
         LIMIT ${limit}`,
       params,
     );

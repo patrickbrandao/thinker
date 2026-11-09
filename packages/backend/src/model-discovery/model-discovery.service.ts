@@ -1,8 +1,12 @@
+import { allowsPrivateDestination } from '../common/utils/private-url-policy';
 import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
+import { emitAlert } from '../common/services/alert-sink';
+import { modelChangeAlerts } from './model-change-alerts';
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { type AuthType, type ModelModality } from 'thinker-shared';
+import { OPENCODE_FREE_KEY } from '../common/constants/subscription-clients';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
 import { CustomProvider } from '../entities/custom-provider.entity';
@@ -14,7 +18,7 @@ import {
   type ProviderModelFetchOptions,
 } from './provider-model-fetcher.service';
 import { ProviderModelRegistryService } from './provider-model-registry.service';
-import { DiscoveredModel, DEFAULT_CONTEXT_WINDOW } from './model-fetcher';
+import { DiscoveredModel, contextWindowFields } from './model-fetcher';
 import { decryptWithAny, getDecryptionSecrets } from '../common/utils/crypto.util';
 import { computeQualityScore } from '../database/quality-score.util';
 import { PricingSyncService } from '../database/pricing-sync.service';
@@ -36,6 +40,7 @@ import {
   isXiaomiTokenPlanRegion,
 } from '../routing/xiaomi-region';
 import { getZaiCodingPlanBaseUrl } from '../routing/zai-region';
+import { defaultAccountBaseUrl } from '../routing/account-base-url';
 import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
 import {
   findOpenRouterPrefix,
@@ -50,6 +55,8 @@ import { resolveMetadataEntry } from './metadata-identity';
 import { lookupKnownPrice } from './known-model-prices';
 import { lookupKnownModalities } from './known-model-modalities';
 import { mergeModelCapabilities, modelSupportsStreaming } from './model-capabilities';
+import { LiveContextService } from './live-context';
+import { localServerRootUrl } from '../common/constants/local-servers';
 // Import static helpers directly to avoid circular dependency with RoutingModule
 const customProviderKey = (id: string) => `custom:${id}`;
 const customModelKey = (id: string, modelName: string) => `custom:${id}/${modelName}`;
@@ -61,12 +68,7 @@ function isQwenProvider(providerId: string): boolean {
 
 function modelsDevModelIdPrefix(providerId: string): string | undefined {
   const lower = providerId.toLowerCase();
-  return lower === 'opencode-go' || lower === 'opencode-zen' ? lower : undefined;
-}
-
-function prefersModelsDevCatalog(providerId: string): boolean {
-  const lower = providerId.toLowerCase();
-  return lower === 'opencode-zen';
+  return lower === 'opencode-go' || lower === 'opencode' ? lower : undefined;
 }
 
 function nonChatFilterKey(providerId: string, authType: AuthType): string {
@@ -132,6 +134,9 @@ export class ModelDiscoveryService {
     @Optional()
     @Inject(ProxyEgressService)
     private readonly egress: ProxyEgressService | null = null,
+    @Optional()
+    @Inject(LiveContextService)
+    private readonly liveContext: LiveContextService | null = null,
   ) {}
 
   /** Discovery goes out through the connection's outbound proxy chain. */
@@ -169,7 +174,8 @@ export class ModelDiscoveryService {
         lowerProvider === 'anthropic' ||
         lowerProvider === 'minimax' ||
         lowerProvider === 'kiro' ||
-        lowerProvider === 'xai'
+        lowerProvider === 'xai' ||
+        lowerProvider === 'opencode-go'
       ) {
         // Kiro's token blob is an OAuthTokenBlob superset (source 'kiro-oidc',
         // plus client credentials), so the generic unwrap reads its access
@@ -228,6 +234,11 @@ export class ModelDiscoveryService {
       endpointOverride = getXiaomiTokenPlanBaseUrl(provider.region);
     }
 
+    // An API-key connection's own base URL replaces the official base of the
+    // models endpoint too (see routing/account-base-url.ts).
+    const accountBaseUrl =
+      provider.auth_type === 'api_key' && provider.base_url ? provider.base_url : null;
+
     if (options.forceRefresh && !options.skipModelsDevRefresh) {
       await this.refreshModelsDevCache();
     }
@@ -243,6 +254,15 @@ export class ModelDiscoveryService {
       ...(isBedrockProvider(provider.provider)
         ? { previousModels: provider.cached_models ?? [] }
         : {}),
+      ...(accountBaseUrl
+        ? {
+            accountBaseUrl: {
+              base: accountBaseUrl,
+              official: defaultAccountBaseUrl(provider.provider, 'api_key', provider.region),
+              allowPrivate: allowsPrivateDestination(provider.allow_private_destination),
+            },
+          }
+        : {}),
     };
     const fetchProviderModels = () =>
       this.fetcher.fetch(
@@ -257,9 +277,13 @@ export class ModelDiscoveryService {
       const models = buildModelsDevFallback(this.modelsDevSync, provider.provider, {
         idPrefix: modelsDevModelIdPrefix(provider.provider),
       });
+      // The free OpenCode key reaches only the models without a price.
+      if (lowerProvider === 'opencode' && apiKey === OPENCODE_FREE_KEY) {
+        return models.filter((m) => m.inputPricePerToken === 0 && m.outputPricePerToken === 0);
+      }
       if (lowerProvider !== 'opencode-go') return models;
-      // OpenCode Go is surfaced as a subscription gateway with per-request
-      // quota cost from the docs catalog, not token pricing from models.dev.
+      // OpenCode Go is a subscription: its quota cost is recorded per request
+      // from the OpenCode catalog, so the picker does not show token prices.
       return models.map((model) => ({
         ...model,
         inputPricePerToken: 0,
@@ -276,16 +300,6 @@ export class ModelDiscoveryService {
         this.logger.log(
           `Subscription provider ${provider.provider} — using ${raw.length} curated models`,
         );
-      }
-    } else if (
-      provider.auth_type !== 'subscription' &&
-      prefersModelsDevCatalog(provider.provider)
-    ) {
-      raw = buildModelsDevModels();
-      if (raw.length > 0) {
-        this.logger.log(`Using ${raw.length} models from models.dev for ${provider.provider}`);
-      } else {
-        raw = await fetchProviderModels();
       }
     } else {
       raw = await fetchProviderModels();
@@ -379,9 +393,11 @@ export class ModelDiscoveryService {
       return provider.cached_models ?? [];
     }
 
+    const changes = modelChangeAlerts(provider, provider.cached_models, filtered);
     provider.cached_models = filtered;
     provider.models_fetched_at = new Date().toISOString();
     await this.providerRepo.save(provider);
+    for (const alert of changes) emitAlert(alert);
     await this.invalidateProviderAccess(provider);
 
     this.logger.log(
@@ -406,6 +422,7 @@ export class ModelDiscoveryService {
         .map((p) =>
           this.discoverModels(p, discoveryOptions).catch((err) => {
             this.logger.warn(`Discovery failed for ${p.provider}: ${err}`);
+            alertDiscoveryFailure(p, err);
           }),
         ),
     );
@@ -489,6 +506,7 @@ export class ModelDiscoveryService {
           this.logger.warn(
             `Per-provider refresh failed for ${provider.provider} (tenant ${tenantId}): ${message}`,
           );
+          alertDiscoveryFailure(provider, err);
           return {
             ok: false,
             modelCount: previousCount,
@@ -518,7 +536,20 @@ export class ModelDiscoveryService {
    * cached list when warm, otherwise runs the full DB-backed assembly and
    * caches the result. Invalidated on any provider mutation (see invalidate()).
    */
+  /**
+   * The agent's catalog snapshot (one per `/v1/models` or proxied request).
+   * llama.cpp windows are lowered to the server's live `n_ctx` here, so the
+   * listing, `auto`/virtual windows and context-window fit all see it.
+   */
   async getModelsForAgent(tenantId: string, agentId?: string): Promise<DiscoveredModel[]> {
+    const models = await this.getRegisteredModelsForAgent(tenantId, agentId);
+    return this.liveContext ? this.liveContext.apply(models) : models;
+  }
+
+  private async getRegisteredModelsForAgent(
+    tenantId: string,
+    agentId?: string,
+  ): Promise<DiscoveredModel[]> {
     if (!agentId) return this.fetchModelsForAgent(tenantId);
 
     const cached = this.modelsCache.get(agentId);
@@ -585,7 +616,9 @@ export class ModelDiscoveryService {
     const models: DiscoveredModel[] = [];
     const seen = new Map<string, number>();
 
-    for (const p of providers) {
+    // Priority order, so each model's account list starts with the primary key.
+    const byPriority = [...providers].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+    for (const p of byPriority) {
       if (p.provider.startsWith('custom:')) continue;
       const rawCached = p.cached_models;
       if (!Array.isArray(rawCached)) continue;
@@ -603,9 +636,18 @@ export class ModelDiscoveryService {
         // providers can expose the same native model name, and the picker must
         // keep each provider-specific route selectable.
         const dedupeKey = `${providerId}::${effectiveAuthType}::${m.id}`;
-        if (!seen.has(dedupeKey)) {
+        const existing = seen.get(dedupeKey);
+        if (existing === undefined) {
           seen.set(dedupeKey, models.length);
-          models.push({ ...m, provider: p.provider, authType: effectiveAuthType });
+          models.push({
+            ...m,
+            provider: p.provider,
+            authType: effectiveAuthType,
+            keyLabels: [p.label],
+          });
+        } else {
+          const labels = models[existing]!.keyLabels;
+          if (labels && !labels.includes(p.label)) labels.push(p.label);
         }
       }
     }
@@ -627,6 +669,14 @@ export class ModelDiscoveryService {
     for (const cp of customProviders) {
       if (!Array.isArray(cp.models)) continue;
       const cpKey = customProviderKey(cp.id);
+      // A single-model llama.cpp server reports its runtime context on
+      // /props; router mode (several models) has no single n_ctx.
+      this.liveContext?.setTarget(
+        cpKey,
+        cp.local_type === 'llamacpp' && cp.local_config && cp.models.length === 1
+          ? { rootUrl: localServerRootUrl(cp.local_config) }
+          : null,
+      );
       if (agentId && !customAuthTypes.has(cpKey)) continue;
       for (const m of cp.models) {
         const modelKey = customModelKey(cp.id, m.model_name);
@@ -645,7 +695,7 @@ export class ModelDiscoveryService {
           displayName: m.model_name,
           provider: cpKey,
           authType: customAuthTypes.get(cpKey) ?? 'api_key',
-          contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
+          ...contextWindowFields(m.context_window),
           inputPricePerToken: inputPerToken,
           outputPricePerToken: outputPerToken,
           capabilityReasoning: m.capabilities?.includes('reasoning') === true,
@@ -748,7 +798,8 @@ export class ModelDiscoveryService {
         : model;
     const pricingProvider = isBedrock ? providerId : metadataProvider;
     const pricingModel = isBedrock ? model.id : metadataModel;
-    const known = lookupKnownPrice(pricingModel) ?? lookupKnownPrice(model.id);
+    const known =
+      lookupKnownPrice(pricingModel, providerId) ?? lookupKnownPrice(model.id, providerId);
     if (known) {
       return this.computeScore(
         this.applyCapabilities(
@@ -756,6 +807,7 @@ export class ModelDiscoveryService {
             ...modelWithMetadataName,
             inputPricePerToken: known.input,
             outputPricePerToken: known.output,
+            ...(known.cacheRead !== undefined ? { cacheReadPricePerToken: known.cacheRead } : {}),
           },
           providerId,
         ),
@@ -776,8 +828,10 @@ export class ModelDiscoveryService {
           ...modelWithMetadataName,
           inputPricePerToken: mdEntry.inputPricePerToken,
           outputPricePerToken: mdEntry.outputPricePerToken,
-          contextWindow:
-            mdEntry.contextWindow ?? capabilityEntry.contextWindow ?? model.contextWindow,
+          ...catalogContextWindow(
+            modelWithMetadataName,
+            mdEntry.contextWindow ?? capabilityEntry.contextWindow,
+          ),
           displayName: capabilityEntry.name || mdEntry.name || modelWithMetadataName.displayName,
           capabilityReasoning: capabilityEntry.reasoning ?? model.capabilityReasoning,
           capabilityCode: capabilityEntry.toolCall ?? model.capabilityCode,
@@ -804,7 +858,7 @@ export class ModelDiscoveryService {
           ...modelWithMetadataName,
           inputPricePerToken: pricing.input,
           outputPricePerToken: pricing.output,
-          contextWindow: pricing.contextWindow ?? modelWithMetadataName.contextWindow,
+          ...catalogContextWindow(modelWithMetadataName, pricing.contextWindow),
           displayName: pricing.displayName || modelWithMetadataName.displayName,
         };
       }
@@ -854,6 +908,24 @@ export class ModelDiscoveryService {
   }
 }
 
+/**
+ * A catalog (models.dev, OpenRouter) window replaces the provider's, and a
+ * real value clears the `default` stand-in mark.
+ */
+function catalogContextWindow(
+  model: DiscoveredModel,
+  catalogWindow: number | null | undefined,
+): Pick<DiscoveredModel, 'contextWindow' | 'contextWindowSource'> {
+  if (typeof catalogWindow !== 'number' || !Number.isFinite(catalogWindow) || catalogWindow <= 0) {
+    return { contextWindow: model.contextWindow, contextWindowSource: model.contextWindowSource };
+  }
+  return {
+    contextWindow: catalogWindow,
+    contextWindowSource:
+      model.contextWindowSource === 'default' ? undefined : model.contextWindowSource,
+  };
+}
+
 /** Unknown modalities (no list) count as text so the model is kept. */
 function carriesText(modalities: readonly ModelModality[] | undefined): boolean {
   return !modalities || modalities.includes('text');
@@ -870,4 +942,25 @@ function providerModalitiesFirst(
     ...(inputModalities ? { inputModalities } : {}),
     ...(outputModalities ? { outputModalities } : {}),
   };
+}
+
+/** catalog.sync_failed (instance event) for a failed model discovery, at most hourly per provider. */
+function alertDiscoveryFailure(
+  provider: { provider: string; tenant_id: string; label?: string | null },
+  err: unknown,
+): void {
+  const message = err instanceof Error ? err.message : String(err);
+  emitAlert({
+    tenantId: null,
+    level: 'warning',
+    type: 'catalog.sync_failed',
+    title: `Model discovery failed for ${provider.provider}`,
+    message: message.slice(0, 1000),
+    entityType: 'provider',
+    entityId: provider.provider,
+    entityName: provider.provider,
+    metadata: { source: 'discovery', tenant_id: provider.tenant_id, label: provider.label ?? null },
+    dedupeKey: `catalog.sync_failed:discovery:${provider.provider}`,
+    dedupeWindowMs: 60 * 60_000,
+  });
 }

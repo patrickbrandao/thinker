@@ -1,5 +1,6 @@
 import {
   toGoogleRequest,
+  googleResponseFailure,
   fromGoogleResponse,
   transformGoogleStreamChunk,
   type GoogleStreamChunkResult,
@@ -91,6 +92,7 @@ export {
   hasMessageCacheControl,
   extractThinkingBlocksFromMessagesResponse,
   toGoogleRequest,
+  googleResponseFailure,
   toAnthropicRequest,
   toResponsesRequest,
   collectChatGptSseResponse,
@@ -127,9 +129,32 @@ const OPENAI_ONLY_FIELDS = new Set([
   'audio',
   'prediction',
   'reasoning_effort',
+  'verbosity',
 ]);
 
-const OLLAMA_ENDPOINTS = new Set(['ollama', 'ollama-cloud']);
+/**
+ * Non-passthrough endpoints that implement `reasoning_effort` (api-huggingface
+ * G1, api-mistral G1, local-ollama G1, plus xAI, DeepSeek and MiniMax).
+ */
+const REASONING_EFFORT_ENDPOINTS = new Set([
+  'xai',
+  'deepseek',
+  'minimax',
+  'huggingface',
+  'mistral',
+  'ollama',
+  'ollama-cloud',
+]);
+/**
+ * Endpoints that take no Anthropic `thinking` but do take `reasoning_effort`:
+ * a disabled thinking becomes effort `none`, an enabled one `high` (Mistral)
+ * or the model default (Ollama).
+ */
+const THINKING_AS_EFFORT: Record<string, 'high' | null> = {
+  mistral: 'high',
+  ollama: null,
+  'ollama-cloud': null,
+};
 const MISTRAL_TOOL_CALL_ID_REGEX = /^[A-Za-z0-9]{9}$/;
 
 /**
@@ -146,9 +171,9 @@ const NVIDIA_NEMOTRON_FAMILY_RE = /^nemotron(?:[-_.\d]|$)/i;
 
 /**
  * OpenAI models that require `max_completion_tokens` instead of `max_tokens`.
- * All o-series reasoning models and GPT-5+ models use the new parameter.
+ * All o-series reasoning models and GPT-5+ (GPT-6 included) use the new parameter.
  */
-const OPENAI_MAX_COMPLETION_TOKENS_RE = /^(o\d|gpt-5)/i;
+const OPENAI_MAX_COMPLETION_TOKENS_RE = /^(o\d|gpt-[5-9])/i;
 
 /**
  * Endpoints that ultimately hit OpenAI infrastructure and therefore need
@@ -413,6 +438,13 @@ export interface SanitizeOpenAiBodyOptions {
    * without one.
    */
   forwardReasoningEffort?: boolean;
+  /**
+   * The upstream implements `reasoning_effort` (ProviderEndpoint
+   * nativeReasoningEffort): keep the caller's value, and turn a disabled
+   * `thinking` into `none`. Unlike forwardReasoningEffort, nothing is added
+   * when the caller sent no effort.
+   */
+  nativeReasoningEffort?: boolean;
 }
 
 /**
@@ -469,18 +501,19 @@ export function sanitizeOpenAiBody(
     // non-passthrough provider gets the OpenAI-only field stripped below.
     if (
       key === 'reasoning_effort' &&
-      (endpointKey === 'xai' ||
-        endpointKey === 'deepseek' ||
-        endpointKey === 'minimax' ||
-        options.forwardReasoningEffort)
+      (REASONING_EFFORT_ENDPOINTS.has(endpointKey) ||
+        options.forwardReasoningEffort ||
+        options.nativeReasoningEffort)
     ) {
       cleaned[key] = value;
       continue;
     }
     if (OPENAI_ONLY_FIELDS.has(key)) continue;
-    // Ollama's OpenAI-compatible endpoint does not accept the Anthropic-style
-    // `thinking` block; other non-passthrough providers receive it unchanged.
-    if (key === 'thinking' && OLLAMA_ENDPOINTS.has(endpointKey.toLowerCase())) continue;
+    // Ollama's and Mistral's OpenAI-compatible endpoints do not accept the
+    // Anthropic-style `thinking` block (it becomes an effort below); other
+    // non-passthrough providers receive it unchanged.
+    if (key === 'thinking' && Object.hasOwn(THINKING_AS_EFFORT, endpointKey.toLowerCase()))
+      continue;
     if (key === 'max_completion_tokens') {
       // Preserve max_completion_tokens for endpoints that require it; otherwise
       // downconvert to max_tokens for OpenAI-compatible providers that only know
@@ -493,6 +526,18 @@ export function sanitizeOpenAiBody(
       continue;
     }
     cleaned[key] = value;
+  }
+  const thinking = body.thinking as { type?: unknown } | undefined;
+  const thinkingKey = endpointKey.toLowerCase();
+  if (
+    (Object.hasOwn(THINKING_AS_EFFORT, thinkingKey) || options.nativeReasoningEffort) &&
+    cleaned.reasoning_effort === undefined &&
+    thinking &&
+    typeof thinking === 'object'
+  ) {
+    if (thinking.type === 'disabled') cleaned.reasoning_effort = 'none';
+    else if (THINKING_AS_EFFORT[thinkingKey])
+      cleaned.reasoning_effort = THINKING_AS_EFFORT[thinkingKey];
   }
   if (
     options.forwardReasoningEffort &&

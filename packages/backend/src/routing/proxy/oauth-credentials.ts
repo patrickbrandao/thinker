@@ -5,6 +5,8 @@ import { GeminiOauthService } from '../oauth/gemini/gemini-oauth.service';
 import { parseOAuthTokenBlob, REJECTED_TOKEN_EXPIRY } from '../oauth/core';
 import { KiroOauthService } from '../oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../oauth/xai/xai-oauth.service';
+import { OpencodeOauthService } from '../oauth/opencode/opencode-oauth.service';
+import { opencodeCatalogProvider } from '../../model-discovery/opencode-catalog.service';
 
 export interface OAuthServiceSet {
   openaiOauth: OpenaiOauthService;
@@ -13,6 +15,7 @@ export interface OAuthServiceSet {
   geminiOauth: GeminiOauthService;
   kiroOauth: KiroOauthService;
   xaiOauth: XaiOauthService;
+  opencodeOauth?: OpencodeOauthService;
 }
 
 export interface ResolvedCredentials {
@@ -105,6 +108,17 @@ export async function refreshRejectedOAuthCredential(
     );
     return unwrapped ? { apiKey: unwrapped } : null;
   }
+  const opencodeProvider = opencodeCatalogProvider(lower);
+  if (opencodeProvider && services.opencodeOauth) {
+    const unwrapped = await services.opencodeOauth.unwrapToken(
+      expiredRawValue,
+      agentId,
+      tenantId,
+      keyLabel,
+      opencodeProvider,
+    );
+    return unwrapped ? { apiKey: unwrapped } : null;
+  }
   return null;
 }
 
@@ -121,6 +135,7 @@ export async function resolveApiKey(
   kiroOauth: KiroOauthService,
   xaiOauth: XaiOauthService,
   keyLabel?: string,
+  opencodeOauth?: OpencodeOauthService,
 ): Promise<ResolvedCredentials> {
   if (authType === 'subscription') {
     const lower = provider.toLowerCase();
@@ -156,6 +171,19 @@ export async function resolveApiKey(
     }
     if (lower === 'xai') {
       const unwrapped = await xaiOauth.unwrapToken(apiKey, agentId, tenantId, keyLabel);
+      if (unwrapped) return { apiKey: unwrapped };
+      if (parseOAuthTokenBlob(apiKey)) return { apiKey: null };
+    }
+    // OpenCode and OpenCode Go take either a Console OAuth blob or a pasted API key.
+    const opencodeProvider = opencodeCatalogProvider(lower);
+    if (opencodeProvider && opencodeOauth) {
+      const unwrapped = await opencodeOauth.unwrapToken(
+        apiKey,
+        agentId,
+        tenantId,
+        keyLabel,
+        opencodeProvider,
+      );
       if (unwrapped) return { apiKey: unwrapped };
       if (parseOAuthTokenBlob(apiKey)) return { apiKey: null };
     }

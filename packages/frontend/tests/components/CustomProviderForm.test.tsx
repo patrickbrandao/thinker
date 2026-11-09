@@ -1717,6 +1717,7 @@ describe('CustomProviderForm — edit mode: key connections', () => {
     is_active: true,
     has_api_key: true,
     key_prefix: 'sk-accta',
+    key_masked: 'sk-ac********',
     label: 'Default',
     priority: 0,
     region: null,
@@ -1747,7 +1748,7 @@ describe('CustomProviderForm — edit mode: key connections', () => {
     ]);
     renderForm();
 
-    expect(await screen.findByDisplayValue('sk-accta••••••••')).toBeDefined();
+    expect(await screen.findByDisplayValue('sk-ac********')).toBeDefined();
     expect(mockGetProviders).toHaveBeenCalledWith('test-agent');
     expect(screen.queryByText('No key set')).toBeNull();
     expect(screen.queryByLabelText('Disconnect provider')).toBeNull();
@@ -1867,7 +1868,7 @@ describe('CustomProviderForm — edit mode: key connections', () => {
   it('saves the definition without touching the keys', async () => {
     mockGetProviders.mockResolvedValue([connection({})]);
     renderForm();
-    await screen.findByDisplayValue('sk-accta••••••••');
+    await screen.findByDisplayValue('sk-ac********');
 
     fireEvent.click(screen.getByText('Save changes'));
 

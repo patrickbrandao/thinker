@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { getCodexConfigSnippet, getCodexKeyExportSnippet } from 'thinker-shared';
+import {
+  getCodexConfigSnippet,
+  getCodexKeyExportSnippet,
+  SNIPPET_CONTEXT_WINDOW,
+} from 'thinker-shared';
 import RichText from './RichText.jsx';
 import { CHIP, RevealButton, SetupCard, SetupHint, SnippetBlock } from './setup-ui.jsx';
 import { t } from '../i18n/index.js';
@@ -30,6 +34,17 @@ export default function CodexSetup({ apiKey, keyPrefix, baseUrl }: Props) {
       </SetupHint>
 
       <SnippetBlock code={config} copyText={config} language="toml" />
+
+      <SetupHint>
+        <RichText
+          text={t('harnesses.guides.contextHint')}
+          parts={{
+            name: 'Codex',
+            field: <code className={CHIP}>model_context_window</code>,
+            value: <code className={CHIP}>{SNIPPET_CONTEXT_WINDOW}</code>,
+          }}
+        />
+      </SetupHint>
 
       <SetupHint>{t('harnesses.guides.codexExport')}</SetupHint>
 

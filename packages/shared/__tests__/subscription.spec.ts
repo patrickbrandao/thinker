@@ -130,13 +130,7 @@ describe('getSubscriptionProviderConfig', () => {
       subscriptionTokenPrefix: 'tp-',
       knownModelsMatch: 'exact',
     });
-    expect(config?.knownModels).toEqual([
-      'mimo-v2.5-pro',
-      'mimo-v2-pro',
-      'mimo-v2.5',
-      'mimo-v2-omni',
-      'mimo-v2-flash',
-    ]);
+    expect(config?.knownModels).toEqual(['mimo-v2.6-pro', 'mimo-v2.6-flash']);
   });
 
   it('returns config for Qwen Token Plan', () => {
@@ -209,7 +203,7 @@ describe('getSubscriptionProviderConfig', () => {
       supportsSubscription: true,
       subscriptionLabel: 'GLM Coding Plan',
       subscriptionAuthMode: 'token',
-      subscriptionKeyPlaceholder: 'Paste your Z.ai API key',
+      subscriptionKeyPlaceholder: 'Paste your GLM Coding Plan API key',
     });
   });
 
@@ -218,7 +212,7 @@ describe('getSubscriptionProviderConfig', () => {
     expect(config).toMatchObject({
       supportsSubscription: true,
       subscriptionLabel: 'OpenCode Go (beta)',
-      subscriptionAuthMode: 'token',
+      subscriptionAuthMode: 'device_code',
       subscriptionKeyPlaceholder: 'Paste your OpenCode API key',
     });
     expect(config?.subscriptionCapabilities).toMatchObject({
@@ -244,7 +238,7 @@ describe('getSubscriptionProviderConfig', () => {
 
   it('publishes the curated xai subscription models', () => {
     const config = getSubscriptionProviderConfig('xai');
-    expect(config?.knownModels).toEqual(['grok-4.7', 'grok-4.6', 'grok-4.5']);
+    expect(config?.knownModels).toEqual(['grok-4.7', 'grok-4.6', 'grok-4.5', 'grok-build-0.1']);
   });
 
   it('returns config for gemini', () => {
@@ -360,8 +354,10 @@ describe('getSubscriptionKnownModels', () => {
 
   it('returns known models for copilot', () => {
     const models = getSubscriptionKnownModels('copilot');
-    expect(models).toContain('copilot/claude-opus-4.6');
-    expect(models).toContain('copilot/gpt-5.4');
+    expect(models).toContain('copilot/claude-opus-5.5');
+    expect(models).toContain('copilot/gpt-6.1-sol');
+    expect(models).not.toContain('copilot/claude-opus-4.6');
+    expect(models).not.toContain('copilot/gpt-5.4');
   });
 
   it('returns known models for BytePlus ModelArk Coding Plan', () => {
@@ -379,11 +375,8 @@ describe('getSubscriptionKnownModels', () => {
     expect(getSubscriptionKnownModels('nous')).toBeNull();
   });
 
-  it('returns known models for minimax including M2.7', () => {
-    const models = getSubscriptionKnownModels('minimax');
-    expect(models).toContain('MiniMax-M2.7');
-    expect(models).toContain('MiniMax-M2.7-highspeed');
-    expect(models).toContain('MiniMax-M2.5');
+  it('returns the M Plan text model for minimax', () => {
+    expect(getSubscriptionKnownModels('minimax')).toEqual(['MiniMax-M3.1-Flash']);
   });
 
   it('returns the fixed model id for Mistral Vibe', () => {
@@ -392,13 +385,7 @@ describe('getSubscriptionKnownModels', () => {
 
   it('returns known models for Xiaomi MiMo Token Plan', () => {
     const models = getSubscriptionKnownModels('xiaomi');
-    expect(models).toEqual([
-      'mimo-v2.5-pro',
-      'mimo-v2-pro',
-      'mimo-v2.5',
-      'mimo-v2-omni',
-      'mimo-v2-flash',
-    ]);
+    expect(models).toEqual(['mimo-v2.6-pro', 'mimo-v2.6-flash']);
   });
 
   it('returns null known models for Qwen Token Plan (relies on live /v1/models discovery)', () => {
@@ -407,6 +394,8 @@ describe('getSubscriptionKnownModels', () => {
 
   it('returns the fixed model ids for moonshot Kimi Coding Plan', () => {
     expect(getSubscriptionKnownModels('moonshot')).toEqual([
+      'k3.1-pro',
+      'k3.1-pro-highspeed',
       'k3',
       'k3-256k',
       'kimi-for-coding',
@@ -425,10 +414,7 @@ describe('getSubscriptionKnownModels', () => {
   });
 
   it('returns known models for zai', () => {
-    const models = getSubscriptionKnownModels('zai');
-    expect(models).toContain('glm-5.1');
-    expect(models).toContain('glm-5');
-    expect(models).toContain('glm-4.7');
+    expect(getSubscriptionKnownModels('zai')).toEqual(['glm-5.3', 'glm-5.3-flash']);
   });
 
   it('returns null for opencode-go (dynamic catalog, no hardcoded list)', () => {
@@ -450,7 +436,7 @@ describe('getSubscriptionKnownModels', () => {
 
   it('returns known models for xai', () => {
     const models = getSubscriptionKnownModels('xai');
-    expect(models).toEqual(['grok-4.7', 'grok-4.6', 'grok-4.5']);
+    expect(models).toEqual(['grok-4.7', 'grok-4.6', 'grok-4.5', 'grok-build-0.1']);
   });
 
   it('returns null for unsupported providers', () => {
@@ -525,13 +511,14 @@ describe('getSubscriptionCapabilities', () => {
       supportsBatching: false,
     });
     expect(caps?.modelContextWindows).toMatchObject({
-      'gpt-6-astra': 1050000,
-      'gpt-6.1-sol': 1050000,
-      'gpt-6-sol': 1050000,
-      'gpt-6-luna': 1050000,
-      'gpt-5.6-sol': 1050000,
-      'gpt-5.6-terra': 1050000,
-      'gpt-5.6-luna': 1050000,
+      'gpt-6-astra': 272000,
+      'gpt-6.1-sol': 272000,
+      'gpt-6.1-terra': 500000,
+      'gpt-6-sol': 272000,
+      'gpt-6-luna': 272000,
+      'gpt-5.6-sol': 272000,
+      'gpt-5.6-terra': 272000,
+      'gpt-5.6-luna': 272000,
     });
   });
 
@@ -572,10 +559,10 @@ describe('getSubscriptionCapabilities', () => {
     });
   });
 
-  it('returns capabilities for zai with 204800 context window', () => {
+  it('returns capabilities for zai with the 1M context window', () => {
     const caps = getSubscriptionCapabilities('zai');
     expect(caps).toMatchObject({
-      maxContextWindow: 204800,
+      maxContextWindow: 1000000,
       supportsPromptCaching: true,
       supportsBatching: false,
     });
@@ -595,7 +582,7 @@ describe('getSubscriptionCapabilities', () => {
   it('returns capabilities for Qwen Token Plan', () => {
     const caps = getSubscriptionCapabilities('qwen');
     expect(caps).toMatchObject({
-      maxContextWindow: 991000,
+      maxContextWindow: 1000000,
       supportsPromptCaching: true,
       supportsBatching: false,
     });
@@ -604,7 +591,7 @@ describe('getSubscriptionCapabilities', () => {
   it('returns capabilities for Mistral Vibe subscription', () => {
     const caps = getSubscriptionCapabilities('mistral');
     expect(caps).toMatchObject({
-      maxContextWindow: 200000,
+      maxContextWindow: 262144,
       supportsPromptCaching: true,
       supportsBatching: false,
     });

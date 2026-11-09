@@ -30,14 +30,26 @@ describe('computePeriodBoundaries', () => {
     jest.useRealTimers();
   });
 
-  it('hour: start is 1 hour before the current local hour', () => {
+  it('hour: start is the current local clock hour', () => {
     const now = new Date();
     const { periodStart } = computePeriodBoundaries('hour');
     const start = parseLocal(periodStart);
-    const expectedHour = now.getHours() - 1;
-    expect(start.getHours()).toBe(expectedHour < 0 ? expectedHour + 24 : expectedHour);
+    expect(start.getHours()).toBe(now.getHours());
     expect(start.getMinutes()).toBe(0);
     expect(start.getSeconds()).toBe(0);
+  });
+
+  it('hour: the announced reset opens a window that excludes the usage that blocked', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 10, 7, 10, 30, 0));
+    const blockedAt = computePeriodBoundaries('hour');
+    const reset = parseLocal(computePeriodResetDate('hour'));
+    expect(reset.getHours()).toBe(11);
+    jest.setSystemTime(reset);
+    const afterReset = computePeriodBoundaries('hour');
+    expect(parseLocal(afterReset.periodStart).getTime()).toBe(reset.getTime());
+    expect(parseLocal(blockedAt.periodStart).getHours()).toBe(10);
+    jest.useRealTimers();
   });
 
   it('day: start is local midnight today', () => {

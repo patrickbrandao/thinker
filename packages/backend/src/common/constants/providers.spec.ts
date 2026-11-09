@@ -86,11 +86,11 @@ describe('PROVIDER_REGISTRY', () => {
     expect(og!.localOnly).toBe(false);
   });
 
-  it('opencode-zen is registered as an API-key provider with opencodezen alias', () => {
-    const oz = PROVIDER_REGISTRY.find((p) => p.id === 'opencode-zen');
+  it('opencode is registered as an API-key provider keeping the OpenCode Zen ids', () => {
+    const oz = PROVIDER_REGISTRY.find((p) => p.id === 'opencode');
     expect(oz).toBeDefined();
-    expect(oz!.displayName).toBe('OpenCode Zen');
-    expect(oz!.aliases).toEqual(['opencodezen']);
+    expect(oz!.displayName).toBe('OpenCode');
+    expect(oz!.aliases).toEqual(['opencode-zen', 'opencodezen']);
     expect(oz!.openRouterPrefixes).toEqual([]);
     expect(oz!.requiresApiKey).toBe(true);
     expect(oz!.localOnly).toBe(false);
@@ -171,13 +171,13 @@ describe('PROVIDER_REGISTRY', () => {
   it('pioneer is registered as an API-key provider', () => {
     const pioneer = PROVIDER_REGISTRY.find((p) => p.id === 'pioneer');
     expect(pioneer).toBeDefined();
-    expect(pioneer!.displayName).toBe('Pioneer');
-    expect(pioneer!.aliases).toEqual(['pioneer-ai', 'pioneer ai']);
+    expect(pioneer!.displayName).toBe('Fastino');
+    expect(pioneer!.aliases).toEqual(['pioneer-ai', 'pioneer ai', 'fastino']);
     expect(pioneer!.openRouterPrefixes).toEqual([]);
     expect(pioneer!.requiresApiKey).toBe(true);
     expect(pioneer!.localOnly).toBe(false);
-    expect(pioneer!.keyPrefix).toBe('pio_sk_');
-    expect(pioneer!.keyPlaceholder).toBe('pio_sk_...');
+    expect(pioneer!.keyPrefix).toBe('fast_sk_');
+    expect(pioneer!.keyPlaceholder).toBe('fast_sk_...');
   });
 
   it('meta is registered as an API-key provider with an OpenRouter fallback prefix', () => {
@@ -239,10 +239,10 @@ describe('PROVIDER_BY_ID_OR_ALIAS', () => {
     expect(entry.displayName).toBe('Z.ai');
   });
 
-  it('resolves opencodezen alias to opencode-zen entry', () => {
+  it('resolves opencodezen alias to opencode entry', () => {
     const entry = PROVIDER_BY_ID_OR_ALIAS.get('opencodezen') as ProviderRegistryEntry;
     expect(entry).toBeDefined();
-    expect(entry.id).toBe('opencode-zen');
+    expect(entry.id).toBe('opencode');
   });
 
   it('resolves kilocode alias to kilo entry', () => {
@@ -278,7 +278,7 @@ describe('PROVIDER_BY_ID_OR_ALIAS', () => {
       const entry = PROVIDER_BY_ID_OR_ALIAS.get(name) as ProviderRegistryEntry;
       expect(entry).toBeDefined();
       expect(entry.id).toBe('pioneer');
-      expect(entry.displayName).toBe('Pioneer');
+      expect(entry.displayName).toBe('Fastino');
     }
   });
 

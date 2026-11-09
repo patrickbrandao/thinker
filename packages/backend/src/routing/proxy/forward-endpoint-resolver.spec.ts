@@ -322,6 +322,65 @@ describe('resolveForwardEndpoint', () => {
     });
     expect(out.customEndpoint).toBeDefined();
     expect(out.forwardModel).toBe('meta-llama/Llama-3.1-8B');
+    expect(out.customEndpoint?.allowPrivateDestination).toBe(true);
+  });
+
+  it('carries the stored private-destination flag of custom providers and connection base URLs', () => {
+    const custom = resolveForwardEndpoint({
+      provider: 'custom:abc',
+      authType: 'api_key',
+      model: 'custom:abc/m',
+      customProvider: {
+        base_url: 'https://llm.example/v1',
+        api_kind: 'openai',
+        allow_private_destination: false,
+      },
+    });
+    expect(custom.customEndpoint?.allowPrivateDestination).toBe(false);
+    const account = resolveForwardEndpoint({
+      provider: 'openai',
+      authType: 'api_key',
+      model: 'gpt-4o',
+      providerBaseUrl: 'https://llm.example/v1',
+      providerBaseUrlAllowsPrivate: false,
+    });
+    expect(account.customEndpoint?.allowPrivateDestination).toBe(false);
+  });
+
+  it('strips the catalog prefix when a connection base URL overrides a native endpoint', () => {
+    const go = resolveForwardEndpoint({
+      provider: 'opencode-go',
+      authType: 'api_key',
+      model: 'opencode-go/glm-5.3',
+      providerBaseUrl: 'http://wwz:8000/opencode/inference/go/openai',
+    });
+    expect(go.customEndpoint).toBeDefined();
+    expect(go.forwardModel).toBe('glm-5.3');
+    // OpenRouter ids keep their vendor segment, as on the native endpoint.
+    const or = resolveForwardEndpoint({
+      provider: 'openrouter',
+      authType: 'api_key',
+      model: 'white-wizard/wwz-fast',
+      providerBaseUrl: 'http://wwz:8000/openrouter',
+    });
+    expect(or.forwardModel).toBe('white-wizard/wwz-fast');
+  });
+
+  it('marks the Anthropic connection override so caller beta flags still reach it', () => {
+    const out = resolveForwardEndpoint({
+      provider: 'anthropic',
+      authType: 'api_key',
+      model: 'claude-sonnet-5-5',
+      providerBaseUrl: 'http://wwz:8000/anthropic',
+    });
+    expect(out.customEndpoint?.anthropicAccountOverride).toBe(true);
+    const openai = resolveForwardEndpoint({
+      provider: 'openai',
+      authType: 'api_key',
+      model: 'gpt-4o',
+      providerBaseUrl: 'http://wwz:8000/openai',
+    });
+    expect(openai.customEndpoint?.anthropicAccountOverride).toBeUndefined();
   });
 
   it('sets no override for a custom provider whose row is missing', () => {

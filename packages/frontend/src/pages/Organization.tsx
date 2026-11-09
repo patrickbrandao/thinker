@@ -1,6 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import ErrorState from '../components/ErrorState.js';
 import TemporaryPasswordBox from '../components/TemporaryPasswordBox.js';
+import ApiKeysPanel from '../components/ApiKeysPanel.js';
 import { Badge, Button, ButtonLink, Field, Modal, Panel } from '../components/ui.js';
 import { retentionOptions } from '../components/LogRetentionSelect.js';
 import {
@@ -238,6 +239,8 @@ export default function Organization() {
             </select>
           </Field>
         </Panel>
+
+        {canManageMembers && orgId ? <ApiKeysPanel orgId={orgId} /> : null}
 
         <Panel title={t('triggers.org.title')}>
           <div className="flex flex-wrap items-center justify-between gap-3">

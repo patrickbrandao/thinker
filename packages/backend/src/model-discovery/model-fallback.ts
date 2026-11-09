@@ -1,4 +1,4 @@
-import { DiscoveredModel, DEFAULT_CONTEXT_WINDOW } from './model-fetcher';
+import { DiscoveredModel, contextWindowFields } from './model-fetcher';
 import {
   OPENROUTER_PREFIX_TO_PROVIDER,
   PROVIDER_BY_ID_OR_ALIAS,
@@ -219,7 +219,7 @@ export function buildModelsDevFallback(
     id: idPrefix ? `${idPrefix}/${e.id}` : e.id,
     displayName: e.name || e.id,
     provider: providerId,
-    contextWindow: e.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    ...contextWindowFields(e.contextWindow),
     inputPricePerToken: e.inputPricePerToken,
     outputPricePerToken: e.outputPricePerToken,
     capabilityReasoning: e.reasoning ?? false,
@@ -271,8 +271,9 @@ export function buildFallbackModels(
       id: modelId,
       displayName: metaModel?.displayName ?? entry.displayName ?? modelId,
       provider: providerId,
-      contextWindow:
-        entry.contextWindow ?? (metaModel ? META_MODEL_API_CONTEXT_WINDOW : DEFAULT_CONTEXT_WINDOW),
+      ...contextWindowFields(
+        entry.contextWindow ?? (metaModel ? META_MODEL_API_CONTEXT_WINDOW : undefined),
+      ),
       inputPricePerToken: entry.input,
       outputPricePerToken: entry.output,
       capabilityReasoning: !!metaModel,

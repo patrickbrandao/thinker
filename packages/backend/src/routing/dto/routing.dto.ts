@@ -27,6 +27,7 @@ import {
   MAX_STREAM_WARMUP_OVERRIDE_MS,
   MIN_STREAM_WARMUP_OVERRIDE_MS,
 } from '../proxy/stream-warmup';
+import { MAX_STREAM_IDLE_OVERRIDE_MS, MIN_STREAM_IDLE_OVERRIDE_MS } from '../proxy/stream-writer';
 
 const KNOWN_PROVIDER_IDS: readonly string[] = Array.from(PROVIDER_BY_ID_OR_ALIAS.keys());
 
@@ -108,6 +109,16 @@ export class ConnectProviderDto {
   @IsOptional()
   @IsString()
   base_url?: string;
+
+  /**
+   * API-key connections: base URL replacing the provider's official one
+   * (`tenant_providers.base_url`). Not the Qwen `baseUrl` above, which
+   * selects a Qwen endpoint stored as the region.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  accountBaseUrl?: string;
 
   @IsOptional()
   @IsString()
@@ -268,6 +279,26 @@ export class SetStreamWarmupDto {
   @Min(MIN_STREAM_WARMUP_OVERRIDE_MS)
   @Max(MAX_STREAM_WARMUP_OVERRIDE_MS)
   stream_warmup_ms!: number | null;
+}
+
+/**
+ * Body for setting a connection's stream idle timeout override (longest gap
+ * between two upstream chunks): an integer in ms within the bounds, or null.
+ */
+export class SetStreamIdleDto {
+  @ValidateIf((_obj, value) => value !== null)
+  @IsInt()
+  @Min(MIN_STREAM_IDLE_OVERRIDE_MS)
+  @Max(MAX_STREAM_IDLE_OVERRIDE_MS)
+  stream_idle_timeout_ms!: number | null;
+}
+
+/** Body for setting (string) or clearing (null) an API-key connection's base URL. */
+export class SetBaseUrlDto {
+  @ValidateIf((_obj, value) => value !== null)
+  @IsString()
+  @MaxLength(2048)
+  base_url!: string | null;
 }
 
 export function responseModeFromDto(body: SetResponseModeDto): ResponseMode | undefined {

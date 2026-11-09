@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Matches,
   Max,
   Min,
@@ -52,6 +53,11 @@ export class MessagesQueryDto {
   @IsOptional()
   @IsString()
   range?: string;
+
+  /** Harness session id: its requests and those of its subagent sessions. */
+  @IsOptional()
+  @IsString()
+  session?: string;
 
   @IsOptional()
   @IsString()
@@ -152,6 +158,12 @@ export class MessagesQueryDto {
     message: `routing_tier must be one of: ${ALL_TIERS.join(', ')}`,
   })
   routing_tier?: MessageTier;
+
+  /** Upstream that served an attempt (OpenRouter's `provider`), case-insensitive. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  served_provider?: string;
 
   @IsOptional()
   @IsIn(SPECIFICITY_CATEGORIES, {

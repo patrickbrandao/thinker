@@ -14,8 +14,10 @@ export function validateApiKey(
 
   const trimmed = key.replace(/\s/g, '');
   if (!trimmed) return { valid: false, error: t('providerSetup.validation.apiKeyRequired') };
+  if (provider.freeKey && trimmed === provider.freeKey) return { valid: true };
 
-  if (provider.keyPrefix && !trimmed.startsWith(provider.keyPrefix)) {
+  const prefixes = [provider.keyPrefix, ...(provider.legacyKeyPrefixes ?? [])].filter(Boolean);
+  if (prefixes.length && !prefixes.some((prefix) => trimmed.startsWith(prefix))) {
     return {
       valid: false,
       error: t('providerSetup.validation.keyPrefix', {
@@ -42,6 +44,11 @@ const SUBSCRIPTION_PREFIXES: Record<string, string> = {
   xiaomi: 'tp-',
 };
 
+/** Extra accepted prefixes: MiMo Token Plan Team keys start with `ttp-` (sub-xiaomi G3). */
+const SUBSCRIPTION_ALT_PREFIXES: Record<string, readonly string[]> = {
+  xiaomi: ['ttp-'],
+};
+
 const SUBSCRIPTION_MIN_LENGTHS: Record<string, number> = {
   qwen: 30,
   xiaomi: 10,
@@ -59,7 +66,8 @@ export function validateSubscriptionKey(
   const trimmed = key.replace(/\s/g, '');
   if (!trimmed) return { valid: false, error: t('providerSetup.validation.tokenRequired') };
   const prefix = SUBSCRIPTION_PREFIXES[provider.id];
-  if (prefix && !trimmed.startsWith(prefix)) {
+  const accepted = [prefix, ...(SUBSCRIPTION_ALT_PREFIXES[provider.id] ?? [])];
+  if (prefix && !accepted.some((p) => p && trimmed.startsWith(p))) {
     return {
       valid: false,
       error: t('providerSetup.validation.subscriptionPrefix', { name: provider.name, prefix }),

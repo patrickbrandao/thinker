@@ -1,3 +1,4 @@
+import { Audit } from '../../alerts/audit.decorator';
 import {
   BadRequestException,
   Body,
@@ -23,6 +24,7 @@ import { ApiKeyGeneratorService } from '../../otlp/services/api-key.service';
 import { IngestEventBusService } from '../../common/services/ingest-event-bus.service';
 import { TriggerSignalService } from '../../common/services/trigger-signal.service';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
+import { MinRole } from '../../common/decorators/roles.decorator';
 import { CreateAgentDto } from '../../common/dto/create-agent.dto';
 import { DuplicateAgentDto } from '../../common/dto/duplicate-agent.dto';
 import { RenameAgentDto } from '../../common/dto/rename-agent.dto';
@@ -93,6 +95,7 @@ export class AgentsController {
     return { agents };
   }
 
+  @Audit({ entity: 'harness', action: 'created' })
   @Post('agents')
   async createAgent(@TenantCtx() ctx: TenantContext, @Body() body: CreateAgentDto) {
     const slug = slugify(body.name);
@@ -182,6 +185,7 @@ export class AgentsController {
     return { copied, suggested_name };
   }
 
+  @Audit({ entity: 'harness', action: 'created' })
   @Post('agents/:agentName/duplicate')
   async duplicateAgent(
     @TenantCtx() ctx: TenantContext,
@@ -232,6 +236,9 @@ export class AgentsController {
     return { agent: info };
   }
 
+  // The full key is a live inference credential: revealing it is a member
+  // action (ADR 0006), like the MCP tool that needs the write scope.
+  @MinRole('member', { includeReads: true })
   @Get('agents/:agentName/key')
   async getAgentKey(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     // Guard: playground agents cannot expose their API key through the user-facing
@@ -247,6 +254,7 @@ export class AgentsController {
     };
   }
 
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
   @Post('agents/:agentName/rotate-key')
   async rotateAgentKey(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     // Guard: playground agents cannot have their key rotated through the user-facing
@@ -258,6 +266,7 @@ export class AgentsController {
     return { apiKey: result.apiKey };
   }
 
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
   @Patch('agents/:agentName')
   async updateAgent(
     @TenantCtx() ctx: TenantContext,
@@ -297,6 +306,7 @@ export class AgentsController {
     return result;
   }
 
+  @Audit({ entity: 'harness', action: 'deleted', idParam: 'agentName', nameParams: ['agentName'] })
   @Delete('agents/:agentName')
   async deleteAgent(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     const deleted = await this.lifecycle.deleteAgent(ctx.tenantId, agentName);

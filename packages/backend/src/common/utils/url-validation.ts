@@ -8,6 +8,7 @@ const PRIVATE_RANGES: { addr: bigint; mask: bigint }[] = [
   cidr('192.168.0.0', 16), // Class C private
   cidr('169.254.0.0', 16), // Link-local
   cidr('100.64.0.0', 10), // Carrier-grade NAT (RFC 6598) — routes to cloud fabric (EKS/GKE pods, Tailscale)
+  cidr('198.18.0.0', 15), // Benchmarking (RFC 2544) — often used as Docker default-address-pools
   cidr('0.0.0.0', 8), // Current network
 ];
 
@@ -90,6 +91,10 @@ export function isPrivateIp(ip: string): boolean {
   // Check IPv6 private ranges
   if (normalizedIp.includes(':')) {
     const lower = normalizedIp.toLowerCase();
+    // Documentation range 2001:db8::/32 (RFC 3849) is never globally routed;
+    // Docker networks with IPv6 enabled commonly use it, as client-ip.ts knows.
+    const h = ipv6Hextets(lower);
+    if (h && h[0] === 0x2001 && h[1] === 0x0db8) return true;
     return PRIVATE_V6_PREFIXES.some((prefix) => lower.startsWith(prefix));
   }
 

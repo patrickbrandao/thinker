@@ -648,13 +648,13 @@ export function providerIcon(id: string, size: number = 20): ReactNode {
         </svg>
       );
 
-    /* ── OpenCode Zen ─────────────────────────────── */
-    case 'opencode-zen':
+    /* ── OpenCode ─────────────────────────────── */
+    case 'opencode':
       return (
         <>
           {/* Light mode logo (dark frame) */}
           <svg
-            className="provider-icon--opencode-zen provider-icon--opencode-zen-light block dark:hidden"
+            className="provider-icon--opencode provider-icon--opencode-light block dark:hidden"
             style={s}
             viewBox="0 0 240 300"
             fill="none"
@@ -666,7 +666,7 @@ export function providerIcon(id: string, size: number = 20): ReactNode {
           </svg>
           {/* Dark mode logo (light frame) */}
           <svg
-            className="provider-icon--opencode-zen provider-icon--opencode-zen-dark hidden dark:block"
+            className="provider-icon--opencode provider-icon--opencode-dark hidden dark:block"
             style={s}
             viewBox="0 0 240 300"
             fill="none"
@@ -772,7 +772,7 @@ const BASE_URL_TO_PROVIDER: [RegExp, string][] = [
   [/integrate\.api\.nvidia\.com/i, 'nvidia nim'],
   [/api\.ollama\.com/i, 'ollama cloud'],
   [/openrouter\.ai/i, 'openrouter'],
-  [/api\.pioneer\.ai|pioneer\.ai/i, 'pioneer'],
+  [/fastino\.ai|pioneer\.ai/i, 'pioneer'],
   [/siliconflow\.cn|api\.siliconflow/i, 'siliconflow'],
   [/aiplatform\.googleapis\.com/i, 'vertex'],
 ];

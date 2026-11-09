@@ -17,9 +17,14 @@ import { t } from '../i18n/index.js';
 import {
   MAX_STREAM_WARMUP_SECONDS,
   MIN_STREAM_WARMUP_SECONDS,
+  MAX_STREAM_IDLE_SECONDS,
+  MIN_STREAM_IDLE_SECONDS,
   parseWarmupSeconds,
+  parseIdleSeconds,
   warmupMsToSecondsInput,
+  idleMsToSecondsInput,
   streamWarmupError,
+  streamIdleError,
 } from '../services/stream-warmup.js';
 import { customProviderColor } from '../services/formatters.js';
 import type { ProviderDef } from '../services/providers.js';
@@ -28,6 +33,8 @@ import { useResource } from '../lib/use-resource.js';
 import InfoTooltip from './InfoTooltip.js';
 import ProviderKeyForm, { MAX_KEYS_PER_PROVIDER } from './ProviderKeyForm.js';
 import { Button, Modal, cx } from './ui.js';
+import { maskedKeyLabel } from '../services/key-mask.js';
+import type { FormLayout, WindowSection } from './TabbedWindow.js';
 
 const BASE_URL_PLACEHOLDERS: Record<CustomProviderApiKind, string> = {
   openai: 'https://api.example.com/v1',
@@ -41,6 +48,10 @@ interface Props {
   initialData?: CustomProviderData;
   prefill?: CustomProviderPrefill;
   onDeleted?: () => void;
+  /** Inside a window whose title already names the form: no back button or title. */
+  embedded?: boolean;
+  /** Lay the form out as window tabs with its actions in a footer. */
+  layout?: FormLayout;
 }
 
 interface ModelRow {
@@ -110,6 +121,8 @@ export default function CustomProviderForm(props: Props) {
   const [editingKey, setEditingKey] = useState(false);
   const initialWarmupMs = initialData?.stream_warmup_ms ?? null;
   const [warmupSeconds, setWarmupSeconds] = useState(() => warmupMsToSecondsInput(initialWarmupMs));
+  const initialIdleMs = initialData?.stream_idle_timeout_ms ?? null;
+  const [idleSeconds, setIdleSeconds] = useState(() => idleMsToSecondsInput(initialIdleMs));
   const [rows, setRows] = useState<ModelRow[]>(() =>
     initialData ? toModelRows(initialData.models) : prefillRows(props.prefill),
   );
@@ -180,8 +193,7 @@ export default function CustomProviderForm(props: Props) {
     minKeyLength: 0,
     keyPlaceholder: 'sk-...',
   };
-  const keyPrefix = activeKeys[0]?.key_prefix;
-  const keyPrefixDisplay = () => (keyPrefix ? `${keyPrefix}${'•'.repeat(8)}` : '••••••••••••');
+  const keyPrefixDisplay = () => maskedKeyLabel(activeKeys[0]);
 
   const handleProbe = async () => {
     const url = baseUrl.trim();
@@ -303,6 +315,12 @@ export default function CustomProviderForm(props: Props) {
       return;
     }
     if (warmupMs !== initialWarmupMs) data.stream_warmup_ms = warmupMs;
+    const idleMs = parseIdleSeconds(idleSeconds);
+    if (idleMs === undefined) {
+      setError(streamIdleError());
+      return;
+    }
+    if (idleMs !== initialIdleMs) data.stream_idle_timeout_ms = idleMs;
 
     setBusy(true);
     try {
@@ -359,23 +377,472 @@ export default function CustomProviderForm(props: Props) {
     </label>
   );
 
+  if (props.layout) {
+    const sections: WindowSection[] = [
+      {
+        key: 'general',
+        label: t('providers.detail.manageTab.general'),
+        content: (
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="label" htmlFor="cp-name">
+                {t('providers.customForm.providerName')}
+              </label>
+              <input
+                ref={nameRef}
+                id="cp-name"
+                className="field"
+                type="text"
+                placeholder={t('providers.customForm.providerNamePlaceholder')}
+                value={name}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setName(value);
+                  if (!aliasTouched) setAlias(deriveCustomProviderAlias(value) ?? '');
+                  setError(null);
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="cp-alias">
+                {t('providers.customForm.alias')}
+              </label>
+              <input
+                id="cp-alias"
+                className="field"
+                type="text"
+                placeholder={t('providers.customForm.aliasPlaceholder')}
+                value={alias}
+                onChange={(e) => {
+                  setAlias(e.currentTarget.value);
+                  setAliasTouched(true);
+                  setError(null);
+                }}
+              />
+              <p className="hint" data-testid="cp-alias-hint">
+                {t('providers.customForm.aliasHintBefore')}
+                <code className="font-mono">{modelIdPreview}</code>
+                {t('providers.customForm.aliasHintMiddle')}
+                <code className="font-mono">/v1/models</code>
+                {t('providers.customForm.aliasHintAfter')}
+                {isEdit ? t('providers.customForm.aliasHintEdit') : null}
+              </p>
+            </div>
+
+            <fieldset
+              className="m-0 border-0 p-0"
+              aria-describedby="cp-format-help"
+              disabled={isEdit}
+            >
+              <legend className="label">{t('providers.customForm.apiFormat')}</legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup">
+                {/* i18n-ignore: API path */}
+                {formatOption('openai', 'OpenAI', '/v1/chat/completions')}
+                {/* i18n-ignore: API path */}
+                {formatOption('anthropic', 'Anthropic', '/v1/messages')}
+              </div>
+              <p id="cp-format-help" className="hint">
+                {isEdit
+                  ? t('providers.customForm.formatHelpEdit')
+                  : t('providers.customForm.formatHelpCreate')}
+              </p>
+            </fieldset>
+
+            <div>
+              <label className="label" htmlFor="cp-base-url">
+                {t('providers.customForm.baseUrl')}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="cp-base-url"
+                  className="field"
+                  type="url"
+                  placeholder={BASE_URL_PLACEHOLDERS[apiKind]}
+                  value={baseUrl}
+                  onChange={(e) => {
+                    setBaseUrl(e.currentTarget.value);
+                    setError(null);
+                    setProbeError(null);
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => void handleProbe()}
+                  disabled={probeBusy || !baseUrl.trim()}
+                  aria-label={
+                    apiKind === 'anthropic'
+                      ? t('providers.customForm.fetchModelsAnthropic')
+                      : t('providers.customForm.fetchModelsOpenai')
+                  }
+                >
+                  {probeBusy ? (
+                    <span className="spinner" aria-hidden="true" />
+                  ) : (
+                    t('providers.customForm.fetchModels')
+                  )}
+                </Button>
+              </div>
+              <p className="hint">
+                {t('providers.customForm.localHintBefore')}
+                <code className="font-mono">http://host.docker.internal:&lt;port&gt;</code>
+                {t('providers.customForm.localHintDocker')}{' '}
+                <code className="font-mono">http://host.containers.internal:&lt;port&gt;</code>
+                {t('providers.customForm.localHintPodman')}{' '}
+                <code className="font-mono">http://localhost:&lt;port&gt;</code>
+                {t('providers.customForm.localHintAfter')}
+              </p>
+              {probeError ? (
+                <p className="mt-1 text-xs text-danger" role="alert">
+                  {probeError}
+                </p>
+              ) : null}
+            </div>
+
+            {showKeyField ? (
+              <div>
+                <label className="label" htmlFor="cp-api-key">
+                  {t('providers.customForm.apiKey')}{' '}
+                  <span className="font-normal text-muted">
+                    {t('providers.customForm.apiKeyOptional')}
+                  </span>
+                </label>
+                {isEdit && !editingKey ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="cp-api-key"
+                      className="field font-mono"
+                      type="text"
+                      value={
+                        initialData?.has_api_key
+                          ? '••••••••••••'
+                          : t('providers.customForm.noKeySet')
+                      }
+                      disabled
+                      aria-label={t('providers.customForm.currentKeyAria')}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => {
+                        setEditingKey(true);
+                        setApiKey('');
+                      }}
+                    >
+                      {t('providers.customForm.change')}
+                    </Button>
+                  </div>
+                ) : (
+                  <input
+                    id="cp-api-key"
+                    className="field provider-detail__input--masked font-mono"
+                    type="text"
+                    autoComplete="off"
+                    // i18n-ignore: key format sample
+                    placeholder="sk-..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.currentTarget.value)}
+                  />
+                )}
+              </div>
+            ) : null}
+          </div>
+        ),
+      },
+    ];
+    if (isEdit) {
+      sections.push({
+        key: 'streaming',
+        label: t('providers.detail.manageTab.streaming'),
+        content: (
+          <div className="flex flex-col gap-4">
+            {isEdit ? (
+              <div>
+                <label className="label" htmlFor="cp-stream-warmup">
+                  {t('providers.customForm.streamWarmup')}{' '}
+                  <span className="font-normal text-muted">
+                    {t('providers.customForm.optional')}
+                  </span>
+                </label>
+                <input
+                  id="cp-stream-warmup"
+                  className="field"
+                  type="number"
+                  min={MIN_STREAM_WARMUP_SECONDS}
+                  max={MAX_STREAM_WARMUP_SECONDS}
+                  step="1"
+                  placeholder={t('providers.customForm.inherit')}
+                  value={warmupSeconds}
+                  onChange={(e) => {
+                    setWarmupSeconds(e.currentTarget.value);
+                    setError(null);
+                  }}
+                />
+                <p className="hint">{t('providers.customForm.warmupHint')}</p>
+              </div>
+            ) : null}
+
+            {isEdit ? (
+              <div>
+                <label className="label" htmlFor="cp-stream-idle">
+                  {t('providers.customForm.streamIdle')}{' '}
+                  <span className="font-normal text-muted">
+                    {t('providers.customForm.optional')}
+                  </span>
+                </label>
+                <input
+                  id="cp-stream-idle"
+                  className="field"
+                  type="number"
+                  min={MIN_STREAM_IDLE_SECONDS}
+                  max={MAX_STREAM_IDLE_SECONDS}
+                  step="1"
+                  placeholder={t('providers.customForm.inherit')}
+                  value={idleSeconds}
+                  onChange={(e) => {
+                    setIdleSeconds(e.currentTarget.value);
+                    setError(null);
+                  }}
+                />
+                <p className="hint">{t('providers.customForm.idleHint')}</p>
+              </div>
+            ) : null}
+          </div>
+        ),
+      });
+    }
+    sections.push({
+      key: 'models',
+      label: t('providers.detail.manageTab.models'),
+      content: (
+        <>
+          <div>
+            <div id="cp-models-label" className="label flex items-center gap-1">
+              {t('providers.customForm.models')}
+              {hasEstimatedPrices ? (
+                <InfoTooltip text={t('providers.customForm.estimatedPrice')} />
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-2" aria-labelledby="cp-models-label">
+              <div
+                className="hidden grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_28px] gap-2 text-xs text-muted sm:grid"
+                aria-hidden="true"
+              >
+                <span>{t('providers.customForm.modelName')}</span>
+                <span>{t('providers.customForm.inputPerM')}</span>
+                <span>{t('providers.customForm.outputPerM')}</span>
+                <span>{t('providers.customForm.contextWindow')}</span>
+                <span />
+              </div>
+              {rows.map((row, i) => (
+                <div
+                  key={i}
+                  className="grid grid-cols-[repeat(3,minmax(0,1fr))_28px] items-center gap-2 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_28px]"
+                >
+                  <input
+                    className="field col-span-3 sm:col-span-1"
+                    type="text"
+                    placeholder={t('providers.customForm.modelName')}
+                    aria-label={t('providers.customForm.modelNameAria', { n: i + 1 })}
+                    value={row.model_name}
+                    onChange={(e) => updateRow(i, 'model_name', e.currentTarget.value)}
+                  />
+                  <input
+                    className="field col-start-1 sm:col-start-auto"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={t('providers.customForm.inputPlaceholder')}
+                    aria-label={t('providers.customForm.inputAria', { n: i + 1 })}
+                    value={row.input_price}
+                    onChange={(e) => updateRow(i, 'input_price', e.currentTarget.value)}
+                  />
+                  <input
+                    className="field"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={t('providers.customForm.outputPlaceholder')}
+                    aria-label={t('providers.customForm.outputAria', { n: i + 1 })}
+                    value={row.output_price}
+                    onChange={(e) => updateRow(i, 'output_price', e.currentTarget.value)}
+                  />
+                  <input
+                    className="field"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder={t('providers.customForm.tokensPlaceholder')}
+                    aria-label={t('providers.customForm.contextAria', { n: i + 1 })}
+                    value={row.context_window}
+                    onChange={(e) => updateRow(i, 'context_window', e.currentTarget.value)}
+                  />
+                  <button
+                    type="button"
+                    className="icon-btn row-start-1 col-start-4 sm:row-start-auto sm:col-start-auto"
+                    onClick={() => removeRow(i)}
+                    disabled={rows.length <= 1}
+                    aria-label={t('providers.customForm.removeModelAria', { n: i + 1 })}
+                    title={t('providers.customForm.remove')}
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-start"
+                onClick={addRow}
+                disabled={!rows.at(-1)?.model_name.trim()}
+              >
+                {t('providers.customForm.addModel')}
+              </Button>
+            </div>
+          </div>
+        </>
+      ),
+    });
+    if (showConnections) {
+      sections.push({
+        key: 'keys',
+        label: t('providers.detail.manageTab.keys'),
+        content: (
+          <>
+            {showConnections ? (
+              <div className="mt-5 border-t border-line pt-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted">
+                    {t('providers.customForm.keyPoolHint')}
+                  </span>
+                  {showAddKeyButton ? (
+                    <Button size="sm" className="shrink-0" onClick={() => setAddKeyOpen(true)}>
+                      <ListPlus size={14} aria-hidden="true" />
+                      {t('providers.customForm.addAnotherKey')}
+                    </Button>
+                  ) : null}
+                </div>
+                <ProviderKeyForm
+                  provDef={keyProviderDef}
+                  provId={`custom:${initialData!.id}`}
+                  agentName={agentName}
+                  isSubMode={false}
+                  connected={keysConnected}
+                  selectedAuthType="api_key"
+                  busy={keyBusy}
+                  setBusy={setKeyBusy}
+                  keyInput={keyInput}
+                  setKeyInput={setKeyInput}
+                  editing={keyEditing}
+                  setEditing={setKeyEditing}
+                  validationError={keyError}
+                  setValidationError={setKeyError}
+                  getKeyPrefixDisplay={keyPrefixDisplay}
+                  providers={loadedConnections ?? []}
+                  addKeyOpen={addKeyOpen}
+                  setAddKeyOpen={setAddKeyOpen}
+                  canDisconnect={false}
+                  onBack={() => {
+                    setKeyEditing(false);
+                    setKeyInput('');
+                  }}
+                  onUpdate={() => void connections.reload()}
+                />
+              </div>
+            ) : null}
+          </>
+        ),
+      });
+    }
+    return props.layout({
+      sections,
+      notice: error ? (
+        <div className="form-error mb-3" role="alert">
+          {error}
+        </div>
+      ) : null,
+      actions: (
+        <div className="flex w-full items-center justify-end gap-2">
+          {isEdit ? (
+            <Button
+              variant="danger"
+              size="sm"
+              className="mr-auto"
+              disabled={busy}
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              {t('providers.customForm.deleteProvider')}
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="sm" onClick={props.onBack}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            size="sm"
+            busy={busy}
+            disabled={!canSubmit}
+            onClick={() => {
+              if (canSubmit) handleSubmit();
+            }}
+          >
+            {isEdit ? t('providers.customForm.saveChanges') : t('providers.customForm.connect')}
+          </Button>
+        </div>
+      ),
+      extra: (
+        <>
+          <Modal
+            open={showDeleteConfirm}
+            title={t('providers.customForm.deleteProvider')}
+            onClose={() => setShowDeleteConfirm(false)}
+          >
+            <p className="text-sm text-dim">
+              {t('providers.customForm.deleteConfirmBefore')}{' '}
+              <strong className="text-ink">{initialData?.name}</strong>
+              {t('providers.customForm.deleteConfirmAfter')}
+            </p>
+            <div className="actions mt-4 flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={busy}
+              >
+                {t('providers.customForm.cancel')}
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => void handleDelete()} busy={busy}>
+                {t('providers.customForm.delete')}
+              </Button>
+            </div>
+          </Modal>
+        </>
+      ),
+    });
+  }
+
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
-        className="icon-btn modal-back-btn mb-2 self-start"
-        onClick={props.onBack}
-        aria-label={t('providers.customForm.backToProviders')}
-      >
-        <ChevronLeft size={16} aria-hidden="true" />
-      </button>
+      {props.embedded ? (
+        <p className="mb-5 text-sm text-muted">{t('providers.customForm.subtitle')}</p>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="icon-btn modal-back-btn mb-2 self-start"
+            onClick={props.onBack}
+            aria-label={t('providers.customForm.backToProviders')}
+          >
+            <ChevronLeft size={16} aria-hidden="true" />
+          </button>
 
-      <div className="mb-5">
-        <h2 className="text-base font-semibold text-ink">
-          {isEdit ? t('providers.customForm.editTitle') : t('providers.customForm.addTitle')}
-        </h2>
-        <p className="mt-0.5 text-sm text-muted">{t('providers.customForm.subtitle')}</p>
-      </div>
+          <div className="mb-5">
+            <h2 className="text-base font-semibold text-ink">
+              {isEdit ? t('providers.customForm.editTitle') : t('providers.customForm.addTitle')}
+            </h2>
+            <p className="mt-0.5 text-sm text-muted">{t('providers.customForm.subtitle')}</p>
+          </div>
+        </>
+      )}
 
       <form
         className="flex flex-col gap-4"
@@ -518,6 +985,30 @@ export default function CustomProviderForm(props: Props) {
               }}
             />
             <p className="hint">{t('providers.customForm.warmupHint')}</p>
+          </div>
+        ) : null}
+
+        {isEdit ? (
+          <div>
+            <label className="label" htmlFor="cp-stream-idle">
+              {t('providers.customForm.streamIdle')}{' '}
+              <span className="font-normal text-muted">{t('providers.customForm.optional')}</span>
+            </label>
+            <input
+              id="cp-stream-idle"
+              className="field"
+              type="number"
+              min={MIN_STREAM_IDLE_SECONDS}
+              max={MAX_STREAM_IDLE_SECONDS}
+              step="1"
+              placeholder={t('providers.customForm.inherit')}
+              value={idleSeconds}
+              onChange={(e) => {
+                setIdleSeconds(e.currentTarget.value);
+                setError(null);
+              }}
+            />
+            <p className="hint">{t('providers.customForm.idleHint')}</p>
           </div>
         ) : null}
 

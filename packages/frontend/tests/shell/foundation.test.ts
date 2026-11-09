@@ -6,6 +6,7 @@ import { columnLayout, validEdges } from '../../src/components/flow/layout';
 import { pointOnBezier } from '../../src/components/flow/edges';
 import { t, tMaybe, resetLocaleForTests } from '../../src/i18n';
 import { NAVIGATION, activeNavItem } from '../../src/config/navigation';
+import { setConnectionBreadcrumb } from '../../src/services/connection-breadcrumb-store';
 
 describe('signal', () => {
   it('reads, writes and re-renders subscribers', () => {
@@ -55,9 +56,24 @@ describe('i18n', () => {
 
 describe('navigation', () => {
   it('marks the section of nested paths', () => {
+    // A connection page belongs to its account kind, known once it loads.
+    expect(activeNavItem('/providers/connections/abc')).toBeUndefined();
+    setConnectionBreadcrumb('LM Studio', '/providers/local', 'Local', 'lmstudio', 'Default');
+    expect(activeNavItem('/providers/connections/abc')?.key).toBe('local');
+    setConnectionBreadcrumb('Claude', '/providers/subscriptions', 'Subscriptions');
     expect(activeNavItem('/providers/connections/abc')?.key).toBe('subscriptions');
+    setConnectionBreadcrumb(null);
     expect(activeNavItem('/harnesses/bot/routing')?.key).toBe('harnesses');
     expect(NAVIGATION.flatMap((g) => g.items.map((i) => i.key))).not.toContain('organization');
+  });
+
+  it('puts Harnesses alone in the CLIENTS section', () => {
+    const clients = NAVIGATION.find((g) => g.key === 'clients');
+    expect(clients?.label).toBe('nav.sectionClients');
+    expect(clients?.items.map((i) => i.key)).toEqual(['harnesses']);
+    expect(NAVIGATION.find((g) => g.key === 'main')?.items.map((i) => i.key)).not.toContain(
+      'harnesses',
+    );
   });
 });
 

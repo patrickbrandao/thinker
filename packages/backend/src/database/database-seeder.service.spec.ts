@@ -459,7 +459,7 @@ describe('DatabaseSeederService', () => {
       expect(auth.api.signUpEmail).toHaveBeenCalledWith({
         body: {
           email: 'admin@thinker.example.com',
-          password: 'thinker',
+          password: 'thinker123',
           name: 'Admin',
         },
       });

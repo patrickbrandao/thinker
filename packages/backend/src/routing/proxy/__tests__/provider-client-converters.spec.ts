@@ -1,3 +1,4 @@
+import { buildCustomEndpoint } from '../provider-endpoints';
 import {
   createReasoningContentStreamTransformer,
   sanitizeOpenAiBody,
@@ -56,6 +57,25 @@ describe('provider-client-converters', () => {
       expect(sanitizeOpenAiBody(body, 'deepseek', 'deepseek-chat').messages).toEqual(body.messages);
     });
 
+    it('forwards reasoning_effort to Mistral, Hugging Face and Ollama', () => {
+      for (const endpoint of ['mistral', 'huggingface', 'ollama', 'ollama-cloud']) {
+        const result = sanitizeOpenAiBody({ reasoning_effort: 'high' }, endpoint, 'm');
+        expect(result).toHaveProperty('reasoning_effort', 'high');
+      }
+    });
+
+    it('turns Anthropic thinking into an effort on Mistral and Ollama', () => {
+      expect(sanitizeOpenAiBody({ thinking: { type: 'disabled' } }, 'ollama', 'qwen3')).toEqual({
+        reasoning_effort: 'none',
+      });
+      expect(
+        sanitizeOpenAiBody({ thinking: { type: 'enabled', budget_tokens: 2048 } }, 'mistral', 'm'),
+      ).toEqual({ reasoning_effort: 'high' });
+      expect(
+        sanitizeOpenAiBody({ thinking: { type: 'enabled', budget_tokens: 2048 } }, 'ollama', 'm'),
+      ).toEqual({});
+    });
+
     it('should strip OpenAI-only fields for non-passthrough providers', () => {
       const body = {
         messages: [{ role: 'user', content: 'Hi' }],
@@ -71,7 +91,7 @@ describe('provider-client-converters', () => {
         temperature: 0.5,
       };
 
-      const result = sanitizeOpenAiBody(body, 'mistral', 'mistral-large');
+      const result = sanitizeOpenAiBody(body, 'fireworks', 'mistral-large');
 
       expect(result).not.toHaveProperty('store');
       expect(result).not.toHaveProperty('metadata');
@@ -1380,13 +1400,47 @@ describe('sanitizeOpenAiBody provider-specific fields', () => {
   });
 
   it('keeps reasoning_content without model capability checks', () => {
-    const result = sanitizeOpenAiBody(
-      bodyWithReasoning(),
-      'opencode-zen',
-      'opencode-zen/big-pickle',
-    );
+    const result = sanitizeOpenAiBody(bodyWithReasoning(), 'opencode', 'opencode/big-pickle');
 
     const messages = result.messages as Array<Record<string, unknown>>;
     expect(messages[0].reasoning_content).toBe('upstream thinking');
+  });
+});
+
+describe('sanitizeOpenAiBody with a native reasoning_effort (llama.cpp)', () => {
+  it('keeps the caller effort instead of stripping it', () => {
+    expect(
+      sanitizeOpenAiBody({ model: 'q', reasoning_effort: 'low' }, 'custom', 'q', {
+        nativeReasoningEffort: true,
+      }).reasoning_effort,
+    ).toBe('low');
+    expect(
+      sanitizeOpenAiBody({ model: 'q', reasoning_effort: 'low' }, 'custom', 'q').reasoning_effort,
+    ).toBeUndefined();
+  });
+
+  it('turns a disabled thinking into none and adds nothing otherwise', () => {
+    const tools = [{ type: 'function', function: { name: 'f', parameters: {} } }];
+    expect(
+      sanitizeOpenAiBody({ model: 'q', thinking: { type: 'disabled' } }, 'custom', 'q', {
+        nativeReasoningEffort: true,
+      }).reasoning_effort,
+    ).toBe('none');
+    expect(
+      sanitizeOpenAiBody({ model: 'q', tools }, 'custom', 'q', { nativeReasoningEffort: true }),
+    ).not.toHaveProperty('reasoning_effort');
+  });
+});
+
+describe('buildCustomEndpoint for local servers', () => {
+  it('marks only llama.cpp as implementing reasoning_effort', () => {
+    expect(
+      buildCustomEndpoint('http://llama:9931/v1', 'openai', { localType: 'llamacpp' })
+        .nativeReasoningEffort,
+    ).toBe(true);
+    expect(
+      buildCustomEndpoint('http://lms:1234/v1', 'openai', { localType: 'lmstudio' })
+        .nativeReasoningEffort,
+    ).toBeUndefined();
   });
 });

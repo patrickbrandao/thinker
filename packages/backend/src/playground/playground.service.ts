@@ -1,3 +1,4 @@
+import { isFlatFeeReportedCost } from '../routing/proxy/proxy-message-recorder';
 import { HttpException, Injectable, Logger, Optional } from '@nestjs/common';
 import { runWithOutboundScope, type OutboundScope } from '../common/outbound/outbound-proxy';
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
@@ -18,8 +19,7 @@ import {
 } from '../routing/proxy/oauth-credentials';
 import { ProviderKeyService } from '../routing/routing-core/provider-key.service';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
-import { OpencodeGoCatalogService } from '../model-discovery/opencode-go-catalog.service';
-import { PROVIDER_BY_ID_OR_ALIAS } from '../common/constants/providers';
+import { OpencodeCatalogService } from '../model-discovery/opencode-catalog.service';
 import { PlaygroundAgentService } from './playground-agent.service';
 import { OpenaiOauthService } from '../routing/oauth/openai/openai-oauth.service';
 import { MinimaxOauthService } from '../routing/oauth/minimax/minimax-oauth.service';
@@ -27,6 +27,7 @@ import { AnthropicOauthService } from '../routing/oauth/anthropic/anthropic-oaut
 import { GeminiOauthService } from '../routing/oauth/gemini/gemini-oauth.service';
 import { KiroOauthService } from '../routing/oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../routing/oauth/xai/xai-oauth.service';
+import { OpencodeOauthService } from '../routing/oauth/opencode/opencode-oauth.service';
 import { ModelPricingCacheService } from '../model-prices/model-pricing-cache.service';
 import { computeTokenCost } from '../common/utils/cost-calculator';
 import { scrubSecrets } from '../common/utils/secret-scrub';
@@ -65,8 +66,9 @@ export class PlaygroundService {
     @InjectRepository(CustomProvider)
     private readonly customProviderRepo: Repository<CustomProvider>,
     private readonly customProviders: CustomProviderService,
-    private readonly opencodeGoCatalog: OpencodeGoCatalogService,
+    private readonly opencodeCatalog: OpencodeCatalogService,
     @Optional() private readonly egress?: ProxyEgressService,
+    @Optional() private readonly opencodeOauth?: OpencodeOauthService,
   ) {}
 
   /**
@@ -88,6 +90,8 @@ export class PlaygroundService {
     // with the proxy for minimax/qwen/zai/copilot/custom.
     let oauthResourceUrl: string | undefined;
     let providerRegion: string | null | undefined;
+    let providerBaseUrl: string | null | undefined;
+    let providerBaseUrlAllowsPrivate: boolean | undefined;
     let egressScope: OutboundScope | undefined;
     try {
       // The Playground always runs under the reserved per-tenant "Playground"
@@ -129,6 +133,8 @@ export class PlaygroundService {
       rawApiKey = key.apiKey;
       providerKeyLabel = key.label;
       providerRegion = key.region;
+      providerBaseUrl = key.baseUrl ?? null;
+      providerBaseUrlAllowsPrivate = key.baseUrlAllowsPrivate !== false;
       egressScope = await this.egress?.scopeForConnection(agent.tenant_id, dto.provider, key.id);
       const resolved = await runWithOutboundScope(egressScope, () =>
         resolveApiKey(
@@ -144,6 +150,7 @@ export class PlaygroundService {
           this.kiroOauth,
           this.xaiOauth,
           providerKeyLabel,
+          this.opencodeOauth,
         ),
       );
       if (resolved.apiKey === null) {
@@ -209,6 +216,8 @@ export class PlaygroundService {
       authType,
       model: dto.model,
       providerRegion,
+      providerBaseUrl,
+      providerBaseUrlAllowsPrivate,
       resourceUrl: oauthResourceUrl,
       customProvider,
       logger: this.logger,
@@ -228,6 +237,7 @@ export class PlaygroundService {
         customEndpoint,
         signal: abort.signal,
         providerResource,
+        oauthToken: authType === 'subscription' && isRefreshableOAuthCredential(rawApiKey),
         egressScope,
       };
       forward = await this.providerClient.forward(forwardOptions);
@@ -246,6 +256,7 @@ export class PlaygroundService {
               geminiOauth: this.geminiOauth,
               kiroOauth: this.kiroOauth,
               xaiOauth: this.xaiOauth,
+              opencodeOauth: this.opencodeOauth,
             },
           ),
         );
@@ -361,27 +372,26 @@ export class PlaygroundService {
         .canonicalizeAgentMessageKeys(ctx.tenantId ?? '', dto.provider, dto.model)
         .then(({ provider }) => provider ?? dto.provider)
         .catch(() => dto.provider);
+      const opencode = await this.opencodeCatalog.costInputs(canonicalProvider, dto.model);
       const cost = computeTokenCost({
         inputTokens,
         outputTokens,
         cacheReadTokens,
         cacheCreationTokens,
         model: dto.model,
-        pricing: this.pricingCache.getByModel(dto.model, dto.provider),
-        isSubscription: authType === 'subscription',
+        pricing: opencode?.pricing ?? this.pricingCache.getByModel(dto.model, dto.provider),
+        isSubscription: authType === 'subscription' && !opencode?.pricing,
         // Same source order as the proxy recorder: a playground run against
         // the same provider must not report a different cost. That parity is
         // the whole point, so each input is resolved the way the recorder
         // resolves it — the local check on the canonical provider, because a
         // tile-connected llama.cpp arrives as `custom:<uuid>`, and the
-        // per-request rate from the OpenCode Go catalogue.
+        // list price from the OpenCode catalogue.
         isLocalProvider: authType === 'local' || isLocalOnlyProvider(canonicalProvider),
-        perRequestCostUsd:
-          authType === 'subscription' &&
-          PROVIDER_BY_ID_OR_ALIAS.get(canonicalProvider.toLowerCase())?.id === 'opencode-go'
-            ? await this.opencodeGoCatalog.resolveCostPerRequest(dto.model)
-            : null,
-        reportedCostUsd: usage?.reported_cost_usd,
+        reportedCostUsd:
+          opencode?.ignoreReportedCost || isFlatFeeReportedCost(dto.provider)
+            ? undefined
+            : usage?.reported_cost_usd,
         // The request start, not the completion time. A stream that opens at
         // 09:59 UTC and closes at 10:01 crossed out of a DeepSeek peak window
         // mid-answer; the proxy recorder bills such a run from `startedAt`, so
@@ -530,6 +540,7 @@ export class PlaygroundService {
           trace_id: null,
           session_key: null,
           session_id: null,
+          parent_session_id: null,
           timestamp,
           duration_ms: metrics.durationMs,
           status: 'success',
@@ -607,6 +618,7 @@ export class PlaygroundService {
           trace_id: null,
           session_key: null,
           session_id: null,
+          parent_session_id: null,
           timestamp,
           duration_ms: durationMs,
           status: 'failed',
@@ -656,6 +668,7 @@ export class PlaygroundService {
         trace_id: null,
         session_key: null,
         session_id: null,
+        parent_session_id: null,
         timestamp: new Date().toISOString(),
         duration_ms: 0,
         status: 'failed',

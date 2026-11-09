@@ -284,7 +284,9 @@ describe('ProviderController', () => {
           auth_type: 'api_key',
           is_active: true,
           has_api_key: true,
-          key_prefix: 'sk-proj-',
+          // Undecryptable fixture: the stored prefix, cut to the 50% budget.
+          key_prefix: 'sk-p',
+          key_masked: 'sk-p********',
           region: null,
           connected_at: '2025-01-01',
           models_fetched_at: '2026-04-01T10:00:00.000Z',
@@ -328,7 +330,8 @@ describe('ProviderController', () => {
       expect(result[0]).not.toHaveProperty('api_key_encrypted');
       expect(result[0]).not.toHaveProperty('agent_id');
       expect(result[0]).toHaveProperty('has_api_key', true);
-      expect(result[0]).toHaveProperty('key_prefix', 'sk-proj-');
+      expect(result[0]).toHaveProperty('key_prefix', 'sk-p');
+      expect(result[0]).toHaveProperty('key_masked', 'sk-p********');
     });
 
     it('should return null key_prefix when provider has no key_prefix', async () => {

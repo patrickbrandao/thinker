@@ -117,10 +117,11 @@ describe('CustomProviderController', () => {
         local_config: null,
         has_api_key: true,
         keys: [
-          { label: 'Default', key_prefix: 'sk-abc12', priority: 0 },
-          { label: 'Backup', key_prefix: 'sk-bak12', priority: 1 },
+          { label: 'Default', key_prefix: 'sk-a', key_masked: 'sk-a********', priority: 0 },
+          { label: 'Backup', key_prefix: 'sk-b', key_masked: 'sk-b********', priority: 1 },
         ],
         stream_warmup_ms: null,
+        stream_idle_timeout_ms: null,
         models: [{ model_name: 'llama' }],
         created_at: '2026-03-04',
       });

@@ -18,6 +18,22 @@ export const BEDROCK_ENDPOINT_REGIONS = [
   'ap-southeast-3',
   'ap-northeast-1',
   'sa-east-1',
+  // Runtime-only regions (no Mantle; Messages and CRIS profiles), api-bedrock G2.
+  'us-west-1',
+  'ca-central-1',
+  'ap-southeast-1',
+  'ap-northeast-2',
+  'ap-northeast-3',
+  'ap-east-1',
+  'af-south-1',
+  'me-south-1',
+  'me-central-1',
+  'il-central-1',
+  'eu-west-3',
+  'eu-south-2',
+  'eu-central-2',
+  'us-gov-west-1',
+  'us-gov-east-1',
 ] as const;
 
 const AWS_REGION_RE = /^[a-z]{2}(?:-gov)?-[a-z]+-\d+$/;
@@ -41,16 +57,24 @@ export function isBedrockRegion(value: string | null | undefined): value is stri
   );
 }
 
+/** Regions that host `bedrock-mantle` (the first 13 of BEDROCK_ENDPOINT_REGIONS). */
+const BEDROCK_MANTLE_REGIONS: ReadonlySet<string> = new Set(BEDROCK_ENDPOINT_REGIONS.slice(0, 13));
+
+/** Whether a region hosts the Mantle API; Runtime-only regions do not. */
+export function isBedrockMantleRegion(region: string | null | undefined): boolean {
+  return typeof region === 'string' && BEDROCK_MANTLE_REGIONS.has(region);
+}
+
 export function getBedrockMantleBaseUrl(region?: string | null): string {
-  const resolved = isBedrockRegion(region) ? region : DEFAULT_BEDROCK_REGION;
+  const resolved = isBedrockMantleRegion(region) ? region! : DEFAULT_BEDROCK_REGION;
   return `https://bedrock-mantle.${resolved}.api.aws`;
 }
 
 // A cross-Region inference (CRIS) profile ID is a base model ID prefixed with a
-// geographic scope, such as `us.openai.gpt-6-sol`. Bedrock also has `jp.`, `au.`
-// and `us-gov.` scopes; they are left out until a catalogued model is offered
-// under one of them.
-const BEDROCK_CRIS_PROFILE_RE = /^(?:global|us|eu|apac)\.(.+)$/;
+// geographic scope, such as `us.openai.gpt-6-sol`. `in.` (India) is listed in
+// the Bedrock guide (api-bedrock G3); `jp.`, `au.` and `us-gov.` are left out
+// until a catalogued model is offered under one of them.
+const BEDROCK_CRIS_PROFILE_RE = /^(?:global|us|eu|apac|in)\.(.+)$/;
 
 /** Base model ID of a CRIS profile (`us.openai.gpt-6-sol` → `openai.gpt-6-sol`), else null. */
 export function getBedrockInferenceProfileBaseModelId(model: string): string | null {

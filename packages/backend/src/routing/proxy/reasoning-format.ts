@@ -9,6 +9,12 @@
 export interface OpenAiReasoningStreamFormat {
   outputStreamDeltaPaths: readonly string[];
   clientStreamDeltaPath: 'reasoning_content';
+  /**
+   * The provider sends reasoning as `thinking` chunks inside a list-shaped
+   * `content` (Mistral). They are lifted into `reasoning_content` and the
+   * text chunks joined back into a string.
+   */
+  contentChunks?: boolean;
 }
 
 export interface NormalizedReasoningDelta {
@@ -19,6 +25,19 @@ export interface NormalizedReasoningDelta {
 const STANDARD_OPENAI_REASONING_STREAM_FORMAT: OpenAiReasoningStreamFormat = Object.freeze({
   outputStreamDeltaPaths: Object.freeze(['reasoning_content']),
   clientStreamDeltaPath: 'reasoning_content',
+});
+
+// Cerebras returns the parsed trace in `reasoning` (api-cerebras G1).
+const CEREBRAS_REASONING_STREAM_FORMAT: OpenAiReasoningStreamFormat = Object.freeze({
+  outputStreamDeltaPaths: Object.freeze(['reasoning_content', 'reasoning']),
+  clientStreamDeltaPath: 'reasoning_content',
+});
+
+// Mistral returns `content: [{type: 'thinking', ...}, {type: 'text', ...}]` (api-mistral G2).
+const MISTRAL_REASONING_STREAM_FORMAT: OpenAiReasoningStreamFormat = Object.freeze({
+  outputStreamDeltaPaths: Object.freeze(['reasoning_content']),
+  clientStreamDeltaPath: 'reasoning_content',
+  contentChunks: true,
 });
 
 const COPILOT_REASONING_STREAM_FORMAT: OpenAiReasoningStreamFormat = Object.freeze({
@@ -35,7 +54,7 @@ const COPILOT_REASONING_STREAM_FORMAT: OpenAiReasoningStreamFormat = Object.free
 const REASONING_CONTENT_AWARE_ENDPOINTS = new Set([
   'openrouter',
   'opencode-go',
-  'opencode-zen',
+  'opencode',
   'custom',
 ]);
 
@@ -64,13 +83,13 @@ const UNSAFE_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
  * Some reasoning APIs reject follow-up turns that don't echo back the previous
  * assistant's `reasoning_content`. Preserve it for:
  *  - the native `deepseek` and `moonshot` endpoints (always)
- *  - aggregator/gateway endpoints (OpenRouter, OpenCode Go, OpenCode Zen and
+ *  - aggregator/gateway endpoints (OpenRouter, OpenCode Go, OpenCode and
  *    custom OpenAI-compatible providers) serving a reasoning model over the
  *    DeepSeek dialect.
  * Strict OpenAI-compatible endpoints (Mistral, native OpenAI, etc.) keep
  * stripping the field even if a community fine-tune slug contains "deepseek".
  *
- * On a gateway the slug alone can't answer this — Zen serves `big-pickle`
+ * On a gateway the slug alone can't answer this — OpenCode serves `big-pickle`
  * (DeepSeek dialect) and `claude-opus-5` (translated) off the same endpoint —
  * so the decision is: never for a translated family, then the catalog's
  * reasoning capability, then the known reasoning families for slugs the
@@ -117,16 +136,78 @@ export function getOpenAiReasoningStreamFormat(
   const normalizedEndpoint = endpointKey.toLowerCase();
   const key = normalizedEndpoint.startsWith('custom:') ? 'custom' : normalizedEndpoint;
   if (key === 'copilot') return COPILOT_REASONING_STREAM_FORMAT;
+  if (key === 'cerebras') return CEREBRAS_REASONING_STREAM_FORMAT;
+  if (key === 'mistral') return MISTRAL_REASONING_STREAM_FORMAT;
   if (supportsReasoningContent(endpointKey, model, catalog)) {
     return STANDARD_OPENAI_REASONING_STREAM_FORMAT;
   }
   return null;
 }
 
+/** Text of a Mistral `thinking` chunk (string or nested text chunks). */
+function chunkText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!Array.isArray(value)) return '';
+  return value
+    .map((part) =>
+      part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string'
+        ? (part as { text: string }).text
+        : '',
+    )
+    .join('');
+}
+
+/**
+ * Split a list-shaped `content` into its text and its thinking. Returns null
+ * when `content` is not a chunk list.
+ */
+function splitContentChunks(content: unknown): { text: string; thinking: string } | null {
+  if (!Array.isArray(content)) return null;
+  let text = '';
+  let thinking = '';
+  for (const part of content) {
+    if (!part || typeof part !== 'object') continue;
+    const chunk = part as Record<string, unknown>;
+    if (chunk.type === 'thinking') thinking += chunkText(chunk.thinking ?? chunk.text);
+    else if (chunk.type === 'text' && typeof chunk.text === 'string') text += chunk.text;
+  }
+  return { text, thinking };
+}
+
+/**
+ * Normalize a non-streaming assistant `message` in place: lift the provider's
+ * reasoning field (or Mistral thinking chunks) into `reasoning_content`.
+ */
+export function normalizeOpenAiReasoningMessage(
+  message: Record<string, unknown>,
+  format: OpenAiReasoningStreamFormat,
+): void {
+  if (format.contentChunks) {
+    const split = splitContentChunks(message.content);
+    if (split) {
+      message.content = split.text;
+      if (split.thinking && !message.reasoning_content) message.reasoning_content = split.thinking;
+    }
+  }
+  const reasoning = firstStringAtPaths(message, format.outputStreamDeltaPaths);
+  if (reasoning && !message.reasoning_content) message.reasoning_content = reasoning;
+}
+
 export function normalizeOpenAiReasoningDelta(
   delta: Record<string, unknown>,
   format: OpenAiReasoningStreamFormat,
 ): NormalizedReasoningDelta | null {
+  if (format.contentChunks) {
+    const split = splitContentChunks(delta.content);
+    if (split) {
+      delta.content = split.text;
+      if (split.thinking) {
+        delta.reasoning_content = split.thinking;
+        return { text: split.thinking, normalized: true };
+      }
+      return { text: '', normalized: true };
+    }
+  }
   const reasoning = firstStringAtPaths(delta, format.outputStreamDeltaPaths);
   if (!reasoning) return null;
 

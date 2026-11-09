@@ -139,3 +139,48 @@ describe('trigger kinds and test variables', () => {
     expect(triggerTestPath('t1', 'bot')).toBe('/triggers/test?trigger=t1&harness=bot');
   });
 });
+
+describe('GELF and RELP forms', () => {
+  it('sends the URL for GELF over HTTP and host/port otherwise, never compressing TCP', () => {
+    const form = emptyForm();
+    form.name = 'Graylog';
+    form.type = 'gelf';
+    form.gelf = {
+      ...form.gelf,
+      transport: 'http',
+      url: ' https://logs.lan/gelf ',
+      compression: 'gzip',
+    };
+    expect(validateForm(form, null)).toEqual({});
+    expect(buildPayload(form, true).config).toMatchObject({
+      transport: 'http',
+      url: 'https://logs.lan/gelf',
+      compression: 'gzip',
+      source: null,
+    });
+    form.gelf = { ...form.gelf, transport: 'tcp', host: 'logs.lan', port: '12201' };
+    const tcp = buildPayload(form, true).config as Record<string, unknown>;
+    expect(tcp).toMatchObject({
+      transport: 'tcp',
+      host: 'logs.lan',
+      port: 12201,
+      compression: 'none',
+    });
+    expect(tcp.url).toBeUndefined();
+  });
+
+  it('requires the RELP host and keeps the syslog line options', () => {
+    const form = emptyForm();
+    form.name = 'rsyslog';
+    form.type = 'relp';
+    expect(validateForm(form, null)['relp.host']).toBeTruthy();
+    form.relp = { ...form.relp, host: 'logs.lan' };
+    expect(validateForm(form, null)).toEqual({});
+    expect(buildPayload(form, true).config).toMatchObject({
+      host: 'logs.lan',
+      port: 20514,
+      format: 'rfc5424',
+      app_name: 'thinker',
+    });
+  });
+});

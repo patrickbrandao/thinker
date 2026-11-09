@@ -11,6 +11,7 @@ import {
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
+import { usePageWake } from '../lib/use-page-wake.js';
 import { Button, IconButton } from './ui.js';
 
 type Phase = 'idle' | 'loading' | 'awaiting' | 'success' | 'error';
@@ -23,6 +24,8 @@ interface Props {
   onConnected: () => void;
   onUpdated?: () => void;
   onDisconnected: () => void;
+  /** Only add a new account: no header, no account list. */
+  newConnection?: boolean;
 }
 
 const SLOW_DOWN_INCREASE = 5;
@@ -38,6 +41,9 @@ export default function CopilotDeviceLogin(props: Props) {
   const pollTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const copiedTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cancelled = useRef(false);
+  // The pending poll's device code and interval, and whether a request is out.
+  const pollState = useRef<{ code: string; delaySec: number } | null>(null);
+  const pollInFlight = useRef(false);
   const latest = useRef(props);
   latest.current = props;
 
@@ -45,7 +51,7 @@ export default function CopilotDeviceLogin(props: Props) {
   const isMultiKey = activeKeys.length > 1;
   const canAddAnother = activeKeys.length < MAX_KEYS_PER_PROVIDER;
   const idleOrError = phase === 'idle' || phase === 'error';
-  const showConnectedState = props.connected && idleOrError;
+  const showConnectedState = props.connected && idleOrError && !props.newConnection;
 
   useEffect(() => {
     cancelled.current = false;
@@ -80,10 +86,13 @@ export default function CopilotDeviceLogin(props: Props) {
     return currentDelay;
   };
 
-  const schedulePoll = (code: string, delaySec: number, errorCount = 0) => {
+  const schedulePoll = (code: string, delaySec: number, errorCount = 0, waitSec = delaySec) => {
     if (cancelled.current) return;
+    pollState.current = { code, delaySec };
+    clearTimeout(pollTimeout.current);
     pollTimeout.current = setTimeout(async () => {
       if (cancelled.current) return;
+      pollInFlight.current = true;
       try {
         const result = await copilotPollToken(latest.current.agentName, code);
         if (cancelled.current) return;
@@ -98,9 +107,18 @@ export default function CopilotDeviceLogin(props: Props) {
         } else {
           schedulePoll(code, delaySec, nextErrors);
         }
+      } finally {
+        pollInFlight.current = false;
       }
-    }, delaySec * 1000);
+    }, waitSec * 1000);
   };
+
+  // Back from approving on GitHub: check now instead of waiting out a timer
+  // the browser throttled while this page was hidden.
+  usePageWake(phase === 'awaiting', () => {
+    const state = pollState.current;
+    if (state && !pollInFlight.current) schedulePoll(state.code, state.delaySec, 0, 0);
+  });
 
   const startLogin = async () => {
     setPhase('loading');
@@ -153,21 +171,25 @@ export default function CopilotDeviceLogin(props: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <IconButton label={t('providerSetup.shared.backToProviders')} onClick={props.onBack}>
-          <ChevronLeft size={16} aria-hidden="true" />
-        </IconButton>
-        <h2 className="text-base font-semibold text-ink">
-          {t('providerSetup.shared.connectProvider')}
-        </h2>
-      </div>
+      {props.newConnection ? null : (
+        <>
+          <div className="flex items-center gap-2">
+            <IconButton label={t('providerSetup.shared.backToProviders')} onClick={props.onBack}>
+              <ChevronLeft size={16} aria-hidden="true" />
+            </IconButton>
+            <h2 className="text-base font-semibold text-ink">
+              {t('providerSetup.shared.connectProvider')}
+            </h2>
+          </div>
 
-      <div className="flex items-center gap-3">
-        <span className="inline-flex size-8 items-center justify-center">
-          {providerIcon('copilot', 28)}
-        </span>
-        <div className="text-sm font-semibold text-ink">GitHub Copilot</div>
-      </div>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex size-8 items-center justify-center">
+              {providerIcon('copilot', 28)}
+            </span>
+            <div className="text-sm font-semibold text-ink">GitHub Copilot</div>
+          </div>
+        </>
+      )}
 
       {/* Connected state */}
       {showConnectedState ? (
@@ -220,7 +242,7 @@ export default function CopilotDeviceLogin(props: Props) {
       ) : null}
 
       {/* Idle / Error — show start button */}
-      {!props.connected && idleOrError ? (
+      {(props.newConnection || !props.connected) && idleOrError ? (
         <>
           <p className="text-sm text-dim">{t('providerSetup.copilot.requires')}</p>
           {errorBox}

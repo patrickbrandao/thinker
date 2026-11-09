@@ -21,6 +21,7 @@ export interface ProviderDef {
   subtitle: string;
   models: { label: string; value: string }[];
   keyPrefix: string;
+  legacyKeyPrefixes?: readonly string[];
   minKeyLength: number;
   keyPlaceholder: string;
   noKeyRequired?: boolean;
@@ -33,6 +34,8 @@ export interface ProviderDef {
   subscriptionKeyPlaceholder?: string;
   /** Optional note shown near the subscription credential field. */
   subscriptionRequirementNote?: string;
+  /** Terms-of-use risk shown as a warning on the subscription connection. */
+  subscriptionTermsWarning?: string;
   /**
    * Set when the provider accepts no new subscription connections. Existing
    * connections keep working and stay manageable; this note replaces the
@@ -66,7 +69,11 @@ export interface ProviderDef {
   subscriptionTokenAlternative?: {
     prefix: string;
     placeholder: string;
-    dividerLabel: string;
+    /** Radio choice between the sign-in flow and the pasted token, with a line each. */
+    loginLabel: string;
+    loginHint: string;
+    tokenLabel: string;
+    tokenHint: string;
   };
   /** Provider is subscription-only and should not appear in the API Keys tab. */
   subscriptionOnly?: boolean;
@@ -78,6 +85,12 @@ export interface ProviderDef {
   subscriptionSignInHint?: string;
   /** Show a beta badge next to the provider name. */
   beta?: boolean;
+  /**
+   * Key the provider accepts in place of a real one to serve its free models
+   * (OpenCode's `public`). Pre-fills the key of a new account and passes the
+   * key-length check.
+   */
+  freeKey?: string;
 }
 
 /** UI-only overlay fields for each provider. The id must match a `SHARED_PROVIDERS` entry. */
@@ -90,6 +103,7 @@ interface ProviderUIOverlay {
   subscriptionLabel?: string;
   subscriptionKeyPlaceholder?: string;
   subscriptionRequirementNote?: string;
+  subscriptionTermsWarning?: string;
   subscriptionClosedNote?: string;
   subscriptionCredentialKind?: 'setup-token' | 'api-key';
   subscriptionCredentialName?: string;
@@ -101,13 +115,18 @@ interface ProviderUIOverlay {
   subscriptionTokenAlternative?: {
     prefix: string;
     placeholder: string;
-    dividerLabel: string;
+    /** Radio choice between the sign-in flow and the pasted token, with a line each. */
+    loginLabel: string;
+    loginHint: string;
+    tokenLabel: string;
+    tokenHint: string;
   };
   subscriptionOnly?: boolean;
   subscriptionSignInUrl?: string;
   subscriptionSignInLabel?: string;
   subscriptionSignInHint?: string;
   beta?: boolean;
+  freeKey?: string;
 }
 
 /**
@@ -132,6 +151,9 @@ const regionLabel = (key: string) => () => tMaybe(`providerSetup.catalog.regions
 
 const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   qwen: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.qwen');
+    },
     initial: 'Al',
     subtitle: 'Qwen 3.7, DeepSeek, Kimi, GLM via Alibaba Cloud',
     apiKeyEndpointRegions: [
@@ -183,6 +205,12 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   vertex: {
     initial: 'GV',
     subtitle: 'Gemini via Google Cloud Vertex AI',
+    // Express mode serves only a few models; the rest need a project and
+    // location, stored as `project/location` in the region (api-vertex G3).
+    apiKeyEndpointRegions: [
+      region('express', regionLabel('vertexExpress')),
+      region('project', regionLabel('vertexProject'), 'my-project/us-central1'),
+    ],
     models: [],
   },
   bedrock: {
@@ -305,6 +333,9 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     models: [],
   },
   gemini: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.gemini');
+    },
     initial: 'G',
     subtitle: 'Gemini 3.5 Flash, 3.1 Flash-Lite, Gemini 2.5',
     supportsSubscription: true,
@@ -370,19 +401,28 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
   },
   minimax: {
     initial: 'Mm',
-    subtitle: 'MiniMax M3, M2.7, M2.5',
+    subtitle: 'MiniMax M3.1 Flash',
     apiKeyEndpointRegions: [
       region('global', regionLabel('global')),
       region('cn', regionLabel('china')),
     ],
     supportsSubscription: true,
-    subscriptionLabel: 'MiniMax Coding Plan',
+    subscriptionLabel: 'MiniMax M Plan',
     subscriptionAuthMode: 'device_code',
     subscriptionTokenAlternative: {
       prefix: 'sk-cp-',
       placeholder: 'sk-cp-...',
-      get dividerLabel() {
-        return t('providerSetup.catalog.minimaxDivider');
+      get loginLabel() {
+        return t('providerSetup.catalog.minimaxMethod.login');
+      },
+      get loginHint() {
+        return t('providerSetup.catalog.minimaxMethod.loginHint');
+      },
+      get tokenLabel() {
+        return t('providerSetup.catalog.minimaxMethod.token');
+      },
+      get tokenHint() {
+        return t('providerSetup.catalog.minimaxMethod.tokenHint');
       },
     },
     models: [],
@@ -398,8 +438,11 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     })),
   },
   xiaomi: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.xiaomi');
+    },
     initial: 'Mi',
-    subtitle: 'MiMo V2.5 Pro, V2.5, Flash',
+    subtitle: 'MiMo V2.6 Pro, V2.6 Flash',
     supportsSubscription: true,
     subscriptionLabel: 'Xiaomi MiMo Token Plan',
     subscriptionAuthMode: 'token',
@@ -519,26 +562,41 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subtitle: 'DeepSeek, Qwen, GLM, Kimi, MiMo',
     supportsSubscription: true,
     subscriptionLabel: 'OpenCode Go (beta)',
-    subscriptionAuthMode: 'token',
-    get subscriptionKeyPlaceholder() {
-      return t('providerSetup.catalog.pasteYourKey', { name: 'OpenCode' });
-    },
-    subscriptionSignInUrl: 'https://opencode.ai/auth',
-    get subscriptionSignInLabel() {
-      return t('providerSetup.catalog.signInTo', { name: 'OpenCode Go' });
-    },
-    get subscriptionSignInHint() {
-      return t('providerSetup.catalog.opencodeSignInHint');
+    // OpenCode Console device login; a pasted OpenCode API key stays available.
+    subscriptionAuthMode: 'device_code',
+    subscriptionTokenAlternative: {
+      prefix: '',
+      get placeholder() {
+        return t('providerSetup.catalog.pasteYourKey', { name: 'OpenCode' });
+      },
+      get loginLabel() {
+        return t('providerSetup.catalog.opencodeGoMethod.login');
+      },
+      get loginHint() {
+        return t('providerSetup.catalog.opencodeGoMethod.loginHint');
+      },
+      get tokenLabel() {
+        return t('providerSetup.catalog.opencodeGoMethod.token');
+      },
+      get tokenHint() {
+        return t('providerSetup.catalog.opencodeGoMethod.tokenHint');
+      },
     },
     subscriptionOnly: true,
     beta: true,
     models: [],
   },
-  'opencode-zen': {
-    initial: 'OZ',
+  opencode: {
+    initial: 'OC',
     get subtitle() {
-      return t('providerSetup.catalog.subtitles.opencodeZen');
+      return t('providerSetup.catalog.subtitles.opencode');
     },
+    // OpenCode Console device login beside the API key; a new API-key account
+    // starts with the free key `public`.
+    supportsSubscription: true,
+    subscriptionLabel: 'OpenCode Console',
+    subscriptionAuthMode: 'device_code',
+    freeKey: 'public',
     models: [],
   },
   openrouter: {
@@ -549,6 +607,9 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     models: [],
   },
   xai: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.xai');
+    },
     initial: 'X',
     subtitle: 'Grok 4.5, Grok 4.3, Grok Build',
     supportsSubscription: true,
@@ -559,13 +620,16 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     models: [],
   },
   zai: {
+    get subscriptionTermsWarning() {
+      return t('providerSetup.catalog.termsWarning.zai');
+    },
     initial: 'Z',
     subtitle: 'GLM 5.2, GLM 5.1, GLM 5 Turbo',
     supportsSubscription: true,
     subscriptionLabel: 'GLM Coding Plan',
     subscriptionAuthMode: 'token',
     get subscriptionKeyPlaceholder() {
-      return t('providerSetup.catalog.pasteYourKey', { name: 'Z.ai' });
+      return t('providerSetup.catalog.pasteYourKey', { name: 'GLM Coding Plan' });
     },
     subscriptionCredentialKind: 'api-key',
     subscriptionEndpointRegions: [
@@ -587,6 +651,7 @@ export function buildProviderDef(shared: SharedProviderEntry): ProviderDef {
     name: shared.displayName,
     color: shared.color,
     keyPrefix: shared.keyPrefix,
+    legacyKeyPrefixes: shared.legacyKeyPrefixes,
     minKeyLength: shared.minKeyLength,
     keyPlaceholder: shared.keyPlaceholder,
     localOnly: shared.localOnly || undefined,
@@ -607,6 +672,7 @@ const PROVIDER_ORDER = [
   'cline-pass',
   'commandcode',
   'deepseek',
+  'pioneer',
   'fireworks',
   'copilot',
   'gemini',
@@ -626,10 +692,9 @@ const PROVIDER_ORDER = [
   'ollama',
   'ollama-cloud',
   'openai',
+  'opencode',
   'opencode-go',
-  'opencode-zen',
   'openrouter',
-  'pioneer',
   'xai',
   'xiaomi',
   'zai',

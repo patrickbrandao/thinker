@@ -492,7 +492,7 @@ describe('ReasoningContentCache catalog wiring', () => {
       model.toLowerCase().endsWith('big-pickle') ? true : undefined,
   };
 
-  it('prepares Zen codename tool turns the catalog marks as reasoning', async () => {
+  it('prepares OpenCode codename tool turns the catalog marks as reasoning', async () => {
     const cache = new ReasoningContentCache(undefined, zenCatalog);
     const body = {
       messages: [
@@ -504,18 +504,13 @@ describe('ReasoningContentCache catalog wiring', () => {
       ],
     };
 
-    const result = await cache.prepareRequest(
-      body,
-      'session-1',
-      'opencode-zen',
-      'opencode-zen/big-pickle',
-    );
+    const result = await cache.prepareRequest(body, 'session-1', 'opencode', 'opencode/big-pickle');
 
     const messages = result.messages as Array<Record<string, unknown>>;
     expect(messages[0].reasoning_content).toBe('');
   });
 
-  it('leaves Zen slugs alone when the catalog does not know them', async () => {
+  it('leaves OpenCode slugs alone when the catalog does not know them', async () => {
     const cache = new ReasoningContentCache(undefined, zenCatalog);
     const body = {
       messages: [
@@ -530,8 +525,8 @@ describe('ReasoningContentCache catalog wiring', () => {
     const result = await cache.prepareRequest(
       body,
       'session-1',
-      'opencode-zen',
-      'opencode-zen/mystery-slug',
+      'opencode',
+      'opencode/mystery-slug',
     );
 
     expect(result).toBe(body);

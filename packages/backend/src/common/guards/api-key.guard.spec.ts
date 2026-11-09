@@ -1,8 +1,10 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { ApiKeyGuard } from './api-key.guard';
 import { hashKey } from '../utils/hash.util';
+import { ApiKeyAuthService } from '../services/api-key-auth.service';
+import { signRootToken } from '../utils/root-token';
 
 function makeContext(headers: Record<string, string | undefined>): ExecutionContext {
   return {
@@ -11,6 +13,7 @@ function makeContext(headers: Record<string, string | undefined>): ExecutionCont
         headers,
         ip: '127.0.0.1',
       }),
+      getResponse: () => undefined,
     }),
     getHandler: () => ({}),
     getClass: () => ({}),
@@ -24,6 +27,7 @@ describe('ApiKeyGuard', () => {
   let mockSet: jest.Mock;
   let configGet: jest.Mock;
   let reflector: Reflector;
+  let rootQuery: jest.Mock;
 
   beforeEach(() => {
     mockFind = jest.fn().mockResolvedValue([]);
@@ -57,7 +61,12 @@ describe('ApiKeyGuard', () => {
         .fn()
         .mockResolvedValue({ role: 'owner', isInstanceAdmin: false, mustChangePassword: false }),
     } as never;
-    guard = new ApiKeyGuard(reflector, configService, mockRepo, tenantCache);
+    rootQuery = jest.fn().mockResolvedValue([{ id: 'admin-1' }]);
+    guard = new ApiKeyGuard(
+      reflector,
+      configService,
+      new ApiKeyAuthService(configService, mockRepo, tenantCache, { query: rootQuery } as never),
+    );
   });
 
   it('throws UnauthorizedException when X-API-Key header is missing', async () => {
@@ -156,6 +165,46 @@ describe('ApiKeyGuard', () => {
 
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     expect(request.tenantContext).toBeUndefined();
+  });
+
+  it('refuses every key while the creator must change a temporary password (ADR 0006)', async () => {
+    const rawKey = 'thk_adm_blocked-key';
+    mockFind.mockResolvedValueOnce([
+      {
+        id: 'key-3',
+        tenant_id: 'tenant-789',
+        created_by_user_id: 'user-1',
+        key_hash: hashKey(rawKey),
+        key_prefix: rawKey.substring(0, 12),
+        expires_at: null,
+        absolute_expires_at: null,
+      },
+    ]);
+    const configService = { get: configGet } as unknown as ConfigService;
+    const blocked = new ApiKeyGuard(
+      reflector,
+      configService,
+      new ApiKeyAuthService(
+        configService,
+        { find: mockFind } as never,
+        {
+          resolveAccess: jest.fn().mockResolvedValue({
+            tenantId: 'tenant-789',
+            role: 'owner',
+            isInstanceAdmin: false,
+            mustChangePassword: true,
+          }),
+        } as never,
+        { query: rootQuery } as never,
+      ),
+    );
+    const request = { headers: { 'x-api-key': rawKey }, ip: '127.0.0.1' };
+    const ctx = {
+      switchToHttp: () => ({ getRequest: () => request }),
+      getHandler: () => ({}),
+      getClass: () => ({}),
+    } as unknown as ExecutionContext;
+    await expect(blocked.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 
   it('falls back to env-based API key when DB lookup returns empty', async () => {
@@ -544,5 +593,70 @@ describe('ApiKeyGuard', () => {
 
     await guard.canActivate(ctx);
     expect(request.apiKeyExpiresAt).toBeNull();
+  });
+
+  describe('root token', () => {
+    const secret = 'x'.repeat(40);
+    const saved = process.env.THINKER_ENCRYPTION_KEY;
+    beforeEach(() => {
+      process.env.THINKER_ENCRYPTION_KEY = secret;
+    });
+    afterAll(() => {
+      if (saved === undefined) delete process.env.THINKER_ENCRYPTION_KEY;
+      else process.env.THINKER_ENCRYPTION_KEY = saved;
+    });
+
+    it('acts as the oldest instance admin, as owner, without any key row', async () => {
+      const req: Record<string, unknown> = { headers: { 'x-api-key': signRootToken(secret) } };
+      const ctx = {
+        switchToHttp: () => ({ getRequest: () => req, getResponse: () => undefined }),
+        getHandler: () => ({}),
+        getClass: () => ({}),
+      } as unknown as ExecutionContext;
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(mockFind).not.toHaveBeenCalled();
+      expect(req.authMethod).toBe('root');
+      expect(req.tenantContext).toMatchObject({
+        userId: 'admin-1',
+        role: 'owner',
+        isInstanceAdmin: true,
+      });
+      expect(rootQuery.mock.calls[0][0]).toContain('is_instance_admin');
+    });
+
+    it('acts as the account named in the token', async () => {
+      const ctx = makeContext({ 'x-api-key': signRootToken(secret, 'ops@example.com') });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(rootQuery.mock.calls[0][1]).toEqual(['ops@example.com']);
+    });
+
+    it('rejects a token signed with another key', async () => {
+      const ctx = makeContext({ 'x-api-key': signRootToken('y'.repeat(40)) });
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects a token outside the time window', async () => {
+      const old = Math.floor(Date.now() / 1000) - 3600;
+      const ctx = makeContext({ 'x-api-key': signRootToken(secret, '', old) });
+      await expect(guard.canActivate(ctx)).rejects.toThrow('5-minute window');
+    });
+  });
+
+  it('keeps the fixed expiry of an admin key (no sliding)', async () => {
+    const rawKey = 'thk_adm_fixedexpiry';
+    mockFind.mockResolvedValueOnce([
+      {
+        id: 'k9',
+        key_hash: hashKey(rawKey),
+        key_prefix: rawKey.substring(0, 12),
+        tenant_id: 't1',
+        created_by_user_id: 'u1',
+        name: 'ci',
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+        absolute_expires_at: null,
+      },
+    ]);
+    await expect(guard.canActivate(makeContext({ 'x-api-key': rawKey }))).resolves.toBe(true);
+    expect(mockSet).toHaveBeenCalledWith({ last_used_at: expect.any(Function) });
   });
 });

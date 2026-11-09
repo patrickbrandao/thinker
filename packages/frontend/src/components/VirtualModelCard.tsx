@@ -8,6 +8,7 @@ import type {
   RoutingProvider,
 } from '../services/api.js';
 import {
+  clearVirtualModelOverride,
   clearVirtualModelFallbacks,
   setVirtualModelFallbacks,
   type VirtualModel,
@@ -77,6 +78,7 @@ export default function VirtualModelCard(props: VirtualModelCardProps) {
         setVirtualModelFallbacks(props.agentName, vm.id, models, routes)
       }
       persistClearFallbacks={() => clearVirtualModelFallbacks(props.agentName, vm.id)}
+      persistClearChain={() => clearVirtualModelOverride(props.agentName, vm.id)}
       paramsScope={modelParamsScopeForVirtualModel(vm.id)}
       getModelParams={props.getModelParams}
       setModelParams={props.setModelParams}

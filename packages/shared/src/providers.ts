@@ -29,6 +29,8 @@ export interface SharedProviderEntry {
   color: string;
   /** Expected API-key prefix (used for validation / placeholder). */
   keyPrefix: string;
+  /** Older prefixes still accepted (keys issued before a rebrand). */
+  legacyKeyPrefixes?: readonly string[];
   /** Minimum plausible API-key length. */
   minKeyLength: number;
   /** Placeholder shown in the UI's API-key input. */
@@ -57,6 +59,12 @@ export interface MetaModelApiModel {
 export const META_MODEL_API_CONTEXT_WINDOW = 1_048_576;
 
 export const META_MODEL_API_MODELS: readonly MetaModelApiModel[] = [
+  { id: 'muse-spark-1.3', displayName: 'Muse Spark 1.3' },
+  {
+    id: 'muse-spark-1.3-contributor',
+    displayName: 'Muse Spark 1.3 Contributor (inputs and outputs may train Meta)',
+  },
+  { id: 'muse-wonder-1.0', displayName: 'Muse Wonder 1.0 (preview)' },
   { id: 'muse-spark-1.2', displayName: 'Muse Spark 1.2' },
   {
     id: 'muse-spark-1.2-contributor',
@@ -417,15 +425,16 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
   },
   {
     id: 'pioneer',
-    displayName: 'Pioneer',
-    aliases: ['pioneer-ai', 'pioneer ai'],
+    displayName: 'Fastino',
+    aliases: ['pioneer-ai', 'pioneer ai', 'fastino'],
     openRouterPrefixes: [],
     requiresApiKey: true,
     localOnly: false,
     color: '#EA580C',
-    keyPrefix: 'pio_sk_',
+    keyPrefix: 'fast_sk_',
+    legacyKeyPrefixes: ['pio_sk_'],
     minKeyLength: 20,
-    keyPlaceholder: 'pio_sk_...',
+    keyPlaceholder: 'fast_sk_...',
   },
   {
     id: 'opencode-go',
@@ -440,16 +449,17 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPlaceholder: '',
   },
   {
-    id: 'opencode-zen',
-    displayName: 'OpenCode Zen',
-    aliases: ['opencodezen'],
+    id: 'opencode',
+    displayName: 'OpenCode',
+    // Formerly "OpenCode Zen"; the old ids keep resolving.
+    aliases: ['opencode-zen', 'opencodezen'],
     openRouterPrefixes: [],
     requiresApiKey: true,
     localOnly: false,
     color: '#211E1E',
     keyPrefix: '',
     minKeyLength: 20,
-    keyPlaceholder: 'OpenCode Zen API key',
+    keyPlaceholder: 'OpenCode API key',
   },
   {
     id: 'openrouter',
@@ -600,7 +610,7 @@ export const LOCAL_SERVER_HINTS: Readonly<Record<string, LocalServerHint>> = {
     persistsBindAcrossLaunches: true,
   },
   llamacpp: {
-    defaultPort: 8080,
+    defaultPort: 9931,
     setupCommand: 'llama-server -m <your-model>.gguf --port 8080',
     setupNote: 'Replace <your-model>.gguf with the path to a GGUF model on your machine.',
     installUrl: 'https://github.com/ggml-org/llama.cpp#obtaining-and-quantizing-models',

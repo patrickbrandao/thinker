@@ -89,6 +89,53 @@ export function revokeMinimaxOAuth(agentName: string, label?: string) {
   );
 }
 
+/** A Console login connects OpenCode or OpenCode Go. */
+type OpencodeConsoleProvider = 'opencode' | 'opencode-go';
+
+export function startOpencodeOAuth(
+  agentName: string,
+  provider: OpencodeConsoleProvider = 'opencode-go',
+) {
+  const params = new URLSearchParams({ agentName, provider });
+  return fetchMutate<MinimaxOAuthStartResponse>(`/oauth/opencode/start?${params.toString()}`, {
+    method: 'POST',
+  });
+}
+
+export function pollOpencodeOAuth(flowId: string) {
+  return fetchJson<MinimaxOAuthPollResponse>(`/oauth/opencode/poll`, { flowId });
+}
+
+export function revokeOpencodeOAuth(
+  agentName: string,
+  label?: string,
+  provider: OpencodeConsoleProvider = 'opencode-go',
+) {
+  const params = new URLSearchParams({ agentName, provider });
+  if (label) params.set('label', label);
+  return fetchMutate<{ ok: boolean; notifications?: string[] }>(
+    `/oauth/opencode/revoke?${params.toString()}`,
+    { method: 'POST' },
+  );
+}
+
+export interface OpencodeGoUsageWindow {
+  percent: number;
+  limited: boolean;
+  resetsAt: string | null;
+}
+
+export interface OpencodeGoUsage {
+  rolling: OpencodeGoUsageWindow | null;
+  weekly: OpencodeGoUsageWindow | null;
+  monthly: OpencodeGoUsageWindow | null;
+}
+
+/** OpenCode Go allowance meter of the agent's Console login; null without one. */
+export function getOpencodeGoUsage(agentName: string) {
+  return fetchJson<{ usage: OpencodeGoUsage | null }>(`/oauth/opencode/usage`, { agentName });
+}
+
 export function startKiroOAuth(agentName: string, options: KiroOAuthStartOptions = {}) {
   const params = new URLSearchParams({ agentName });
   const startUrl = options.startUrl?.trim();
@@ -245,6 +292,18 @@ const DEVICE_CODE_PROVIDERS: Record<string, DeviceCodeApi> = {
     },
     poll: pollKiroOAuth,
     revoke: revokeKiroOAuth,
+    hasRegion: false,
+  },
+  'opencode-go': {
+    start: (agentName) => startOpencodeOAuth(agentName, 'opencode-go'),
+    poll: pollOpencodeOAuth,
+    revoke: (agentName, label) => revokeOpencodeOAuth(agentName, label, 'opencode-go'),
+    hasRegion: false,
+  },
+  opencode: {
+    start: (agentName) => startOpencodeOAuth(agentName, 'opencode'),
+    poll: pollOpencodeOAuth,
+    revoke: (agentName, label) => revokeOpencodeOAuth(agentName, label, 'opencode'),
     hasRegion: false,
   },
 };

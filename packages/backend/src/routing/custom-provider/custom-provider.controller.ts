@@ -1,3 +1,4 @@
+import { Audit } from '../../alerts/audit.decorator';
 import { Body, Controller, Delete, Get, Param, Post, Put, Optional } from '@nestjs/common';
 import { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context.decorator';
@@ -22,6 +23,7 @@ import {
 } from '../dto/custom-provider.dto';
 import { AgentNameParamDto } from '../dto/routing.dto';
 import { MinRole } from '../../common/decorators/roles.decorator';
+import { providerKeyDisplay } from '../../common/utils/provider-key-mask';
 import { canUsePrivateDestinations } from '../../common/utils/private-url-policy';
 import type { TenantProvider } from '../../entities/tenant-provider.entity';
 import { PROVIDER_CONNECTION_SCOPE } from '../routing-core/resolve-agent.service';
@@ -36,7 +38,7 @@ function keyPool(rows: readonly TenantProvider[], providerKey: string) {
   return rows
     .filter((r) => r.provider === providerKey && r.is_active && !!r.api_key_encrypted)
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
-    .map((r) => ({ label: r.label, key_prefix: r.key_prefix ?? null, priority: r.priority }));
+    .map((r) => ({ label: r.label, ...providerKeyDisplay(r), priority: r.priority }));
 }
 
 /** API shape of one custom provider (local servers included). The API key never leaves. */
@@ -54,6 +56,7 @@ function toResponse(cp: CustomProvider, tenantProviders: readonly TenantProvider
     has_api_key: !!up?.api_key_encrypted,
     keys: keyPool(tenantProviders, provKey),
     stream_warmup_ms: up?.stream_warmup_ms ?? null,
+    stream_idle_timeout_ms: up?.stream_idle_timeout_ms ?? null,
     models: cp.models,
     created_at: cp.created_at,
   };
@@ -166,6 +169,7 @@ export class CustomProviderController {
     return { models };
   }
 
+  @Audit({ entity: 'custom_provider', action: 'created' })
   @Post(':agentName/custom-providers')
   async create(
     @TenantCtx() ctx: TenantContext,
@@ -183,6 +187,11 @@ export class CustomProviderController {
     return toResponse(cp, await this.providerService.getProviders(agent.tenant_id));
   }
 
+  @Audit({
+    entity: 'custom_provider',
+    action: 'updated',
+    lookup: { table: 'custom_providers', nameColumn: 'name' },
+  })
   @Put(':agentName/custom-providers/:id')
   async update(
     @TenantCtx() ctx: TenantContext,
@@ -201,6 +210,11 @@ export class CustomProviderController {
     return toResponse(cp, await this.providerService.getProviders(agent.tenant_id));
   }
 
+  @Audit({
+    entity: 'custom_provider',
+    action: 'deleted',
+    lookup: { table: 'custom_providers', nameColumn: 'name' },
+  })
   @Delete(':agentName/custom-providers/:id')
   async remove(
     @TenantCtx() ctx: TenantContext,

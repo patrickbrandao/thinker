@@ -123,6 +123,8 @@ describe('AgentLifecycleService', () => {
       const mockManagerQb = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         execute: mockExecute,
       };
@@ -144,6 +146,10 @@ describe('AgentLifecycleService', () => {
 
       const keySet = mockManagerQb.set.mock.calls[1][0];
       expect(keySet).toEqual({ is_active: false });
+
+      // Its limit rules go too, so a recreated namesake starts without them.
+      expect(mockManagerQb.from).toHaveBeenCalledWith('notification_rules');
+      expect(mockManagerQb.where).toHaveBeenCalledWith('agent_id = :id', { id: 'agent-id-1' });
 
       expect(mockResolveInvalidate).toHaveBeenCalledWith('tenant-1', 'my-agent');
       expect(mockRoutingInvalidate).toHaveBeenCalledWith('agent-id-1');
@@ -278,6 +284,8 @@ describe('AgentLifecycleService', () => {
       const mockManagerQb = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         execute: mockExecute,
       };
@@ -374,6 +382,8 @@ describe('AgentLifecycleService', () => {
       const mockManagerQb = {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         execute: mockExecute,
       };

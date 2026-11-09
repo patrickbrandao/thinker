@@ -40,7 +40,7 @@ describe('ProxyMessageRecorder request parents', () => {
           }),
         ),
       } as never,
-      {} as never,
+      { costInputs: async () => null } as never,
     );
     return { recorder, insert, requestValues, execute, requestQb };
   }

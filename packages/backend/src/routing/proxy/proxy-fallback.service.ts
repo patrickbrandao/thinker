@@ -53,6 +53,10 @@ interface ForwardProviderOptions {
   tenantId?: string;
   resourceUrl?: string;
   providerRegion?: string | null;
+  /** The connection's own base URL (API-key connections only). */
+  providerBaseUrl?: string | null;
+  /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
+  providerBaseUrlAllowsPrivate?: boolean;
   apiMode?: ProxyApiMode;
   signatureLookup?: SignatureLookup;
   thinkingLookup?: ThinkingBlockLookup;
@@ -61,6 +65,20 @@ interface ForwardProviderOptions {
   paramMergeContext?: ParamMergeContext;
   /** The chain route this attempt serves; picks its params scope. */
   paramsRoute?: ModelRoute | null;
+  /**
+   * First-byte wait of a streaming hop (streamWarmupMsFor). Set: the stream
+   * is warmed up and its start peeked for an error event before the hop is
+   * committed (stream-warmup.ts peekStreamStart).
+   */
+  warmupMs?: number;
+  /**
+   * Whether the chain still has a route after this one. With the default
+   * `last-route` retry mode, a transient 5xx is retried on the same route
+   * only when nothing else is left to try.
+   */
+  hasNextRoute?: boolean;
+  /** The connection's stream idle timeout override (tenant_providers). */
+  streamIdleTimeoutMs?: number | null;
   tenantProviderId?: string | null;
   startProviderAttempt?: StartProviderAttempt;
 }
@@ -75,6 +93,7 @@ import { AnthropicOauthService } from '../oauth/anthropic/anthropic-oauth.servic
 import { GeminiOauthService } from '../oauth/gemini/gemini-oauth.service';
 import { KiroOauthService } from '../oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../oauth/xai/xai-oauth.service';
+import { OpencodeOauthService } from '../oauth/opencode/opencode-oauth.service';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { ProviderClient, ForwardResult } from './provider-client';
 import { resolveEndpointKey } from './provider-endpoints';
@@ -82,7 +101,21 @@ import { CopilotTokenService } from './copilot-token.service';
 import { ReasoningContentCache } from './reasoning-content-cache';
 import { buildProviderExtraHeaders } from './provider-hooks';
 import { shouldTriggerFallback } from './fallback-status-codes';
-import { peekStream, streamWarmupMsFor } from './stream-warmup';
+import { peekStreamStart, streamWarmupMsFor } from './stream-warmup';
+import { noteServedFromBody, servedSniffer } from './served-provider';
+import { validStreamIdleOverride } from './stream-writer';
+import {
+  EMBEDDED_UPSTREAM_ERROR_HEADER,
+  embeddedErrorResponse,
+  embeddedUpstreamError,
+  isContextLengthBody,
+  isEmbeddedErrorCheckEnabled,
+} from './upstream-error-classifier';
+import {
+  parseUpstreamRetryPolicy,
+  waitUnlessAborted,
+  type UpstreamRetryPolicy,
+} from './upstream-retry';
 import {
   buildEmptyResponseError,
   isEmptyResponseFallbackEnabled,
@@ -103,7 +136,7 @@ import type {
   StartProviderAttempt,
 } from './proxy-types';
 import type { ProxyApiMode } from './proxy-types';
-import { refreshRejectedOAuthCredential } from './oauth-credentials';
+import { isRefreshableOAuthCredential, refreshRejectedOAuthCredential } from './oauth-credentials';
 import {
   buildCredentialFailureFallback,
   presentCredentialFailure,
@@ -111,6 +144,7 @@ import {
   type RouteCredentialDeps,
 } from './route-credentials';
 import { recordingResponseFromText } from './attempt-recording-capture';
+import { parseQuotaSignal, type QuotaSignal } from './quota-reset';
 import {
   CredentialRejectionCooldown,
   type RejectedCredentialRef,
@@ -123,6 +157,13 @@ import {
 // honored (capped at MAX) regardless of this default.
 const RATE_LIMIT_COOLDOWN_DEFAULT_MS = 15_000;
 const RATE_LIMIT_COOLDOWN_MAX_MS = 5 * 60_000;
+// A 429 that reports an exhausted quota (OpenCode's free daily limit, Go
+// allowance or budget, a subscription window) stays exhausted until the stated
+// reset, often hours away, so its reset (from Retry-After or the error body,
+// see quota-reset.ts) is honored up to a day instead of five minutes. Without
+// any reset the route rests for an hour rather than the short default.
+const QUOTA_COOLDOWN_MAX_MS = 24 * 60 * 60_000;
+const QUOTA_COOLDOWN_DEFAULT_MS = 60 * 60_000;
 const MAX_RATE_LIMIT_COOLDOWNS = 2_000;
 // Statuses that move a custom provider's request on to the next key of its pool.
 const KEY_POOL_ROTATE_STATUSES = new Set([401, 403, 429]);
@@ -184,6 +225,7 @@ export class ProxyFallbackService {
     private readonly providerParamSpecs: ProviderParamSpecService,
     private readonly reasoningCache: ReasoningContentCache,
     @Optional() private readonly egress?: ProxyEgressService,
+    @Optional() private readonly opencodeOauth?: OpencodeOauthService,
   ) {}
 
   /**
@@ -348,47 +390,44 @@ export class ProxyFallbackService {
       );
 
       // A hop's stream is warmed up exactly like the primary's: a 200 that
-      // never sends a byte becomes a failed hop, so the next route still gets
-      // its turn instead of the client receiving a dead stream.
-      const forward = await this.warmUpStreamBody(
-        await this.tryForwardToProvider({
-          provider,
-          apiKey: credentials.apiKey,
-          model,
-          body,
-          resolveChatBody,
-          stream,
-          sessionKey,
-          reasoningCacheKey,
-          providerCacheKey,
-          signal,
-          agentId,
-          tenantId,
-          rawApiKey: credentials.rawApiKey,
-          providerKeyLabel,
-          authType,
-          apiMode,
-          resourceUrl: credentials.resourceUrl,
-          providerRegion: credentials.providerRegion,
-          signatureLookup,
-          thinkingLookup,
-          clientAnthropicBeta,
-          paramMergeContext,
-          paramsRoute: route,
-          tenantProviderId,
-          startProviderAttempt,
+      // never sends a byte, or whose first event is an error, becomes a failed
+      // hop, so the next route still gets its turn instead of the client
+      // receiving a dead stream.
+      const forward = await this.tryForwardToProvider({
+        provider,
+        apiKey: credentials.apiKey,
+        model,
+        body,
+        resolveChatBody,
+        stream,
+        sessionKey,
+        reasoningCacheKey,
+        providerCacheKey,
+        signal,
+        agentId,
+        tenantId,
+        rawApiKey: credentials.rawApiKey,
+        providerKeyLabel,
+        authType,
+        apiMode,
+        resourceUrl: credentials.resourceUrl,
+        providerRegion: credentials.providerRegion,
+        providerBaseUrl: credentials.providerBaseUrl,
+        providerBaseUrlAllowsPrivate: credentials.providerBaseUrlAllowsPrivate,
+        signatureLookup,
+        thinkingLookup,
+        clientAnthropicBeta,
+        paramMergeContext,
+        paramsRoute: route,
+        tenantProviderId,
+        startProviderAttempt,
+        warmupMs: streamWarmupMsFor(provider, {
+          connectionMs: credentials.streamWarmupMs,
+          local: authType === 'local',
         }),
-        {
-          stream,
-          provider,
-          model,
-          warmupMs: streamWarmupMsFor(provider, {
-            connectionMs: credentials.streamWarmupMs,
-            local: authType === 'local',
-          }),
-          signal,
-        },
-      );
+        hasNextRoute: i < fallbackModels.length - 1,
+        streamIdleTimeoutMs: credentials.streamIdleTimeoutMs,
+      });
       // A custom provider's key pool may have rotated to another key.
       if (forward.servedByKey) {
         tenantProviderId = forward.servedByKey.tenantProviderId;
@@ -439,48 +478,6 @@ export class ProxyFallbackService {
     return { success: null, failures };
   }
 
-  /**
-   * Streaming counterpart of {@link bufferNonStreamBody} for fallback hops.
-   * Peek at the first chunk before the hop is committed; on a stall, error or
-   * empty stream, return a synthetic 502 so the chain treats it as a failed
-   * hop. The primary gets the same warm-up in ProxyService.proxyRequest.
-   */
-  private async warmUpStreamBody(
-    forward: ForwardResult,
-    opts: {
-      stream: boolean;
-      provider: string;
-      model: string;
-      warmupMs: number;
-      signal?: AbortSignal;
-    },
-  ): Promise<ForwardResult> {
-    const { response, attempt } = forward;
-    if (!opts.stream || !response.ok || !response.body) return forward;
-    const warmup = await peekStream(response.body, opts.warmupMs, opts.signal);
-    if (warmup.ok) {
-      return {
-        ...forward,
-        response: new Response(warmup.stream, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers,
-        }),
-      };
-    }
-    if (attempt) attempt.completedAtMs = Date.now();
-    this.logger.warn(
-      `Fallback stream warmup failed: provider=${opts.provider} model=${opts.model} reason=${warmup.reason} message=${warmup.message}`,
-    );
-    return {
-      ...forward,
-      response: new Response(
-        JSON.stringify({ error: { message: `Stream warmup failed: ${warmup.message}` } }),
-        { status: 502, headers: { 'content-type': 'application/json' } },
-      ),
-    };
-  }
-
   private routeCredentialDeps(): RouteCredentialDeps {
     return {
       providerKeyService: this.providerKeyService,
@@ -491,6 +488,7 @@ export class ProxyFallbackService {
         geminiOauth: this.geminiOauth,
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
+        opencodeOauth: this.opencodeOauth,
       },
       egress: this.egress,
     };
@@ -504,6 +502,45 @@ export class ProxyFallbackService {
    * a provider call, unless no other key is left to try.
    */
   async tryForwardToProvider(opts: ForwardProviderOptions): Promise<ForwardResult> {
+    let result = await this.tryKeyPool(opts);
+    // Read per request: cheap, and tests can vary the environment.
+    const policy = parseUpstreamRetryPolicy();
+    for (let retry = 1; retry <= policy.retries; retry++) {
+      if (!(await this.shouldRetrySameRoute(result, opts, policy))) break;
+      this.logger.warn(
+        `Upstream retry ${retry}/${policy.retries}: provider=${opts.provider} model=${opts.model} status=${result.response.status}; same route in ${policy.delayMs}ms`,
+      );
+      if (!(await waitUnlessAborted(policy.delayMs, opts.signal))) break;
+      await this.supersedeFailedAttempt(result);
+      result = await this.tryKeyPool(opts);
+    }
+    return result;
+  }
+
+  /**
+   * Same-route retry of a transient upstream failure (report from NOC
+   * Norte, P4): only the configured statuses, never a context-window
+   * overflow (the same route refuses again), and in `last-route` mode only
+   * when no other route is left.
+   */
+  private async shouldRetrySameRoute(
+    result: ForwardResult,
+    opts: ForwardProviderOptions,
+    policy: UpstreamRetryPolicy,
+  ): Promise<boolean> {
+    if (policy.mode === 'off' || result.response.ok) return false;
+    if (!policy.statuses.has(result.response.status)) return false;
+    if (policy.mode === 'last-route' && opts.hasNextRoute) return false;
+    if (opts.signal?.aborted) return false;
+    const text = await result.response
+      .clone()
+      .text()
+      .catch(() => '');
+    return !isContextLengthBody(text);
+  }
+
+  /** One hop over the connection's key pool (see tryForwardToProvider). */
+  private async tryKeyPool(opts: ForwardProviderOptions): Promise<ForwardResult> {
     const pool = await this.keyPoolCandidates(opts);
     for (let i = 0; i < pool.length; i++) {
       const candidate = pool[i];
@@ -565,6 +602,8 @@ export class ProxyFallbackService {
         providerKeyLabel: k.label,
         tenantProviderId: k.id,
         providerRegion: k.region,
+        providerBaseUrl: k.baseUrl ?? null,
+        providerBaseUrlAllowsPrivate: k.baseUrlAllowsPrivate !== false,
       })),
     ];
   }
@@ -617,13 +656,22 @@ export class ProxyFallbackService {
         opts,
         forward,
       );
-      this.recordRateLimitCooldown(opts, result.response);
+      await this.recordRateLimitCooldown(opts, result.response);
       // Still 401 after any OAuth refresh: the credential is stale (refresh
       // rejected, or the account itself is refused). Skip it until it changes.
       if (result.response.status === 401) {
         this.credentialRejections.reject(this.credentialRef(opts, apiKey));
       }
-      return await this.bufferNonStreamBody(result, opts);
+      const idle = validStreamIdleOverride(opts.streamIdleTimeoutMs);
+      if (idle !== undefined) result.streamIdleTimeoutMs = idle;
+      const buffered = await this.bufferNonStreamBody(result, opts);
+      const peeked = await this.peekStreamBody(buffered, opts);
+      // An error rebuilt from a 200 body or stream start counts like a real
+      // one: a 429 starts the same cooldown.
+      if (peeked.response.headers.get(EMBEDDED_UPSTREAM_ERROR_HEADER)) {
+        await this.recordRateLimitCooldown(opts, peeked.response);
+      }
+      return peeked;
     } catch (error) {
       if (opts.signal?.aborted) throw error;
       if (!isTransportError(error)) throw error;
@@ -646,6 +694,62 @@ export class ProxyFallbackService {
   }
 
   /**
+   * Warm up a streaming hop before it is committed: a stall, an empty stream
+   * or an error event before the first content becomes a failed hop (502, or
+   * the error's own status) while nothing has reached the client yet.
+   */
+  private async peekStreamBody(
+    forward: ForwardResult,
+    opts: ForwardProviderOptions,
+  ): Promise<ForwardResult> {
+    const { response, attempt } = forward;
+    if (!opts.stream || opts.warmupMs === undefined || !response.ok || !response.body) {
+      return forward;
+    }
+    const peek = await peekStreamStart(response.body, {
+      warmupMs: opts.warmupMs,
+      signal: opts.signal,
+      contentType: response.headers.get('content-type'),
+    });
+    if (peek.ok) {
+      const sniffer = servedSniffer(attempt);
+      return {
+        ...forward,
+        response: new Response(sniffer ? peek.stream.pipeThrough(sniffer) : peek.stream, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        }),
+      };
+    }
+    if (attempt) attempt.completedAtMs = Date.now();
+    if (peek.reason === 'upstream_error') {
+      noteServedFromBody(attempt, peek.body);
+      this.logger.warn(
+        `Provider stream error before the first content: provider=${opts.provider} model=${opts.model} status=${peek.status}`,
+      );
+      return {
+        ...forward,
+        response: embeddedErrorResponse(
+          { status: peek.status, body: peek.body, contextLength: peek.contextLength },
+          undefined,
+        ),
+        providerCallStarted: true,
+      };
+    }
+    this.logger.warn(
+      `Stream warmup failed: provider=${opts.provider} model=${opts.model} reason=${peek.reason} message=${peek.message}`,
+    );
+    return {
+      ...forward,
+      response: new Response(
+        JSON.stringify({ error: { message: `Stream warmup failed: ${peek.message}` } }),
+        { status: 502, headers: { 'content-type': 'application/json' } },
+      ),
+    };
+  }
+
+  /**
    * Read a successful non-streaming body before the route is committed. The
    * fallback decision only sees the status line, so a provider that sends 200
    * headers and then times out or drops the socket mid-body used to fail later
@@ -665,12 +769,26 @@ export class ProxyFallbackService {
       const body = await response.arrayBuffer();
       // The attempt ends when its body does, not when headers arrived.
       if (attempt) attempt.completedAtMs = Date.now();
+      noteServedFromBody(attempt, body);
       // A 200 with no content and zero tokens is a failed hop (#129).
       if (isEmptyResponseFallbackEnabled() && isEmptySuccessPayload(body)) {
         this.logger.warn(
           `Provider empty response: provider=${opts.provider} model=${opts.model} (no content, zero tokens)`,
         );
         return { ...forward, response: buildEmptyResponseError(), providerCallStarted: true };
+      }
+      // A 200 whose body is only `{"error": ...}` (OpenRouter's provider
+      // failures): the real status, so fallback and retry see it.
+      const embedded = isEmbeddedErrorCheckEnabled() ? embeddedUpstreamError(body) : null;
+      if (embedded) {
+        this.logger.warn(
+          `Provider error inside a 200: provider=${opts.provider} model=${opts.model} status=${embedded.status}`,
+        );
+        return {
+          ...forward,
+          response: embeddedErrorResponse(embedded, response.headers),
+          providerCallStarted: true,
+        };
       }
       return {
         ...forward,
@@ -777,19 +895,42 @@ export class ProxyFallbackService {
     };
   }
 
-  private recordRateLimitCooldown(opts: ForwardProviderOptions, response: Response): void {
-    this.recordRateLimitCooldownForKey(this.rateLimitCooldownKey(opts), response);
+  private async recordRateLimitCooldown(
+    opts: ForwardProviderOptions,
+    response: Response,
+  ): Promise<void> {
+    // Quota errors arrive as 429, but some plans (MiniMax M Plan) do not
+    // document the status, so any client error body is checked.
+    if (response.status < 400 || response.status >= 500) return;
+    const quota = parseQuotaSignal(
+      await response
+        .clone()
+        .text()
+        .catch(() => ''),
+    );
+    if (response.status !== 429 && !quota?.exhausted) return;
+    this.recordRateLimitCooldownForKey(this.rateLimitCooldownKey(opts), response, quota);
   }
 
-  private recordRateLimitCooldownForKey(key: string | null, response: Response): void {
-    if (response.status !== 429 || !key) return;
+  private recordRateLimitCooldownForKey(
+    key: string | null,
+    response: Response,
+    quota: QuotaSignal | null = null,
+  ): void {
+    if (!key) return;
+    if (response.status !== 429 && !quota?.exhausted) return;
     if (this.rateLimitCooldowns.size >= MAX_RATE_LIMIT_COOLDOWNS) {
       this.evictExpiredRateLimitCooldowns();
       if (this.rateLimitCooldowns.size >= MAX_RATE_LIMIT_COOLDOWNS) {
         this.evictOldestRateLimitCooldown();
       }
     }
-    const ttlMs = this.parseRetryAfterMs(response.headers.get('retry-after'));
+    const retryAfter = response.headers.get('retry-after');
+    const ttlMs = quota?.exhausted
+      ? retryAfter
+        ? this.parseRetryAfterMs(retryAfter, QUOTA_COOLDOWN_MAX_MS)
+        : Math.min(quota.resetInMs ?? QUOTA_COOLDOWN_DEFAULT_MS, QUOTA_COOLDOWN_MAX_MS)
+      : this.parseRetryAfterMs(retryAfter, RATE_LIMIT_COOLDOWN_MAX_MS);
     this.rateLimitCooldowns.set(key, Date.now() + ttlMs);
   }
 
@@ -810,11 +951,11 @@ export class ProxyFallbackService {
     if (oldestKey) this.rateLimitCooldowns.delete(oldestKey);
   }
 
-  private parseRetryAfterMs(retryAfter: string | null): number {
+  private parseRetryAfterMs(retryAfter: string | null, maxMs = RATE_LIMIT_COOLDOWN_MAX_MS): number {
     if (!retryAfter) return RATE_LIMIT_COOLDOWN_DEFAULT_MS;
     const seconds = Number(retryAfter);
     if (Number.isFinite(seconds) && seconds > 0) {
-      return Math.min(seconds * 1000, RATE_LIMIT_COOLDOWN_MAX_MS);
+      return Math.min(seconds * 1000, maxMs);
     }
     // HTTP-date form (RFC 9110): honor the provider's stated instant the same
     // way as the numeric-seconds form — respect the actual delta, capped at
@@ -824,7 +965,7 @@ export class ProxyFallbackService {
     if (Number.isNaN(retryAt)) return RATE_LIMIT_COOLDOWN_DEFAULT_MS;
     const deltaMs = retryAt - Date.now();
     if (deltaMs <= 0) return RATE_LIMIT_COOLDOWN_DEFAULT_MS;
-    return Math.min(deltaMs, RATE_LIMIT_COOLDOWN_MAX_MS);
+    return Math.min(deltaMs, maxMs);
   }
 
   private rateLimitCooldownKey(opts: {
@@ -877,6 +1018,7 @@ export class ProxyFallbackService {
         geminiOauth: this.geminiOauth,
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
+        opencodeOauth: this.opencodeOauth,
       },
     );
     if (!refreshed?.apiKey || refreshed.apiKey === opts.apiKey) {
@@ -979,6 +1121,8 @@ export class ProxyFallbackService {
       authType,
       model: opts.model,
       providerRegion,
+      providerBaseUrl: opts.providerBaseUrl,
+      providerBaseUrlAllowsPrivate: opts.providerBaseUrlAllowsPrivate,
       resourceUrl,
       customProvider,
       logger: this.logger,
@@ -1063,6 +1207,10 @@ export class ProxyFallbackService {
           : {}),
         clientAnthropicBeta: opts.clientAnthropicBeta,
         providerResource,
+        oauthToken:
+          authType === 'subscription' &&
+          !!opts.rawApiKey &&
+          isRefreshableOAuthCredential(opts.rawApiKey),
         attempt,
       });
       if (attempt) attempt.completedAtMs = Date.now();

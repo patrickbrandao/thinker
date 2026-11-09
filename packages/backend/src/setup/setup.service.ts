@@ -116,6 +116,9 @@ export class SetupService {
    * user-creation hook accepts the first account.
    */
   async createFirstAdmin(dto: CreateAdminDto): Promise<void> {
+    // Better Auth stores emails lowercased; every lookup below must match it,
+    // or the first account ends up neither verified nor instance admin.
+    const email = dto.email.trim().toLowerCase();
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     try {
@@ -133,17 +136,18 @@ export class SetupService {
           // finish the verification step instead of returning 409.
           if (count === 1) {
             const unverified = (await queryRunner.query(
-              `SELECT email FROM "user" WHERE "emailVerified" = false AND email = $1`,
-              [dto.email],
+              `SELECT email FROM "user" WHERE "emailVerified" = false AND lower(email) = $1`,
+              [email],
             )) as Array<{ email: string }>;
             if (unverified.length === 1) {
               // Completing a half-created admin is still setup: it needs the
               // token too, or anyone knowing the email could verify it.
               this.assertSetupToken(dto.setupToken);
-              await queryRunner.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
-                dto.email,
-              ]);
-              this.logger.log(`First-run setup recovery — completed verification for ${dto.email}`);
+              await queryRunner.query(
+                `UPDATE "user" SET "emailVerified" = true WHERE lower(email) = $1`,
+                [email],
+              );
+              this.logger.log(`First-run setup recovery — completed verification for ${email}`);
               return;
             }
           }
@@ -159,7 +163,7 @@ export class SetupService {
         await runAsServerUserCreation(() =>
           auth.api.signUpEmail({
             body: {
-              email: dto.email,
+              email,
               password: dto.password,
               name: dto.name,
             },
@@ -167,18 +171,19 @@ export class SetupService {
         );
         this.setupToken.consume();
 
-        await queryRunner.query(`UPDATE "user" SET "emailVerified" = true WHERE email = $1`, [
-          dto.email,
-        ]);
+        await queryRunner.query(
+          `UPDATE "user" SET "emailVerified" = true WHERE lower(email) = $1`,
+          [email],
+        );
         // The first account is the instance administrator (ADR 0006).
         await queryRunner.query(
           `INSERT INTO user_profiles (user_id, is_instance_admin)
-           SELECT id, true FROM "user" WHERE email = $1
+           SELECT id, true FROM "user" WHERE lower(email) = $1
            ON CONFLICT (user_id) DO UPDATE SET is_instance_admin = true`,
-          [dto.email],
+          [email],
         );
 
-        this.logger.log(`First-run setup complete — admin user created: ${dto.email}`);
+        this.logger.log(`First-run setup complete — admin user created: ${email}`);
       } finally {
         await queryRunner.query(`SELECT pg_advisory_unlock($1)`, [SETUP_ADVISORY_LOCK_KEY]);
       }

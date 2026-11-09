@@ -22,7 +22,10 @@ export class XaiOauthService extends RedirectPkceOauthBaseService {
       authorizeUrl: 'https://auth.x.ai/oauth2/authorize',
       tokenUrl: 'https://auth.x.ai/oauth2/token',
       revokeUrl: 'https://auth.x.ai/oauth2/revoke',
-      scope: 'openid profile email offline_access grok-cli:access api:access',
+      // The Grok CLI proxy requires the conversations/workspaces scopes (sub-xai G2).
+      scope:
+        'openid profile email offline_access grok-cli:access api:access conversations:read conversations:write workspaces:read workspaces:write',
+      extraAuthorizeParams: { referrer: 'grok-build' },
       callbackPort: CALLBACK_PORT,
       // xAI's OAuth client is registered with a 127.0.0.1 redirect on a
       // bare /callback path, and its endpoints want an explicit Accept.

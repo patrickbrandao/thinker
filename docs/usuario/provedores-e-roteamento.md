@@ -21,7 +21,7 @@ O nome distingue os servidores no seletor de modelos, nas rotas e nos logs. Mode
 
 Do lado do servidor (ligue-o em `0.0.0.0`, não em `127.0.0.1`, senão o Thinker não o enxerga):
 
-- **Ollama:** `OLLAMA_HOST=0.0.0.0:11434 ollama serve` e `ollama pull llama3.1:8b`. Porta padrão 11434.
+- **Ollama:** `OLLAMA_HOST=0.0.0.0:11434 ollama serve` e `ollama pull llama3.1:8b`. Porta padrão 11434. O Ollama roda cada modelo com uma janela de contexto própria (4096 tokens por padrão) e **corta o prompt sem erro** quando ele passa disso; o máximo do modelo não vale. Suba a janela com `OLLAMA_CONTEXT_LENGTH=32768 ollama serve` ou com `PARAMETER num_ctx` num Modelfile. O teste de conexão mostra a janela efetiva quando o modelo está carregado (ou o `num_ctx` do Modelfile), e é ela que o Thinker usa para o roteamento ciente de contexto.
 - **LM Studio:** ligue "Serve on Local Network" (ou `lms server start --bind 0.0.0.0 --port 1234 --cors`). Porta padrão 1234; com "Require Authentication", informe o token como chave de API.
 - **llama.cpp:** `./llama-server -m modelo.gguf --host 0.0.0.0` (porta padrão 9931 nas versões a partir de outubro de 2026; builds antigos e as imagens Docker de exemplo usam 8080). `--api-key` vira a chave de API do servidor.
 - **Outro servidor OpenAI-compatível (vLLM e similares):** **Add custom provider**, informe a URL (por exemplo `http://host.docker.internal:8000/v1`) e use **Fetch models**.
@@ -31,6 +31,8 @@ Provedores customizados aceitam URLs `http://`, de LAN e de loopback; só precis
 Cada provedor customizado tem um **alias**, o prefixo que seus modelos mostram em `GET /v1/models` (por exemplo `meu-vllm/qwen-3-14b`). O campo `model` aceita o alias.
 
 ### Várias chaves em um provedor customizado (key pool)
+
+Cada conexão recebe um nome `<provedor>-N` (`anthropic-1`, `opencode-2`; `custom-N` nos provedores customizados), com o menor N livre entre as conexões daquele provedor, em todos os tipos de autenticação. Removida a `anthropic-1`, a próxima conexão volta a ser `anthropic-1`. O nome pode ser trocado no formulário. Os runners locais (Ollama, LM Studio, llama.cpp) ficam com `Default`, porque têm uma conexão só. Na atualização, as conexões com os nomes gerados antes (`Default`, `Key N`) são renomeadas para o padrão, junto com as rotas fixadas nelas e o histórico de requisições.
 
 Um provedor customizado com chave de API aceita até 5 chaves, cada uma com um rótulo, todas cifradas com `THINKER_ENCRYPTION_KEY` e restritas à organização. No dashboard, abra o provedor (**Edit custom provider**) e use **Add another key**, as setas para reordenar e a lixeira para remover.
 
@@ -71,15 +73,26 @@ Ligada, cada requisição é pontuada pelo conteúdo (palavras-chave, tamanho, f
 
 `auto` pede para o Thinker rotear. Qualquer outro valor é uma escolha explícita: o Thinker procura o modelo entre os descobertos do harness (use os IDs de `GET /v1/models`). Um ID qualificado pelo provedor (`openai/gpt-novo`) ainda pode ser roteado por esse provedor se a credencial dele estiver habilitada no harness, mesmo fora do catálogo. Se o modelo não está disponível para o harness, a resposta é `M302`.
 
+Uma rota explícita **não tem fallback**: é só aquele modelo, na conexão fixada pelo tier (o rótulo da chave vem do tier, os fallbacks não). Se ela falha, ou está em espera depois de um 429 (`Provider route temporarily cooling down after an upstream 429`), o cliente recebe esse erro direto, sem cabeçalho `X-Thinker-Fallback-*`. A afinidade de sessão e os cabeçalhos do cliente não mudam isso: o que decide é o `model` do corpo.
+
+Isso pega o **Claude Code**, que manda sempre um ID concreto (`claude-sonnet-5-5`, `claude-haiku-5-5` para subagentes e tarefas leves) quando não está configurado com `auto`. Para dar cascata a esses nomes sem mexer no cliente, crie um [modelo virtual](#modelos-virtuais) com o **mesmo nome** do ID: o virtual vence o ID explícito e roteia pela própria cadeia (ou, com Continue on Default, pela do tier `default`).
+
 ## Fallback
 
-Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, resposta em streaming que não começa dentro de `STREAM_WARMUP_MS`, silêncio maior que `STREAM_IDLE_TIMEOUT_MS`, resposta 200 sem conteúdo e com zero tokens), o Thinker tenta o próximo modelo de fallback do tier, na ordem configurada. A primeira tentativa que der certo atende a requisição; o cliente vê um único resultado.
+Quando uma tentativa ao provedor falha (resposta HTTP 4xx ou 5xx, timeout, resposta em streaming que não começa dentro de `STREAM_WARMUP_MS`, silêncio maior que `STREAM_IDLE_TIMEOUT_MS`, resposta 200 sem conteúdo e com zero tokens, resposta 200 que só traz um erro, erro no início do streaming antes de qualquer conteúdo), o Thinker tenta o próximo modelo de fallback do tier, na ordem configurada. A primeira tentativa que der certo atende a requisição; o cliente vê um único resultado.
 
 - Cada tentativa fica registrada separadamente (provedor, modelo, status, custo). A requisição conta como "recuperada por fallback" quando termina com sucesso depois de uma tentativa falha.
 - Se **todas** as tentativas falham, o cliente recebe o erro do provedor da última tentativa. Isso é um erro do provedor, não um código `M###`.
 - Deixe `PROVIDER_TIMEOUT_MS` abaixo do timeout do cliente para o fallback ter tempo de rodar.
+- Um erro transitório (500, 502 ou 503) na última rota da cadeia é repetido uma vez na mesma rota, depois de 1 s, antes de chegar ao cliente (`THINKER_UPSTREAM_RETRY_MODE`; veja [configuração](configuracao.md)).
 
 **Warm-up do streaming.** A espera pelo primeiro trecho de uma resposta em streaming pode ser ajustada por conexão de provedor (botão de gerenciar na página da conexão; para provedores customizados, no formulário de edição), no campo opcional "Stream warm-up (seconds)", de 1 a 600 segundos. Vale o mais específico: o valor da conexão que atende a tentativa, depois `THINKER_LOCAL_STREAM_WARMUP_MS` (padrão 60 s) para runners locais e, por fim, `STREAM_WARMUP_MS` (padrão 15 s). Campo vazio herda o próximo nível. Na API, o campo é `stream_warmup_ms` em milissegundos (1000 a 600000; `null` limpa): `PATCH /api/v1/providers/connections/:id/stream-warmup` e `PUT /api/v1/routing/:agente/custom-providers/:id`. Só administradores da organização alteram esses valores.
+
+**Idle do streaming.** No mesmo lugar, o campo opcional "Stream idle timeout (seconds)" (1 a 3600 s) define a maior pausa aceita entre dois trechos de uma resposta em streaming antes de a tentativa falhar. Vazio herda o `request_timeout_ms` do servidor local (para conexões locais) e, depois, `STREAM_IDLE_TIMEOUT_MS` (padrão 180 s). Na API: `stream_idle_timeout_ms` em milissegundos (1000 a 3600000; `null` limpa), em `PATCH /api/v1/providers/connections/:id/stream-idle` e no `PUT` de custom provider.
+
+**Fixar o provedor do OpenRouter.** Numa rota do OpenRouter, o diálogo de parâmetros do modelo tem a seção "Provider routing": ordem de provedores (`order`), só estes (`only`), ignorar (`ignore`), permitir outros (`allow_fallbacks`), ordenação (`sort`), coleta de dados e retenção zero, e um JSON avançado para as demais chaves (quantizações, preço máximo, latência e vazão preferidas). Vale só para essa rota; os fallbacks seguem o roteamento normal do OpenRouter. Se o cliente mandar o próprio objeto `provider`, ele substitui o da rota por inteiro. Uma ordem manual desliga a afinidade de sessão do OpenRouter, e com ela o cache de prompt aquecido. Para conferir qual provedor atendeu, veja "Served by" no detalhe da mensagem.
+
+**Modelo fora do catálogo.** Quando o provedor deixa de listar o modelo de uma rota, a linha da rota mostra o aviso "Not in catalog": os pedidos pulam para a próxima rota até você trocar o modelo.
 
 ## Modelos virtuais
 

@@ -86,6 +86,44 @@ describe('MessageDetails', () => {
     });
   });
 
+  it('shows served provider, upstream id and a differing served model', async () => {
+    mockGetMessageDetails.mockResolvedValue({
+      message: {
+        ...detailsResponse.message,
+        model: 'openrouter/qwen/qwen3-coder',
+        served_provider: 'DeepInfra',
+        upstream_generation_id: 'gen-123',
+        served_model: 'qwen/qwen3-coder-480b',
+      },
+    });
+    const { container } = render(<MessageDetails messageId="msg-1" />);
+    await vi.waitFor(() => {
+      const link = container.querySelector('a[href="/messages?served_provider=DeepInfra"]');
+      expect(link?.textContent).toBe('DeepInfra');
+      expect(container.textContent).toContain('Upstream ID');
+      expect(container.textContent).toContain('gen-123');
+      expect(container.querySelector('.copy-btn')).not.toBeNull();
+      expect(container.textContent).toContain('Served model');
+      expect(container.textContent).toContain('qwen/qwen3-coder-480b');
+    });
+  });
+
+  it('hides served fields when null and served model when it matches the model', async () => {
+    mockGetMessageDetails.mockResolvedValue({
+      message: {
+        ...detailsResponse.message,
+        served_provider: null,
+        upstream_generation_id: null,
+        served_model: 'openai/gpt-4o',
+      },
+    });
+    const { container } = render(<MessageDetails messageId="msg-1" />);
+    await vi.waitFor(() => expect(container.textContent).toContain('trace-abc123'));
+    expect(container.textContent).not.toContain('Served by');
+    expect(container.textContent).not.toContain('Upstream ID');
+    expect(container.textContent).not.toContain('Served model');
+  });
+
   it('displays description in metadata', async () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
     const { container } = render(<MessageDetails messageId="msg-1" />);

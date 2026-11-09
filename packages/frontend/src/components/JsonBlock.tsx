@@ -6,7 +6,8 @@ const MAX_HIGHLIGHT_BYTES = 50_000;
 
 function serialize(value: unknown): string {
   try {
-    return JSON.stringify(value, null, 2);
+    // JSON.stringify returns undefined for undefined, functions and symbols.
+    return JSON.stringify(value, null, 2) ?? String(value);
   } catch {
     return String(value);
   }

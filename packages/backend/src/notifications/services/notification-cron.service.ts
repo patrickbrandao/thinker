@@ -99,12 +99,13 @@ export class NotificationCronService implements OnModuleInit {
   private async evaluateRule(rule: ActiveRule, actual: number): Promise<boolean> {
     const { periodStart, periodEnd } = computePeriodBoundaries(rule.period);
 
-    if (await this.notificationLog.hasAlreadySent(rule.id, periodStart)) return false;
+    if (await this.notificationLog.hasAlreadySent(rule.id, periodStart, 'soft')) return false;
     if (actual < rule.threshold) return false;
 
     const now = formatNotificationTimestamp();
     await this.notificationLog.insertLog({
       ruleId: rule.id,
+      alertType: 'soft',
       periodStart,
       periodEnd,
       actualValue: actual,

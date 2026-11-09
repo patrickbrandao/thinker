@@ -64,6 +64,15 @@ export class AgentLifecycleService {
         .set({ is_active: false })
         .where('agent_id = :id', { id: agentId })
         .execute();
+
+      // Limit rules are matched by harness name: left behind, they would
+      // block and alert a new harness created later with the same name.
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('notification_rules')
+        .where('agent_id = :id', { id: agentId })
+        .execute();
     });
 
     this.resolveAgent.invalidate(agentTenantId, agentName);

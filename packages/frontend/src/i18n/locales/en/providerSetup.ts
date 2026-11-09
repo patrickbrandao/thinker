@@ -1,5 +1,33 @@
 /** Provider connection flows: key form, OAuth, device code, local servers, provider catalog. */
 export default {
+  wizard: {
+    steps: 'Steps',
+    stepType: 'Type',
+    stepParams: 'Parameters',
+    chooseType: 'Which kind of account?',
+    next: 'Next',
+    back: 'Back',
+    typeChosen: 'Type:',
+    variant: {
+      zen: { label: 'Zen (paid)', hint: 'Your OpenCode API key, billed per use.' },
+      free: { label: 'Free', hint: 'The public key `public`: only the free models.' },
+      console: { label: 'Console', hint: 'Sign in to the OpenCode Console.' },
+      go: { label: 'Go', hint: 'OpenCode Go plan: sign in or paste its key.' },
+      minimaxLogin: { label: 'Sign in', hint: 'Log in with your MiniMax account.' },
+      minimaxToken: { label: 'Paste token', hint: 'Paste a Coding Plan token (sk-cp-…).' },
+      vertexExpress: { label: 'Express mode', hint: 'API key only; a few Gemini models.' },
+      vertexProject: {
+        label: 'Project',
+        hint: 'Google Cloud project and location (project/location).',
+      },
+    },
+  },
+  baseUrlField: {
+    label: 'Base URL',
+    restore: 'Restore default',
+    hint: 'Empty keeps the official URL shown.',
+    warning: 'The API key will be sent to this URL.',
+  },
   shared: {
     connectProvider: 'Connect provider',
     backToProviders: 'Back to providers',
@@ -19,8 +47,10 @@ export default {
     connected: '{{ name }} connected',
     subscriptionConnected: '{{ name }} subscription connected',
     subscriptionDisconnected: '{{ name }} subscription disconnected',
-    popupBlocked: 'Popup was blocked by your browser. Allow popups for this site, then try again.',
+    popupBlockedOpenLink:
+      'Your browser blocked the sign-in window. Open this link in another browser, or copy it; this screen keeps waiting.',
     addConnection: 'Add connection',
+    newConnectionFor: 'New connection: {{ name }}',
     reauthConnection: 'Sign in again: {{ label }}',
     reauthNote:
       'The next sign-in replaces the credential of "{{ label }}". Harness access, routes and history stay as they are.',
@@ -31,7 +61,18 @@ export default {
     getProduct: 'Get {{ name }} ↗',
     beta: 'beta',
   },
+  goUsage: {
+    title: 'OpenCode Go usage',
+    rolling: '5 hours',
+    weekly: 'Week',
+    monthly: 'Month',
+    limited: 'Limit reached',
+    resetsAt: 'Resets {{ time }}',
+  },
   keyForm: {
+    nameTaken: 'A connection named {{ label }} already exists. Pick another name.',
+    freeKeyHint:
+      'The key {{ key }} gives only the free models, like a fresh OpenCode install, with a daily limit set by the provider. Some of them may use your data for training. Paste your API key to unlock every model.',
     nounApiKey: 'API key',
     nounSetupToken: 'setup token',
     pasteToken: 'Paste token',
@@ -210,6 +251,7 @@ export default {
     connectWith: 'Connect with {{ name }}',
     codingPlanToken: '{{ name }} Coding Plan token',
     connectWithToken: 'Connect with token',
+    connectionMethod: 'How to connect {{ name }}',
     tabOpened:
       'A new tab opened with the {{ name }} authorization page. Approve the request there to finish connecting.',
   },
@@ -239,7 +281,7 @@ export default {
   catalog: {
     subtitles: {
       cerebras: 'GPT-OSS, GLM, Gemma on Cerebras inference',
-      pioneer: 'OpenAI-compatible inference and fine-tuned Pioneer models',
+      pioneer: 'OpenAI-compatible inference and fine-tuned Fastino models (formerly Pioneer)',
       groq: 'Llama 4, Qwen, GPT-OSS. Fast inference',
       huggingface: 'Open models through Hugging Face Inference Providers',
       kilo: 'Kilo Gateway unified model access',
@@ -248,7 +290,7 @@ export default {
       meta: 'Muse Spark 1.2, Contributor, and 1.1',
       ollama: 'Llama, Qwen, Gemma, and more',
       ollamaCloud: 'DeepSeek V4, GLM, Kimi, MiniMax in the cloud',
-      opencodeZen: 'Curated Claude, GPT, DeepSeek, MiMo, Nemotron',
+      opencode: 'Pay-as-you-go Claude, GPT, Gemini and free models',
       nous: 'OpenRouter-backed models via NousResearch Portal',
       openrouter: 'Auto-route to 300+ models',
     },
@@ -257,11 +299,33 @@ export default {
     signInWithGoogle: 'Sign in with Google',
     pasteYourKey: 'Paste your {{ name }} API key',
     signInTo: 'Sign in to {{ name }}',
-    opencodeSignInHint: 'Sign in to OpenCode Go to get your API key.',
-    commandCodeRequirement: 'Requires Command Code Pro or higher.',
+    opencodeGoMethod: {
+      login: 'OpenCode Console sign-in (recommended)',
+      loginHint:
+        'Sign in through your browser with a device code. The token renews itself and the account page shows the quota meter (5 hours, week, month).',
+      token: 'API key',
+      tokenHint:
+        'Paste a key created in the OpenCode Console. Inference works, but there is no quota meter: a key does not say which organization it belongs to.',
+    },
+    commandCodeRequirement: 'Requires a Command Code plan with API access (any plan except Go).',
+    termsWarning: {
+      gemini:
+        "Google's terms forbid using the Gemini CLI sign-in from third-party software; the account may be suspended. A Gemini API key under Usage-based providers is the supported path.",
+      qwen: 'The Token Plan is meant for interactive coding tools; automated scripts and app backends are not allowed. Gateway traffic may be treated as automation and the key suspended.',
+      xiaomi:
+        'The MiMo Token Plan quota only covers coding tools; scripts and app backends are forbidden and the key may be blocked.',
+      zai: 'Use a GLM Coding Plan key: a Standard key does not draw on the plan and bills your balance. The plan is limited to officially supported coding tools; violations may lead to throttling or a ban.',
+      xai: 'Thinker reaches the Grok subscription through the official Grok CLI proxy and identifies as that client. xAI publishes no terms allowing third-party gateways; use at your own risk.',
+    },
     geminiClosed:
       'Google no longer allows new Gemini sign-ins from apps outside Google. Existing connections keep working. To add Gemini, connect a Gemini API key under Usage-based providers.',
-    minimaxDivider: 'Or paste your Coding Plan token',
+    minimaxMethod: {
+      login: 'MiniMax sign-in (recommended)',
+      loginHint: 'Sign in through your browser with a device code. The token renews itself.',
+      token: 'Coding Plan token',
+      tokenHint:
+        'Paste the sk-cp- token from your Coding Plan page. It does not renew; replace it when it changes.',
+    },
     regions: {
       autoDetect: 'Auto-detect',
       chinaBeijing: 'China (Beijing)',
@@ -289,6 +353,8 @@ export default {
       mimoCn: 'China (token-plan-cn)',
       mimoSgp: 'Singapore (token-plan-sgp)',
       mimoAms: 'Europe (token-plan-ams)',
+      vertexExpress: 'Express mode (API key only; a few models)',
+      vertexProject: 'Project and location (project/location)',
       zaiGlobal: 'Outside China (api.z.ai)',
       zaiCn: 'China Mainland (open.bigmodel.cn)',
     },

@@ -58,6 +58,7 @@ export default {
     activeConnections: (n: number) =>
       n === 1 ? `${n} active connection` : `${n} active connections`,
     activeKeys: (n: number) => (n === 1 ? `${n} active key` : `${n} active keys`),
+    sessions: (n: number) => (n === 1 ? `${n} session` : `${n} sessions`),
     colName: 'Name',
     colUrl: 'URL',
     colModels: 'Models',
@@ -73,6 +74,20 @@ export default {
     listView: 'List view',
   },
   detail: {
+    tabActivity: 'Activity',
+    tabModels: 'Models',
+    manageTab: {
+      general: 'General',
+      streaming: 'Streaming',
+      credential: 'Credential',
+      proxy: 'Outbound proxy',
+      server: 'Server',
+      models: 'Models',
+      keys: 'Keys',
+    },
+    accountModelsEmpty:
+      'This account has no models yet. Use Refresh models to fetch them from the provider.',
+    changesSaved: 'Changes saved',
     loadErrorTitle: "Couldn't load connection | Thinker",
     loadErrorHeading: "Couldn't load this connection",
     loadErrorBody: 'Something went wrong loading this connection. Please try again.',
@@ -132,6 +147,11 @@ export default {
     warmupHint:
       'Optional. How long a streaming request waits for the first token before failing over. Leave empty to use the default.',
     warmupSaved: 'Stream warm-up saved',
+    streamIdle: 'Stream idle timeout (seconds)',
+    idleHint:
+      "Longest pause allowed between two chunks of a streaming response before the attempt fails. Empty inherits the local server's request timeout, then STREAM_IDLE_TIMEOUT_MS (180 s).",
+    idleSaved: 'Stream idle timeout saved',
+    baseUrlSaved: 'Base URL saved; models are being discovered again.',
     credential: 'Credential',
     credentialKeyHint:
       'Replace the key on this same connection. Harness access, routes and history stay as they are.',
@@ -141,6 +161,11 @@ export default {
     replaceKey: 'Replace',
     replacingKey: 'Replacing...',
     keyReplaced: 'Credential replaced',
+    currentKey: 'Current key',
+    showKey: 'Show full key',
+    hideKey: 'Hide key',
+    revealingKey: 'Loading key...',
+    revealKeyFailed: 'Could not show the key',
     reauthenticate: 'Sign in again',
     reauthFailed: 'Could not start the sign-in',
     saveFailed: 'Failed to save',
@@ -206,6 +231,9 @@ export default {
     inherit: 'Inherit',
     warmupHint:
       'How long a streaming request waits for the first token before failing over. Raise it for local models with slow cold loads. Leave empty to use the default.',
+    streamIdle: 'Stream idle timeout (seconds)',
+    idleHint:
+      "Longest pause allowed between two chunks of a streaming response before the attempt fails. Empty inherits the local server's request timeout, then STREAM_IDLE_TIMEOUT_MS (180 s).",
     apiKey: 'API Key',
     apiKeyOptional: '(optional for local providers)',
     noKeySet: 'No key set',
@@ -267,5 +295,48 @@ export default {
     subscriptionsDesc: 'Use your existing paid plans. You can add several from the same provider.',
     byokDesc: 'Connect providers you pay per token or per usage with your own API keys.',
     localDesc: 'Connect to LLM servers running on your machine.',
+  },
+  models: {
+    subtitle:
+      'Every model your connections offer, with the accounts that serve it, price, context window and capabilities.',
+    refresh: 'Refresh models',
+    refreshed: 'Models refreshed',
+    search: 'Search models',
+    allProviders: 'All providers',
+    allTypes: 'All types',
+    allCapabilities: 'All capabilities',
+    includeInactive: 'Include inactive accounts',
+    count: '{{ shown }} of {{ total }} models',
+    viewByModel: 'By model',
+    viewByAccount: 'By account',
+    emptyTitle: 'No models',
+    emptyBody: 'Connect a provider, or refresh the models of your connections.',
+    reasoning: 'Reasoning',
+    kind: {
+      api_key: 'API key',
+      subscription: 'Subscription',
+      local: 'Local',
+    },
+    col: {
+      model: 'Model',
+      provider: 'Provider',
+      accounts: 'Accounts',
+      account: 'Account',
+      type: 'Type',
+      price: 'Input / output per 1M',
+      context: 'Context',
+      capabilities: 'Capabilities',
+    },
+    detail: {
+      id: 'Model id',
+      longContext: 'Long context',
+      longContextValue: 'Above {{ tokens }} tokens: {{ input }} / {{ output }}',
+      input: 'Input',
+      output: 'Output',
+      endpoints: 'Endpoints',
+      discovered: 'Discovered',
+      priceHint:
+        'Prices are per million tokens as each account reports them; subscriptions and local servers have no per-token price.',
+    },
   },
 };

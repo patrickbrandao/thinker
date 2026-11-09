@@ -49,15 +49,18 @@ The CLI uses that gateway for later commands. You can select another gateway wit
 
 ## Useful commands
 
-| Task                           | Command                                          |
-| ------------------------------ | ------------------------------------------------ |
-| Check your connection          | `thinker doctor`                                 |
-| List available agent platforms | `thinker agent platforms`                        |
-| List connectable providers     | `thinker provider catalog`                       |
-| Review an agent's routing      | `thinker routing status my-app`                  |
-| Read or set model params       | `thinker routing params get my-app`              |
-| Read recent requests           | `thinker requests get --agent my-app --range 7d` |
-| See all commands and options   | `thinker --help`                                 |
+| Task                             | Command                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------- |
+| Check your connection            | `thinker doctor`                                                                 |
+| List available agent platforms   | `thinker agent platforms`                                                        |
+| List connectable providers       | `thinker provider catalog`                                                       |
+| Review an agent's routing        | `thinker routing status my-app`                                                  |
+| Read or set model params         | `thinker routing params get my-app`                                              |
+| Read recent requests             | `thinker requests get --agent my-app --range 7d`                                 |
+| Add an LM Studio/Ollama server   | `thinker provider local add --type lmstudio --name lab --host 10.0.0.5`          |
+| Manage triggers, proxies, limits | `thinker trigger list`, `thinker proxy server list`, `thinker limit list my-app` |
+| Manage workspaces and users      | `thinker org list`, `thinker user list`                                          |
+| See all commands and options     | `thinker --help`                                                                 |
 
 Most commands write JSON to stdout for scripts and coding agents. `thinker agent env` and `thinker skill show` write text. `thinker routing test` sends a real provider request, which may incur provider charges. Destructive commands require `--yes`.
 
@@ -71,7 +74,7 @@ printf '%s' "$MY_KEY" | thinker login --token-stdin
 thinker login --token-env MY_KEY
 ```
 
-The CLI stores login credentials for each gateway host in `~/.config/thinker/config.json` with file mode `0600`. A stored credential is only sent to the host where it was saved. `THINKER_API_KEY` overrides the stored credential for the selected host.
+The CLI stores login credentials for each gateway host in `~/.config/thinker/config.json` with file mode `0600`. A stored credential is only sent to the host where it was saved. `THINKER_API_KEY` overrides the stored credential for the selected host. With the server's `THINKER_ENCRYPTION_KEY` in the environment (inside the container), the CLI mints a short-lived root token, only for a loopback origin (`THINKER_ROOT_REMOTE=1` allows another host), and targets `http://localhost:$PORT` by default. `thinker run --agent <name> -- <command>` gives the child only the agent key (`THINKER_AGENT_KEY`, plus `THINKER_AGENT_URL`): it strips `THINKER_API_KEY`, the server's `THINKER_ENCRYPTION_KEY`/`THINKER_ENCRYPTION_KEY_PREVIOUS` and `THINKER_ROOT_USER` from the inherited environment. The Codex and DeepSeek Harness snippets read the key from `THINKER_AGENT_KEY`, so they work under `thinker run` as is.
 
 Agent keys are separate from management credentials. The CLI stores a newly created agent key in its local keystore and does not print it in `thinker agent setup` unless you pass `--reveal`. Use `thinker agent env my-app` to get the key and URL for your application; its output contains the key, so handle it as a secret.
 

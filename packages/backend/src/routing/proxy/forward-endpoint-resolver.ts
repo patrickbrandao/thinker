@@ -20,6 +20,7 @@ import {
   type ProviderEndpoint,
 } from './provider-endpoints';
 import { CustomProviderService } from '../custom-provider/custom-provider.service';
+import { stripModelPrefix } from './model-prefix';
 import { normalizeMinimaxSubscriptionBaseUrl } from '../provider-base-url';
 import {
   getBedrockMantleBaseUrl,
@@ -35,6 +36,7 @@ import {
   isXiaomiTokenPlanRegion,
 } from '../xiaomi-region';
 import { getZaiCodingPlanBaseUrl } from '../zai-region';
+import { allowsPrivateDestination } from '../../common/utils/private-url-policy';
 
 const XIAOMI_MODEL_PREFIXES = ['xiaomi/', 'mimo/', 'xiaomi-mimo/'] as const;
 
@@ -44,6 +46,8 @@ export interface CustomProviderEndpointConfig {
   api_kind?: 'openai' | 'anthropic' | null;
   local_type?: string | null;
   local_config?: { request_timeout_ms?: number } | null;
+  /** What the private-URL policy allowed whoever registered it (default true). */
+  allow_private_destination?: boolean | null;
 }
 
 export interface ResolveForwardEndpointParams {
@@ -54,6 +58,13 @@ export interface ResolveForwardEndpointParams {
   model: string;
   /** Persisted region for the credential (e.g. `cn`), when known. */
   providerRegion?: string | null;
+  /**
+   * The API-key connection's own base URL. Wins over the region and the
+   * built-in endpoint; only the base changes, the API paths stay the same.
+   */
+  providerBaseUrl?: string | null;
+  /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
+  providerBaseUrlAllowsPrivate?: boolean;
   /** OAuth resource_url (MiniMax region base URL), when present. */
   resourceUrl?: string;
   /**
@@ -87,6 +98,8 @@ export function resolveForwardEndpoint(
     authType,
     model,
     providerRegion,
+    providerBaseUrl,
+    providerBaseUrlAllowsPrivate,
     resourceUrl,
     customProvider,
     logger,
@@ -135,11 +148,27 @@ export function resolveForwardEndpoint(
         customProvider.base_url,
         customProvider.api_kind ?? 'openai',
         customProvider.local_type
-          ? { timeoutMs: customProvider.local_config?.request_timeout_ms }
+          ? {
+              timeoutMs: customProvider.local_config?.request_timeout_ms,
+              localType: customProvider.local_type,
+            }
           : undefined,
+      );
+      customEndpoint.allowPrivateDestination = allowsPrivateDestination(
+        customProvider.allow_private_destination,
       );
       forwardModel = CustomProviderService.rawModelName(model);
     }
+  } else if (providerBaseUrl && authType === 'api_key' && resolveEndpointKey(provider)) {
+    const key = resolveEndpointKey(provider)!;
+    const overrideKey = key === 'bedrock' ? resolveBedrockEndpointKey(model, apiMode) : key;
+    customEndpoint = buildEndpointOverride(providerBaseUrl, overrideKey);
+    // The override reaches ProviderClient as a custom endpoint, which forwards
+    // the model untouched; strip the catalog prefix (opencode-go/glm-5.3) here,
+    // exactly as the native endpoint would have.
+    forwardModel = stripModelPrefix(forwardModel, overrideKey);
+    customEndpoint.allowPrivateDestination = allowsPrivateDestination(providerBaseUrlAllowsPrivate);
+    if (overrideKey === 'anthropic') customEndpoint.anthropicAccountOverride = true;
   } else if (resolveEndpointKey(provider) === 'bedrock' && isBedrockRegion(providerRegion)) {
     const bedrockEndpointKey = resolveBedrockEndpointKey(model, apiMode);
     customEndpoint = buildEndpointOverride(

@@ -4,6 +4,34 @@ import type { Catalog } from '../../types.js';
 const modelos = (n: number) => `${n} modelo${n === 1 ? '' : 's'}`;
 
 const ptBR: Catalog<typeof en> = {
+  wizard: {
+    steps: 'Passos',
+    stepType: 'Tipo',
+    stepParams: 'Parâmetros',
+    chooseType: 'Qual tipo de conta?',
+    next: 'Avançar',
+    back: 'Voltar',
+    typeChosen: 'Tipo:',
+    variant: {
+      zen: { label: 'Zen (pago)', hint: 'Sua chave de API do OpenCode, cobrada por uso.' },
+      free: { label: 'Grátis', hint: 'A chave pública `public`: só os modelos gratuitos.' },
+      console: { label: 'Console', hint: 'Entrar no OpenCode Console.' },
+      go: { label: 'Go', hint: 'Plano OpenCode Go: entrar ou colar a chave.' },
+      minimaxLogin: { label: 'Entrar', hint: 'Login com a sua conta MiniMax.' },
+      minimaxToken: { label: 'Colar token', hint: 'Colar um token do Coding Plan (sk-cp-…).' },
+      vertexExpress: { label: 'Modo express', hint: 'Só a chave de API; poucos modelos Gemini.' },
+      vertexProject: {
+        label: 'Projeto',
+        hint: 'Projeto e localização do Google Cloud (projeto/local).',
+      },
+    },
+  },
+  baseUrlField: {
+    label: 'URL base',
+    restore: 'Restaurar padrão',
+    hint: 'Vazio mantém a URL oficial mostrada.',
+    warning: 'A chave de API será enviada para esta URL.',
+  },
   shared: {
     connectProvider: 'Conectar provedor',
     backToProviders: 'Voltar para os provedores',
@@ -23,8 +51,10 @@ const ptBR: Catalog<typeof en> = {
     connected: '{{ name }} conectado',
     subscriptionConnected: 'Assinatura do {{ name }} conectada',
     subscriptionDisconnected: 'Assinatura do {{ name }} desconectada',
-    popupBlocked: 'O navegador bloqueou o pop-up. Permita pop-ups para este site e tente de novo.',
+    popupBlockedOpenLink:
+      'O navegador bloqueou a janela de login. Abra este link em outro navegador, ou copie-o; esta tela continua aguardando.',
     addConnection: 'Adicionar conexão',
+    newConnectionFor: 'Nova conexão: {{ name }}',
     reauthConnection: 'Autenticar novamente: {{ label }}',
     reauthNote:
       'O próximo login substitui a credencial de "{{ label }}". O acesso dos harnesses, as rotas e o histórico continuam como estão.',
@@ -35,7 +65,18 @@ const ptBR: Catalog<typeof en> = {
     getProduct: 'Obter {{ name }} ↗',
     beta: 'beta',
   },
+  goUsage: {
+    title: 'Uso do OpenCode Go',
+    rolling: '5 horas',
+    weekly: 'Semana',
+    monthly: 'Mês',
+    limited: 'Limite atingido',
+    resetsAt: 'Renova em {{ time }}',
+  },
   keyForm: {
+    nameTaken: 'Já existe uma conexão chamada {{ label }}. Escolha outro nome.',
+    freeKeyHint:
+      'A chave {{ key }} dá só os modelos gratuitos, como numa instalação nova do OpenCode, com limite diário definido pelo provedor. Alguns podem usar seus dados para treinamento. Cole sua chave de API para liberar todos os modelos.',
     nounApiKey: 'chave de API',
     nounSetupToken: 'token de configuração',
     pasteToken: 'Cole o token',
@@ -218,6 +259,7 @@ const ptBR: Catalog<typeof en> = {
     connectWith: 'Conectar com {{ name }}',
     codingPlanToken: 'Token do Coding Plan do {{ name }}',
     connectWithToken: 'Conectar com token',
+    connectionMethod: 'Como conectar {{ name }}',
     tabOpened:
       'Uma nova aba foi aberta com a página de autorização do {{ name }}. Aprove a solicitação lá para concluir a conexão.',
   },
@@ -247,7 +289,7 @@ const ptBR: Catalog<typeof en> = {
   catalog: {
     subtitles: {
       cerebras: 'GPT-OSS, GLM, Gemma na inferência da Cerebras',
-      pioneer: 'Inferência compatível com OpenAI e modelos Pioneer ajustados',
+      pioneer: 'Inferência compatível com OpenAI e modelos Fastino ajustados (antiga Pioneer)',
       groq: 'Llama 4, Qwen, GPT-OSS. Inferência rápida',
       huggingface: 'Modelos abertos pelos Inference Providers do Hugging Face',
       kilo: 'Acesso unificado a modelos pelo Kilo Gateway',
@@ -256,7 +298,7 @@ const ptBR: Catalog<typeof en> = {
       meta: 'Muse Spark 1.2, Contributor e 1.1',
       ollama: 'Llama, Qwen, Gemma e mais',
       ollamaCloud: 'DeepSeek V4, GLM, Kimi, MiniMax na nuvem',
-      opencodeZen: 'Seleção de Claude, GPT, DeepSeek, MiMo, Nemotron',
+      opencode: 'Por uso: Claude, GPT, Gemini e modelos gratuitos',
       nous: 'Modelos do OpenRouter via NousResearch Portal',
       openrouter: 'Roteamento automático para mais de 300 modelos',
     },
@@ -265,11 +307,34 @@ const ptBR: Catalog<typeof en> = {
     signInWithGoogle: 'Entrar com Google',
     pasteYourKey: 'Cole a chave de API do {{ name }}',
     signInTo: 'Entrar no {{ name }}',
-    opencodeSignInHint: 'Entre no OpenCode Go para obter sua chave de API.',
-    commandCodeRequirement: 'Requer o Command Code Pro ou superior.',
+    opencodeGoMethod: {
+      login: 'Login no OpenCode Console (recomendado)',
+      loginHint:
+        'Entre pelo navegador com um código de dispositivo. O token renova sozinho e a página da conta mostra o medidor de cota (5 horas, semana, mês).',
+      token: 'Chave de API',
+      tokenHint:
+        'Cole uma chave criada no Console do OpenCode. A inferência funciona, mas sem medidor de cota: a chave não informa a organização.',
+    },
+    commandCodeRequirement:
+      'Requer um plano do Command Code com acesso à API (qualquer plano, menos o Go).',
+    termsWarning: {
+      gemini:
+        'Os termos do Google proíbem usar o login do Gemini CLI em software de terceiros; a conta pode ser suspensa. O caminho suportado é uma chave da API Gemini em Provedores por uso.',
+      qwen: 'O Token Plan é para ferramentas de código interativas; scripts automatizados e backends de aplicação não são permitidos. O tráfego por gateway pode ser visto como automação e a chave suspensa.',
+      xiaomi:
+        'A cota do MiMo Token Plan só vale em ferramentas de programação; scripts e backends de aplicação são proibidos e a chave pode ser bloqueada.',
+      zai: 'Use uma chave do GLM Coding Plan: a chave Standard não consome o plano e cobra do saldo. O plano é limitado às ferramentas de código oficialmente suportadas; violações podem gerar limitação ou banimento.',
+      xai: 'O Thinker acessa a assinatura Grok pelo proxy do Grok CLI oficial e se identifica como esse cliente. A xAI não publica termos que autorizem gateways de terceiros; use por sua conta e risco.',
+    },
     geminiClosed:
       'O Google não permite mais novos logins do Gemini em apps fora do Google. As conexões existentes continuam funcionando. Para adicionar o Gemini, conecte uma chave de API do Gemini em Provedores por uso.',
-    minimaxDivider: 'Ou cole seu token do Coding Plan',
+    minimaxMethod: {
+      login: 'Login na MiniMax (recomendado)',
+      loginHint: 'Entre pelo navegador com um código de dispositivo. O token renova sozinho.',
+      token: 'Token do Coding Plan',
+      tokenHint:
+        'Cole o token sk-cp- da página do seu Coding Plan. Ele não renova; troque quando mudar.',
+    },
     regions: {
       autoDetect: 'Detectar automaticamente',
       chinaBeijing: 'China (Pequim)',
@@ -297,6 +362,8 @@ const ptBR: Catalog<typeof en> = {
       mimoCn: 'China (token-plan-cn)',
       mimoSgp: 'Singapura (token-plan-sgp)',
       mimoAms: 'Europa (token-plan-ams)',
+      vertexExpress: 'Modo express (só a chave; poucos modelos)',
+      vertexProject: 'Projeto e localização (projeto/localização)',
       zaiGlobal: 'Fora da China (api.z.ai)',
       zaiCn: 'China continental (open.bigmodel.cn)',
     },

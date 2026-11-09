@@ -894,6 +894,16 @@ describe('CustomProviderService', () => {
       await svc.update('cp1', 'tenant-1', { base_url: 'https://b.example' });
       expect(validatePublicUrl).toHaveBeenCalledWith('https://b.example', { allowPrivate: true });
       expect(existing.base_url).toBe('https://b.example');
+      expect(existing.allow_private_destination).toBe(true);
+    });
+
+    it('records that a caller without private access saved the URL (checked at every connection)', async () => {
+      const existing = { id: 'cp1', name: 'n', base_url: 'a' } as CustomProvider;
+      const { svc } = makeDeps({ findOneResults: [existing] });
+      await svc.update('cp1', 'tenant-1', { base_url: 'https://b.example' }, null, {
+        allowPrivate: false,
+      });
+      expect(existing.allow_private_destination).toBe(false);
     });
 
     it('passes allowPrivate=true to validatePublicUrl with no deployment mode configured', async () => {

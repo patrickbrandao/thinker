@@ -1,21 +1,25 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   MarkerType,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  SelectionMode,
   useEdgesState,
   useNodesState,
   useReactFlow,
 } from '@xyflow/react';
+import { BroomSparkles, Hand, SquareDashedMousePointer } from 'lucide-react';
 import { nodeTypes } from './nodes.jsx';
 import { edgeTypes } from './edges.jsx';
-import { GRID, validEdges } from './layout.js';
+import { DRAG_SNAP, GRID, validEdges } from './layout.js';
 import type { FlowNode, Graph } from './types.js';
 import { cx } from '../ui.jsx';
+import { t } from '../../i18n/index.js';
 
 export interface FlowLegendItem {
   id: string;
@@ -36,6 +40,8 @@ export interface FlowCanvasProps {
   editable?: boolean;
   /** Called after a drag, with every moved node at its new position. */
   onNodesMoved?: (nodes: FlowNode[]) => void;
+  /** Adds a reset-layout button to the controls; the page confirms and resets. */
+  onResetLayout?: () => void;
 }
 
 // Sized in pixels (14 stroke units of the base 1.6 line), so it keeps its size on thicker lines.
@@ -47,14 +53,37 @@ const ARROW = {
   markerUnits: 'userSpaceOnUse',
 };
 
-function Canvas({ graph, legend, hint, onNodeOpen, editable, onNodesMoved }: FlowCanvasProps) {
+function Canvas({
+  graph,
+  legend,
+  hint,
+  onNodeOpen,
+  editable,
+  onNodesMoved,
+  onResetLayout,
+}: FlowCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
   const flow = useReactFlow();
   const shape = useRef('');
+  // Dragging empty space pans the stage (hand) or draws a selection box (select).
+  const [selecting, setSelecting] = useState(false);
 
   useEffect(() => {
-    setNodes(graph.nodes);
+    // A data refresh or a saved move keeps the user's selection, and never
+    // moves a node that is being dragged (it would jump back, then return).
+    setNodes((prev) => {
+      const current = new Map(prev.map((n) => [n.id, n]));
+      return graph.nodes.map((n) => {
+        const old = current.get(n.id);
+        if (!old?.selected && !old?.dragging) return n;
+        return {
+          ...n,
+          selected: old.selected,
+          ...(old.dragging ? { dragging: true, position: old.position } : {}),
+        };
+      });
+    });
     setEdges(
       validEdges(graph.nodes, graph.edges).map((e) => ({
         type: 'flow',
@@ -85,7 +114,7 @@ function Canvas({ graph, legend, hint, onNodeOpen, editable, onNodesMoved }: Flo
   }, [flow]);
 
   return (
-    <div className="stage-wrap">
+    <div className={cx('stage-wrap', selecting && 'is-selecting')}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -98,14 +127,37 @@ function Canvas({ graph, legend, hint, onNodeOpen, editable, onNodesMoved }: Flo
         nodesDraggable={editable === true}
         nodesConnectable={false}
         elementsSelectable
+        // In select mode the middle and right buttons still pan.
+        panOnDrag={selecting ? [1, 2] : true}
+        selectionOnDrag={selecting}
+        selectionMode={SelectionMode.Partial}
+        zoomOnDoubleClick={false}
         snapToGrid
-        snapGrid={[GRID, GRID]}
+        snapGrid={[DRAG_SNAP, DRAG_SNAP]}
         minZoom={0.2}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={GRID} size={1} />
-        <Controls position="bottom-left" showInteractive={false} />
+        <Controls position="bottom-left" showInteractive={false}>
+          <ControlButton
+            onClick={() => setSelecting((on) => !on)}
+            title={selecting ? t('shell.flow.selectMode') : t('shell.flow.panMode')}
+            aria-label={selecting ? t('shell.flow.selectMode') : t('shell.flow.panMode')}
+            aria-pressed={selecting}
+          >
+            {selecting ? <SquareDashedMousePointer /> : <Hand />}
+          </ControlButton>
+          {onResetLayout ? (
+            <ControlButton
+              onClick={onResetLayout}
+              title={t('shell.flow.resetLayout')}
+              aria-label={t('shell.flow.resetLayout')}
+            >
+              <BroomSparkles />
+            </ControlButton>
+          ) : null}
+        </Controls>
         {nodes.length > 24 ? <MiniMap pannable zoomable position="top-right" /> : null}
       </ReactFlow>
       {hint ? <div className="stage-hint">{hint}</div> : null}

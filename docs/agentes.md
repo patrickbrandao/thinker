@@ -6,6 +6,7 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 |---|---|---|---|---|
 | Principal | `CLAUDE.md` | sessão | Recebe pedidos, implementa e publica conforme o [ADR 0005](adr/0005-modo-autonomo.md) | Sim |
 | Manifest | `manifest-tracker.md` | Sonnet | Acompanha o upstream e abre issues `upstream` | Não (só `upstream/`) |
+| LiteLLM | `litellm-expert.md` | Sonnet | Estuda o código atual do LiteLLM Proxy (clone raso em `~/.cache/thinker/litellm`), responde como ele faz X e ranqueia recursos que o Thinker não tem, em [`docs/referencia/litellm/`](referencia/litellm/) | Não (só `docs/referencia/litellm/`) |
 | QA Docker | `qa-docker.md` | Sonnet | Build da imagem e testes no Docker local | Não |
 | Revisor | `reviewer.md` | herda | Revisão sob demanda: bugs, segurança, isolamento | Não |
 | Backend | `backend-dev.md` | herda | NestJS, TypeORM, proxy, CLI, MCP | Sim |
@@ -14,6 +15,15 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 | Arquiteto | `architect.md` | herda | Desenho de features e ADRs | Só `docs/` e issues (também planeja milestones e abre as issues) |
 | DevOps | `devops.md` | herda | CI, imagem multi-arch, Docker Hub, releases | Sim (infra) |
 | Docs PT-BR | `docs-ptbr.md` | Sonnet | Documentação e notas de release | Só docs |
+| Pesquisadores de sistemas externos (68) | `api-*.md`, `sub-*.md`, `local-*.md`, `harness-*.md` | herda | Um por entidade externa: mantém o dossiê em [`docs/externos/`](externos/README.md) e abre issues `externo` | Não (só o próprio dossiê) |
+
+## LiteLLM
+
+O `litellm-expert` responde tudo sobre o [LiteLLM Proxy](https://github.com/BerriAI/litellm) a partir do código atualizado do GitHub (um clone raso compartilhado entre worktrees, atualizado quando tem mais de um dia). Ele grava em `docs/referencia/litellm/` um índice (`README.md`, com o SHA revisado), o ranking `recursos.md` (recursos que o Thinker não tem, com valor, esforço, encaixe nos ADRs e onde ficariam no código) e um `<tema>.md` por pergunta. Não abre issues nem faz commit; o Principal revisa o diff e publica (`docs(litellm): ...`).
+
+## Pesquisadores de sistemas externos
+
+Cada provedor (por forma de acesso: API ou assinatura), runtime local e harness suportado tem um agente próprio que estuda a fonte da verdade e mantém uma especificação para o Principal. O procedimento comum está em [`.claude/external-research.md`](../.claude/external-research.md); a lista completa, o formato do dossiê e como acionar estão em [`docs/externos/README.md`](externos/README.md). Uma entidade nova ganha agente, dossiê e linha no índice de `docs/externos/`, não nesta tabela.
 
 ## Execuções agendadas
 

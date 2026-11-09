@@ -2,7 +2,7 @@
 # Thinker: https://github.com/patrickbrandao/thinker
 services:
   thinker:
-    image: tmsoftbrasil/thinker:0.1
+    image: tmsoftbrasil/thinker:0.32
     restart: unless-stopped
     stop_grace_period: 30s
     environment:

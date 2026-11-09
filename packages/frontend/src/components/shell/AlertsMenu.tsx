@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Bell, CircleCheck } from 'lucide-react';
 import { getAlerts, type AlertItem } from '../../services/api/console.js';
+import { listAlertEvents, markAlertRead, markAllAlertsRead } from '../../services/api/alerts.js';
 import { analyticsPing } from '../../services/sse.js';
 import { formatRelativeTime } from '../../services/formatters.js';
 import { useSignal } from '../../lib/signal.js';
 import { useResource } from '../../lib/use-resource.js';
-import { t } from '../../i18n/index.js';
-import { cx, IconButton, Menu } from '../ui.jsx';
+import { t, tMaybe } from '../../i18n/index.js';
+import { Badge, cx, IconButton, Menu } from '../ui.jsx';
 
 const SEEN_KEY = 'thinker.alertsSeenAt';
 const POLL_MS = 60_000;
@@ -34,16 +35,24 @@ function alertTitle(item: AlertItem): string {
   return [status, item.errorClass].filter(Boolean).join(' · ') || item.status;
 }
 
+const BELL_EVENTS = 6;
+const LEVEL_TONE = { error: 'danger', warning: 'warn', info: 'info' } as const;
+
 /**
- * The topbar bell: failed requests of the last 24 hours, newest first. The
- * badge counts the ones newer than the last time the list was opened (kept
- * per browser). Refreshes when new requests arrive and once a minute.
+ * The topbar bell: unread alerts (read state shared by the workspace) and
+ * failed requests of the last 24 hours. For failed requests the badge counts
+ * the ones newer than the last time they were marked seen (kept per
+ * browser). Refreshes when new requests arrive and once a minute.
  */
 export default function AlertsMenu() {
   const ping = useSignal(analyticsPing);
   const [tick, setTick] = useState(0);
   const [seenAt, setSeenAt] = useState(readSeenAt);
   const alerts = useResource(getAlerts, [ping, tick]);
+  const events = useResource(
+    () => listAlertEvents({ unread: true, limit: BELL_EVENTS }),
+    [ping, tick],
+  );
 
   useEffect(() => {
     const id = setInterval(() => setTick((n) => n + 1), POLL_MS);
@@ -51,7 +60,17 @@ export default function AlertsMenu() {
   }, []);
 
   const items = alerts.data?.items ?? [];
-  const unseen = items.filter((i) => Date.parse(i.timestamp) > seenAt).length;
+  const unseenRequests = items.filter((i) => Date.parse(i.timestamp) > seenAt).length;
+  const unreadEvents = events.data?.events ?? [];
+  const unread = events.data?.unread ?? 0;
+  const unseen = unseenRequests + unread;
+
+  const readEvent = (id: string) => {
+    void markAlertRead(id).then(() => events.reload());
+  };
+  const readAllEvents = () => {
+    void markAllAlertsRead().then(() => events.reload());
+  };
 
   const markSeen = () => {
     const now = Date.now();
@@ -71,6 +90,7 @@ export default function AlertsMenu() {
           onClick={() => {
             props.onClick();
             void alerts.reload();
+            void events.reload();
           }}
         >
           <Bell />
@@ -82,7 +102,7 @@ export default function AlertsMenu() {
         <>
           <div className="alerts-head">
             <strong className="text-[13px] text-ink">{t('shell.alerts.title')}</strong>
-            {unseen > 0 ? (
+            {unseenRequests > 0 ? (
               <button type="button" className="link-action text-xs" onClick={markSeen}>
                 {t('shell.alerts.markSeen')}
               </button>
@@ -90,6 +110,45 @@ export default function AlertsMenu() {
               <span className="text-xs text-faint">{t('shell.alerts.window')}</span>
             )}
           </div>
+          {unreadEvents.length > 0 ? (
+            <>
+              <div className="alerts-section">
+                <span>{t('alerts.bell.events')}</span>
+                <button type="button" className="link-action text-xs" onClick={readAllEvents}>
+                  {t('alerts.markAllRead')}
+                </button>
+              </div>
+              <div className="alerts-list">
+                {unreadEvents.map((e) => (
+                  <Link
+                    key={e.id}
+                    to="/alerts"
+                    className="alert-row is-unseen"
+                    data-menu-close
+                    onClick={() => readEvent(e.id)}
+                  >
+                    <span className="alert-title">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <Badge tone={LEVEL_TONE[e.level] ?? 'neutral'}>
+                          {tMaybe(`alerts.level.${e.level}`) ?? e.level}
+                        </Badge>
+                        <span className="truncate">{e.title}</span>
+                      </span>
+                      <span className="shrink-0 text-xs font-normal text-faint">
+                        {formatRelativeTime(e.created_at)}
+                      </span>
+                    </span>
+                    {e.message ? (
+                      <span className="mt-0.5 block line-clamp-2 text-dim">{e.message}</span>
+                    ) : null}
+                  </Link>
+                ))}
+              </div>
+              <div className="alerts-section">
+                <span>{t('alerts.bell.requests')}</span>
+              </div>
+            </>
+          ) : null}
           <div className="alerts-list">
             {items.length === 0 ? (
               <div className="empty">
@@ -121,10 +180,8 @@ export default function AlertsMenu() {
             )}
           </div>
           <div className="alerts-foot">
-            <Link to="/messages?status=failed" data-menu-close onClick={markSeen}>
-              {alerts.data && alerts.data.total > items.length
-                ? t('shell.alerts.viewAllCount', alerts.data.total)
-                : t('shell.alerts.viewAll')}
+            <Link to="/alerts" data-menu-close onClick={markSeen}>
+              {t('alerts.bell.viewAll')}
             </Link>
           </div>
         </>

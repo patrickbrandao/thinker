@@ -20,8 +20,14 @@ export interface CachedProviderKey {
   priority: number;
   apiKey: string | null;
   region: string | null;
+  /** `tenant_providers.base_url` of an API-key connection, else null. */
+  baseUrl?: string | null;
+  /** `tenant_providers.allow_private_destination` (absent = allowed). */
+  baseUrlAllowsPrivate?: boolean;
   /** `tenant_providers.stream_warmup_ms` (#244); absent for the synthetic Ollama key. */
   streamWarmupMs?: number | null;
+  /** `tenant_providers.stream_idle_timeout_ms`; absent for the synthetic Ollama key. */
+  streamIdleTimeoutMs?: number | null;
 }
 
 function getOrExpire<T>(map: Map<string, CachedEntry<T>>, key: string): T | undefined {

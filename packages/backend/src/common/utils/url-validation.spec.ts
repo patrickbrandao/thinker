@@ -73,6 +73,20 @@ describe('isPrivateIp', () => {
     expect(isPrivateIp('fe80::1')).toBe(true);
   });
 
+  // Docker networks often use these: an IPv6-enabled bridge on 2001:db8::/32
+  // and default-address-pools on 198.18.0.0/15. Neither is globally routed.
+  it('detects 2001:db8::/32 (documentation) as private', () => {
+    expect(isPrivateIp('2001:db8:10:249::6')).toBe(true);
+    expect(isPrivateIp('2001:0DB8::1')).toBe(true);
+    expect(isPrivateIp('2001:db9::1')).toBe(false);
+  });
+
+  it('detects 198.18.0.0/15 (benchmarking) as private', () => {
+    expect(isPrivateIp('198.18.128.11')).toBe(true);
+    expect(isPrivateIp('198.19.255.255')).toBe(true);
+    expect(isPrivateIp('198.20.0.1')).toBe(false);
+  });
+
   it('detects ::ffff:127.0.0.1 as private (mapped IPv4)', () => {
     expect(isPrivateIp('::ffff:127.0.0.1')).toBe(true);
   });
@@ -130,7 +144,7 @@ describe('isPrivateIp', () => {
   });
 
   it('handles a full (uncompressed) IPv6 literal as public', () => {
-    expect(isPrivateIp('2001:db8:0:0:0:0:0:1')).toBe(false);
+    expect(isPrivateIp('2606:4700:0:0:0:0:0:1111')).toBe(false);
   });
 });
 

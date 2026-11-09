@@ -1,3 +1,4 @@
+import { oneHourCacheCreation } from './anthropic-adapter';
 import { Response as ExpressResponse } from 'express';
 import type { EventSourceMessage } from 'eventsource-parser';
 import {
@@ -27,10 +28,46 @@ export interface StreamUsage {
   completion_tokens: number;
   cache_read_tokens?: number;
   cache_creation_tokens?: number;
+  /** Subset of `cache_creation_tokens` cached with Anthropic's one-hour TTL. */
+  cache_creation_1h_tokens?: number;
   reported_cost_usd?: number;
 }
 
+const PARTIAL_USAGE = Symbol('thinker.partialUsage');
+
+/**
+ * Usage the provider had already reported when a stream broke off (client
+ * disconnect, idle timeout, upstream failure). Anthropic sends input usage in
+ * `message_start`, so a cancelled request still has a real cost to record.
+ */
+export function attachPartialUsage(error: unknown, usage: StreamUsage | null | undefined): void {
+  if (!usage || error === null || typeof error !== 'object') return;
+  try {
+    Object.defineProperty(error, PARTIAL_USAGE, { value: usage, configurable: true });
+  } catch {
+    // A frozen error simply carries no usage.
+  }
+}
+
+export function partialUsageOf(error: unknown): StreamUsage | undefined {
+  if (error === null || typeof error !== 'object') return undefined;
+  return (error as { [PARTIAL_USAGE]?: StreamUsage })[PARTIAL_USAGE];
+}
+
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 180_000;
+
+/** Bounds of a per-connection idle timeout override. */
+export const MIN_STREAM_IDLE_OVERRIDE_MS = 1_000;
+export const MAX_STREAM_IDLE_OVERRIDE_MS = 3_600_000;
+
+export function validStreamIdleOverride(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= MIN_STREAM_IDLE_OVERRIDE_MS &&
+    value <= MAX_STREAM_IDLE_OVERRIDE_MS
+    ? value
+    : undefined;
+}
 
 export function parseStreamIdleTimeoutMs(rawValue = process.env.STREAM_IDLE_TIMEOUT_MS): number {
   if (!rawValue) return DEFAULT_STREAM_IDLE_TIMEOUT_MS;
@@ -130,6 +167,9 @@ export function parseUsageObject(usage: unknown): StreamUsage | null {
       completion_tokens: typeof u.completion_tokens === 'number' ? u.completion_tokens : 0,
       cache_read_tokens: cacheRead,
       cache_creation_tokens: cacheCreation,
+      ...(typeof u.cache_creation_1h_tokens === 'number' && u.cache_creation_1h_tokens > 0
+        ? { cache_creation_1h_tokens: u.cache_creation_1h_tokens }
+        : {}),
       ...(reportedCostUsd !== undefined ? { reported_cost_usd: reportedCostUsd } : {}),
     };
   }
@@ -171,6 +211,9 @@ export function parseUsageObject(usage: unknown): StreamUsage | null {
       completion_tokens: typeof u.output_tokens === 'number' ? u.output_tokens : 0,
       cache_read_tokens: isAnthropicNative ? nativeCacheRead : cacheRead || undefined,
       cache_creation_tokens: isAnthropicNative ? nativeCacheCreation : nestedCacheCreation,
+      ...(isAnthropicNative && oneHourCacheCreation(u) > 0
+        ? { cache_creation_1h_tokens: oneHourCacheCreation(u) }
+        : {}),
       ...(reportedCostUsd !== undefined ? { reported_cost_usd: reportedCostUsd } : {}),
     };
   }
@@ -346,6 +389,7 @@ export async function pipePassthrough(
     protocol.observer?.assertComplete();
   } catch (error) {
     if (isAbortAfterProviderOutcome(error, protocol.observer)) return capturedUsage;
+    attachPartialUsage(error, capturedUsage);
     streamFailed = error instanceof StreamFailure;
     if (error instanceof StreamIdleTimeoutError) await reader.cancel(error).catch(() => undefined);
     throw error;
@@ -460,6 +504,7 @@ export async function pipeStream(
     }
   } catch (error) {
     if (isAbortAfterProviderOutcome(error, protocol.observer)) return capturedUsage;
+    attachPartialUsage(error, capturedUsage);
     streamFailed = error instanceof StreamFailure;
     if (error instanceof StreamIdleTimeoutError) await reader.cancel(error).catch(() => undefined);
     throw error;

@@ -215,11 +215,11 @@ describe('SHARED_PROVIDER_BY_ID', () => {
   it('pioneer exposes API-key provider metadata', () => {
     const pioneer = SHARED_PROVIDER_BY_ID.get('pioneer');
     expect(pioneer).toBeDefined();
-    expect(pioneer!.displayName).toBe('Pioneer');
+    expect(pioneer!.displayName).toBe('Fastino');
     expect(pioneer!.openRouterPrefixes).toEqual([]);
-    expect(pioneer!.keyPrefix).toBe('pio_sk_');
+    expect(pioneer!.keyPrefix).toBe('fast_sk_');
     expect(pioneer!.minKeyLength).toBe(20);
-    expect(pioneer!.keyPlaceholder).toBe('pio_sk_...');
+    expect(pioneer!.keyPlaceholder).toBe('fast_sk_...');
   });
 
   it('nous exposes subscription-gateway provider metadata', () => {
@@ -261,6 +261,9 @@ describe('SHARED_PROVIDER_BY_ID', () => {
     expect(meta!.keyPlaceholder).toBe('LLM_...');
     expect(META_MODEL_API_CONTEXT_WINDOW).toBe(1_048_576);
     expect(META_MODEL_API_MODELS.map((model) => model.id)).toEqual([
+      'muse-spark-1.3',
+      'muse-spark-1.3-contributor',
+      'muse-wonder-1.0',
       'muse-spark-1.2',
       'muse-spark-1.2-contributor',
       'muse-spark-1.1',

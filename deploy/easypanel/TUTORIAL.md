@@ -21,7 +21,7 @@ If Thinker is available in your Easypanel template catalog:
 1. Open your Easypanel project.
 2. Choose **Templates**.
 3. Search for **Thinker**.
-4. Keep the default image `tmsoftbrasil/thinker:0.1` unless you need to pin another version.
+4. Keep the default image `tmsoftbrasil/thinker:0.32` unless you need to pin another version.
 5. Deploy the template.
 
 The template provisions Thinker, PostgreSQL, a persistent request-recording volume, generated secrets, and a domain proxy on port `2099`.
@@ -43,7 +43,7 @@ Create the Thinker app service:
 1. Click **Create Service**.
 2. Choose **App**.
 3. Set source type to **Docker image**.
-4. Use image `tmsoftbrasil/thinker:0.1`.
+4. Use image `tmsoftbrasil/thinker:0.32`.
 5. Set the proxy port to `2099`.
 6. Add your domain and mark it as the primary domain.
 
@@ -97,7 +97,7 @@ Before publishing a template, smoke test the full first-run flow:
 
 ## What Gets Provisioned
 
-- Thinker Docker image `tmsoftbrasil/thinker:0.1`.
+- Thinker Docker image `tmsoftbrasil/thinker:0.32`.
 - PostgreSQL service.
 - Generated or manually configured session and encryption secrets.
 - HTTPS domain proxy to Thinker port `2099`.

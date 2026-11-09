@@ -1,7 +1,7 @@
 import type { Response as ExpressResponse } from 'express';
 import { PlaygroundService } from './playground.service';
 import { CustomProviderService } from '../routing/custom-provider/custom-provider.service';
-import { OpencodeGoCatalogService } from '../model-discovery/opencode-go-catalog.service';
+import { OpencodeCatalogService } from '../model-discovery/opencode-catalog.service';
 import type { ProviderClient } from '../routing/proxy/provider-client';
 import type { ProviderKeyService } from '../routing/routing-core/provider-key.service';
 import type { PlaygroundAgentService } from './playground-agent.service';
@@ -88,7 +88,7 @@ const asRes = (r: MockRes): ExpressResponse => r as unknown as ExpressResponse;
 
 interface Mocks {
   customProviders: { canonicalizeAgentMessageKeys: jest.Mock };
-  opencodeGoCatalog: { resolveCostPerRequest: jest.Mock };
+  opencodeCatalog: { costInputs: jest.Mock };
   playgroundAgent: { resolve: jest.Mock };
   providerKeyService: {
     hasActiveProvider: jest.Mock;
@@ -155,7 +155,7 @@ function buildService(mocks: Partial<Mocks> = {}): { service: PlaygroundService;
           Promise.resolve({ provider, model }),
         ),
     },
-    opencodeGoCatalog: { resolveCostPerRequest: jest.fn().mockResolvedValue(null) },
+    opencodeCatalog: { costInputs: jest.fn().mockResolvedValue(null) },
     ...mocks,
   };
   const service = new PlaygroundService(
@@ -174,7 +174,7 @@ function buildService(mocks: Partial<Mocks> = {}): { service: PlaygroundService;
     full.messageRepo as unknown as Repository<AgentMessage>,
     full.customProviderRepo as unknown as Repository<CustomProvider>,
     full.customProviders as unknown as CustomProviderService,
-    full.opencodeGoCatalog as unknown as OpencodeGoCatalogService,
+    full.opencodeCatalog as unknown as OpencodeCatalogService,
   );
   return { service, mocks: full };
 }

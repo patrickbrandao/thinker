@@ -26,10 +26,10 @@ describe('CodexSetup', () => {
     expect(container.textContent).toContain('model_provider = "thinker"');
     expect(container.textContent).toContain('base_url = "http://localhost:38240/v1"');
     expect(container.textContent).toContain('wire_api = "responses"');
-    expect(container.textContent).toContain('env_key = "THINKER_API_KEY"');
+    expect(container.textContent).toContain('env_key = "THINKER_AGENT_KEY"');
     expect(container.textContent).not.toContain('[profiles.thinker]');
     expect(container.textContent).not.toContain('codex --profile');
-    expect(container.textContent).toContain('export THINKER_API_KEY="thk_YOUR_KEY"');
+    expect(container.textContent).toContain('export THINKER_AGENT_KEY="thk_YOUR_KEY"');
     expect(container.textContent).not.toContain('thk_live...');
     expect(screen.queryByLabelText('Reveal API key')).toBeNull();
 
@@ -45,7 +45,7 @@ describe('CodexSetup', () => {
 
     fireEvent.click(copyButtons[1]!);
     await vi.waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith('export THINKER_API_KEY="thk_YOUR_KEY"');
+      expect(writeText).toHaveBeenCalledWith('export THINKER_AGENT_KEY="thk_YOUR_KEY"');
     });
     expect(writeText).not.toHaveBeenCalledWith(expect.stringContaining('thk_live...'));
   });
@@ -55,21 +55,21 @@ describe('CodexSetup', () => {
       <CodexSetup apiKey="thk_secret" keyPrefix="thk_live" baseUrl="http://localhost:38240/v1" />,
     );
 
-    expect(container.textContent).toContain('export THINKER_API_KEY="thk_live..."');
+    expect(container.textContent).toContain('export THINKER_AGENT_KEY="thk_live..."');
     expect(container.textContent).not.toContain('thk_secret');
 
     fireEvent.click(screen.getByLabelText('Reveal API key'));
-    expect(container.textContent).toContain('export THINKER_API_KEY="thk_secret"');
+    expect(container.textContent).toContain('export THINKER_AGENT_KEY="thk_secret"');
 
     fireEvent.click(screen.getByLabelText('Hide API key'));
-    expect(container.textContent).toContain('export THINKER_API_KEY="thk_live..."');
+    expect(container.textContent).toContain('export THINKER_AGENT_KEY="thk_live..."');
 
     const copyButtons = container.querySelectorAll(
       '.setup-cli-block__actions [aria-label="Copy to clipboard"]',
     );
     fireEvent.click(copyButtons[1]!);
     await vi.waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith('export THINKER_API_KEY="thk_secret"');
+      expect(writeText).toHaveBeenCalledWith('export THINKER_AGENT_KEY="thk_secret"');
     });
   });
 });

@@ -308,7 +308,8 @@ describe('LimitCheckService', () => {
       const signal = mockEmit.mock.calls[0][0];
       expect(signal.periodStart).toBe(logged.periodStart);
       expect(signal.periodEnd).toBe(logged.periodEnd);
-      expect(mockHasAlreadySent).toHaveBeenCalledWith('r1', logged.periodStart);
+      expect(mockHasAlreadySent).toHaveBeenCalledWith('r1', logged.periodStart, 'hard');
+      expect(logged.alertType).toBe('hard');
     });
 
     it('neither logs nor emits when already notified for this period', async () => {

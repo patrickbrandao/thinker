@@ -14,7 +14,7 @@ import { hashKey, keyPrefix } from '../common/utils/hash.util';
 import { getSeedConnections } from './seed-messages';
 
 const OLD_USER_EMAIL = 'olduser@thinker.example.com';
-const OLD_USER_PASSWORD = 'thinker';
+const OLD_USER_PASSWORD = 'thinker123';
 const OLD_TENANT_ID = 'seed-tenant-old-001';
 const OLD_AGENT_ID = 'seed-agent-old-001';
 const OLD_OTLP_KEY_ID = 'seed-otlp-key-old-001';

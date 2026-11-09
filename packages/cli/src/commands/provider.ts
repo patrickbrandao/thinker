@@ -70,8 +70,8 @@ export async function providerList(io: CliIo, argv: string[]): Promise<void> {
 /**
  * The providers endpoint carries dashboard-only fields: `model_counts` is the
  * global catalog census (not your connections), `models_fetched_at` and
- * `priority` render freshness/ordering chrome, `key_prefix` decorates the key
- * card. Kept: `cached_model_count` (0 = discovery found nothing, routing will
+ * `priority` render freshness/ordering chrome, `key_prefix`/`key_masked` decorate
+ * the key card. Kept: `cached_model_count` (0 = discovery found nothing, routing will
  * fail on that connection), `is_active`, and `display_name` when set (custom
  * providers have no other human name).
  */
@@ -93,6 +93,7 @@ function stripProviderNoise(result: unknown, enabledSet?: Set<string>): unknown 
           if (typeof conn !== 'object' || conn === null) return conn;
           const c = { ...(conn as Record<string, unknown>) };
           delete c['key_prefix'];
+          delete c['key_masked'];
           delete c['priority'];
           delete c['models_fetched_at'];
           if (enabledSet && typeof c['id'] === 'string') {

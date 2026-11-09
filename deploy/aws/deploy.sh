@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 STACK_NAME="${STACK_NAME:-thinker}"
 SERVICE_NAME="${SERVICE_NAME:-thinker}"
-IMAGE_URL="${IMAGE_URL:-docker.io/tmsoftbrasil/thinker:0.1}"
+IMAGE_URL="${IMAGE_URL:-docker.io/tmsoftbrasil/thinker:0.32}"
 DESIRED_COUNT="${DESIRED_COUNT:-1}"
 DATABASE_INSTANCE_CLASS="${DATABASE_INSTANCE_CLASS:-db.t4g.micro}"
 DATABASE_DELETION_PROTECTION="${DATABASE_DELETION_PROTECTION:-false}"

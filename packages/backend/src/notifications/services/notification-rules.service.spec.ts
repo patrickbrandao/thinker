@@ -180,6 +180,11 @@ describe('NotificationRulesService', () => {
       ruleRepo.count.mockResolvedValueOnce(1);
       ruleRepo.findOneBy.mockResolvedValueOnce({
         id: 'r1',
+        metric_type: 'tokens',
+        threshold: 100,
+      } as NotificationRule);
+      ruleRepo.findOneBy.mockResolvedValueOnce({
+        id: 'r1',
         threshold: 200,
       } as NotificationRule);
 
@@ -189,6 +194,30 @@ describe('NotificationRulesService', () => {
         { id: 'r1' },
         expect.objectContaining({ threshold: 200, updated_at: expect.any(String) }),
       );
+    });
+
+    it('rejects a fractional threshold for a stored token rule', async () => {
+      ruleRepo.count.mockResolvedValueOnce(1);
+      ruleRepo.findOneBy.mockResolvedValueOnce({
+        id: 'r1',
+        metric_type: 'tokens',
+        threshold: 100,
+      } as NotificationRule);
+      await expect(service.updateRule('tenant-1', 'r1', { threshold: 0.5 })).rejects.toThrow(
+        'whole number',
+      );
+    });
+
+    it('accepts cents for a stored cost rule', async () => {
+      ruleRepo.count.mockResolvedValueOnce(1);
+      ruleRepo.findOneBy.mockResolvedValueOnce({
+        id: 'r1',
+        metric_type: 'cost',
+        threshold: 10,
+      } as NotificationRule);
+      ruleRepo.findOneBy.mockResolvedValueOnce({ id: 'r1', threshold: 0.5 } as NotificationRule);
+      const result = await service.updateRule('tenant-1', 'r1', { threshold: 0.5 });
+      expect(result?.threshold).toBe(0.5);
     });
 
     it('returns existing rule when no fields to update (skips UPDATE)', async () => {

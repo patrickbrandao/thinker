@@ -1,3 +1,4 @@
+import { baseUrlFields } from '../../routing/account-base-url-check';
 import { Controller, Get, Query } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -21,6 +22,7 @@ import {
 import { computeCutoff } from '../../common/utils/postgres-sql';
 import { sqlCastFloat, sqlSanitizeCost } from '../../common/utils/postgres-sql';
 import { rangeToInterval } from '../../common/utils/range.util';
+import { providerKeyDisplay } from '../../common/utils/provider-key-mask';
 
 @Controller('api/v1/provider-analytics')
 export class ProviderAnalyticsController {
@@ -416,10 +418,12 @@ export class ProviderAnalyticsController {
         auth_type: conn.auth_type,
         label: conn.label,
         cached_model_count: cachedModelCount,
-        key_prefix: conn.key_prefix,
+        ...providerKeyDisplay(conn),
         connected_at: conn.connected_at,
         is_active: conn.is_active,
         stream_warmup_ms: conn.stream_warmup_ms ?? null,
+        stream_idle_timeout_ms: conn.stream_idle_timeout_ms ?? null,
+        ...baseUrlFields(conn),
         last_used_at: lastUsedAt,
       },
       agents: (() => {

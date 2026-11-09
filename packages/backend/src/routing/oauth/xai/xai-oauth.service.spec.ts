@@ -129,7 +129,7 @@ describe('XaiOauthService', () => {
     expect(parsed.searchParams.get('scope')).toContain('grok-cli:access');
     expect(parsed.searchParams.get('scope')).toContain('api:access');
     expect(parsed.searchParams.has('plan')).toBe(false);
-    expect(parsed.searchParams.has('referrer')).toBe(false);
+    expect(parsed.searchParams.get('referrer')).toBe('grok-build');
     expect(parsed.searchParams.get('state')?.length).toBeGreaterThan(0);
     expect(svc.getPendingCount()).toBe(1);
   });

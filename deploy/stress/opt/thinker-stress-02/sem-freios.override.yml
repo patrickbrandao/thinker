@@ -1,0 +1,13 @@
+# /opt/thinker-stress-02/sem-freios.override.yml (copiado para /opt/thinker/docker-compose.override.yml pelo stress.sh --sem-freios)
+# sem limite de CPU e memoria, banco com fsync de verdade (I/O)
+services:
+  thinker-app:
+    cpus: 0
+    mem_limit: 0
+    environment:
+      NODE_OPTIONS: --max-old-space-size=32768
+  thinker-postgres:
+    cpus: 0
+    mem_limit: 0
+    command: [postgres, -c, max_connections=2000, -c, shared_buffers=16GB, -c, synchronous_commit=on,
+              -c, shared_preload_libraries=pg_stat_statements, -c, track_io_timing=on]

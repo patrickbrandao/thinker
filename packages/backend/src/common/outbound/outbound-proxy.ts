@@ -10,6 +10,7 @@ import {
 import { assertConnectableHost, pinnedDirectFetch, ssrfSafeLookup } from '../utils/ssrf-safe-fetch';
 import { getContainerHostAlias } from '../utils/container-host';
 import { Logger } from '@nestjs/common';
+import { planGroup, quarantineProxy, type BalanceMode, type EgressGroup } from './egress-balance';
 
 const logger = new Logger('OutboundProxy');
 
@@ -41,6 +42,7 @@ export type ProxySourceType = 'provider' | 'connection' | 'trigger' | 'email_con
 export type HopResult =
   | 'ok'
   | 'skipped_disabled'
+  | 'skipped_quarantine'
   | 'refused'
   | 'timeout'
   | 'auth_407'
@@ -67,14 +69,18 @@ export interface OutboundProxy {
   version: string;
 }
 
-export type EgressItem = { kind: 'proxy'; proxy: OutboundProxy } | { kind: 'direct' };
+/** One line of a chain: a proxy, Direct, or proxies balanced by affinity or per request. */
+export type EgressItem = { kind: 'proxy'; proxy: OutboundProxy } | { kind: 'direct' } | EgressGroup;
 
 export interface EgressHop {
   kind: 'proxy' | 'direct' | 'global';
   proxy_id: string | null;
   name: string;
-  /** 1-based position in the chain (1 for the global proxy and plain direct). */
+  /** 1-based line of the chain (1 for the global proxy and plain direct). */
   position: number;
+  /** Balanced line: how it balances, and the 1-based try inside the line. */
+  mode?: BalanceMode;
+  attempt?: number;
   result: HopResult;
   ms: number;
   tunnel_ms: number | null;
@@ -161,7 +167,7 @@ export function childScope(
 export function summarizeEgress(hops: EgressHop[]): EgressSummary | null {
   for (let i = hops.length - 1; i >= 0; i--) {
     const hop = hops[i]!;
-    if (hop.result === 'skipped_disabled') continue;
+    if (hop.result === 'skipped_disabled' || hop.result === 'skipped_quarantine') continue;
     return { kind: hop.kind, proxy_id: hop.proxy_id, name: hop.kind === 'proxy' ? hop.name : null };
   }
   return null;
@@ -554,6 +560,12 @@ export function classifyProxyError(error: unknown): ProxyErrorClass | null {
 export interface OutboundFetchOptions {
   /** User-supplied destination: pin direct connections to validated addresses. */
   pinDestination?: boolean;
+  /**
+   * With `pinDestination`: false also refuses private, LAN and loopback
+   * addresses on direct connections (a destination the private-URL policy did
+   * not allow when it was registered). Default true.
+   */
+  allowPrivateDestination?: boolean;
 }
 
 type FetchInit = RequestInit;
@@ -608,8 +620,15 @@ function countBody(response: Response, done: (bytes: number) => void): Response 
   });
 }
 
-function directFetch(url: string, init: FetchInit, pin: boolean): Promise<Response> {
-  return pin ? pinnedDirectFetch(url, init) : fetch(url, init);
+function directFetch(
+  url: string,
+  init: FetchInit,
+  pin: boolean,
+  allowPrivate = true,
+): Promise<Response> {
+  return pin
+    ? pinnedDirectFetch(url, init, allowPrivate ? {} : { allowPrivate: false })
+    : fetch(url, init);
 }
 
 /** One fetch through `proxy`. Throws the raw undici error on failure. */
@@ -642,6 +661,7 @@ async function runChain(
   url: string,
   init: FetchInit,
   pin: boolean,
+  allowPrivate = true,
 ): Promise<Response> {
   const target = new URL(url);
   const destination = destinationOf(target);
@@ -651,54 +671,143 @@ async function runChain(
   let held429: Response | null = null;
 
   for (let index = 0; index < chain.length; index++) {
-    const item = chain[index]!;
+    const line = chain[index]!;
     const position = index + 1;
-    const isLast = index === chain.length - 1;
-
-    if (item.kind === 'proxy' && !item.proxy.enabled) {
-      scope.hops.push({
-        kind: 'proxy',
-        proxy_id: item.proxy.id,
-        name: item.proxy.name,
-        position,
-        result: 'skipped_disabled',
-        ms: 0,
-        tunnel_ms: null,
-        status: null,
-      });
-      failures.push(`${item.proxy.name}: disabled`);
-      continue;
+    const lastLine = index === chain.length - 1;
+    const tries: Array<{ kind: 'proxy'; proxy: OutboundProxy } | { kind: 'direct' }> = [];
+    let balance: BalanceMode | null = null;
+    if (line.kind === 'group') {
+      balance = line.mode;
+      const plan = planGroup(line, lastLine);
+      for (const skip of plan.skipped) {
+        scope.hops.push({
+          kind: 'proxy',
+          proxy_id: skip.proxy.id,
+          name: skip.proxy.name,
+          position,
+          mode: line.mode,
+          result: skip.result,
+          ms: 0,
+          tunnel_ms: null,
+          status: null,
+        });
+        failures.push(
+          `${skip.proxy.name}: ${skip.result === 'skipped_disabled' ? 'disabled' : 'quarantine'}`,
+        );
+      }
+      for (const proxy of plan.order) tries.push({ kind: 'proxy', proxy });
+    } else {
+      tries.push(line);
     }
 
-    const startedAt = new Date();
-    const started = performance.now();
-    let response: Response;
-    let tunnelMs: number | null = null;
-    try {
-      if (item.kind === 'direct') {
-        response = await directFetch(url, init, pin);
-      } else {
-        ({ response, tunnelMs } = await fetchViaProxy(item.proxy, url, init));
-      }
-    } catch (error) {
-      const ms = Math.round(performance.now() - started);
-      const aborted = init.signal?.aborted === true;
-      const cls = item.kind === 'proxy' && !aborted ? classifyProxyError(error) : null;
-      if (!cls || item.kind !== 'proxy') {
-        // Direct errors, aborts and destination errors through a working
-        // tunnel follow the normal transport-error flow.
-        const hop: EgressHop = {
-          kind: item.kind,
-          proxy_id: item.kind === 'proxy' ? item.proxy.id : null,
-          name: item.kind === 'proxy' ? item.proxy.name : 'direct',
+    for (let t = 0; t < tries.length; t++) {
+      const item = tries[t]!;
+      const isLast = lastLine && t === tries.length - 1;
+      const tag = balance ? { mode: balance, attempt: t + 1 } : {};
+
+      if (item.kind === 'proxy' && !item.proxy.enabled) {
+        scope.hops.push({
+          kind: 'proxy',
+          proxy_id: item.proxy.id,
+          name: item.proxy.name,
           position,
-          result: 'error',
-          ms,
-          tunnel_ms: tunnelMs,
+          ...tag,
+          result: 'skipped_disabled',
+          ms: 0,
+          tunnel_ms: null,
           status: null,
-          error: errorMessage(error).slice(0, 300),
+        });
+        failures.push(`${item.proxy.name}: disabled`);
+        continue;
+      }
+
+      const startedAt = new Date();
+      const started = performance.now();
+      let response: Response;
+      let tunnelMs: number | null = null;
+      try {
+        if (item.kind === 'direct') {
+          response = await directFetch(url, init, pin, allowPrivate);
+        } else {
+          ({ response, tunnelMs } = await fetchViaProxy(item.proxy, url, init));
+        }
+      } catch (error) {
+        const ms = Math.round(performance.now() - started);
+        const aborted = init.signal?.aborted === true;
+        const cls = item.kind === 'proxy' && !aborted ? classifyProxyError(error) : null;
+        if (!cls || item.kind !== 'proxy') {
+          // Direct errors, aborts and destination errors through a working
+          // tunnel follow the normal transport-error flow.
+          const hop: EgressHop = {
+            kind: item.kind,
+            proxy_id: item.kind === 'proxy' ? item.proxy.id : null,
+            name: item.kind === 'proxy' ? item.proxy.name : 'direct',
+            position,
+            ...tag,
+            result: 'error',
+            ms,
+            tunnel_ms: tunnelMs,
+            status: null,
+            error: errorMessage(error).slice(0, 300),
+          };
+          scope.hops.push(hop);
+          if (item.kind === 'proxy') {
+            emit({
+              scope,
+              hop,
+              proxy: item.proxy,
+              destination,
+              startedAt,
+              bytesSent,
+              bytesReceived: 0,
+            });
+          }
+          if (held429) void held429.body?.cancel().catch(() => undefined);
+          throw error;
+        }
+        quarantineProxy(item.proxy.id);
+        const hop: EgressHop = {
+          kind: 'proxy',
+          proxy_id: item.proxy.id,
+          name: item.proxy.name,
+          position,
+          ...tag,
+          result: cls.result,
+          ms,
+          tunnel_ms: null,
+          status: cls.status,
+          error: cls.message,
         };
         scope.hops.push(hop);
+        emit({
+          scope,
+          hop,
+          proxy: item.proxy,
+          destination,
+          startedAt,
+          bytesSent: 0,
+          bytesReceived: 0,
+        });
+        failures.push(`${item.proxy.name}: ${cls.result}`);
+        continue;
+      }
+
+      const ms = Math.round(performance.now() - started);
+      const hop: EgressHop = {
+        kind: item.kind,
+        proxy_id: item.kind === 'proxy' ? item.proxy.id : null,
+        name: item.kind === 'proxy' ? item.proxy.name : 'direct',
+        position,
+        ...tag,
+        result: 'ok',
+        ms,
+        tunnel_ms: tunnelMs,
+        status: response.status,
+      };
+      scope.hops.push(hop);
+
+      if (response.status === 429 && !isLast) {
+        hop.result = 'upstream_429';
         if (item.kind === 'proxy') {
           emit({
             scope,
@@ -711,71 +820,18 @@ async function runChain(
           });
         }
         if (held429) void held429.body?.cancel().catch(() => undefined);
-        throw error;
+        held429 = response;
+        failures.push(`${hop.name}: upstream_429`);
+        continue;
       }
-      const hop: EgressHop = {
-        kind: 'proxy',
-        proxy_id: item.proxy.id,
-        name: item.proxy.name,
-        position,
-        result: cls.result,
-        ms,
-        tunnel_ms: null,
-        status: cls.status,
-        error: cls.message,
-      };
-      scope.hops.push(hop);
-      emit({
-        scope,
-        hop,
-        proxy: item.proxy,
-        destination,
-        startedAt,
-        bytesSent: 0,
-        bytesReceived: 0,
-      });
-      failures.push(`${item.proxy.name}: ${cls.result}`);
-      continue;
-    }
 
-    const ms = Math.round(performance.now() - started);
-    const hop: EgressHop = {
-      kind: item.kind,
-      proxy_id: item.kind === 'proxy' ? item.proxy.id : null,
-      name: item.kind === 'proxy' ? item.proxy.name : 'direct',
-      position,
-      result: 'ok',
-      ms,
-      tunnel_ms: tunnelMs,
-      status: response.status,
-    };
-    scope.hops.push(hop);
-
-    if (response.status === 429 && !isLast) {
-      hop.result = 'upstream_429';
-      if (item.kind === 'proxy') {
-        emit({
-          scope,
-          hop,
-          proxy: item.proxy,
-          destination,
-          startedAt,
-          bytesSent,
-          bytesReceived: 0,
-        });
-      }
       if (held429) void held429.body?.cancel().catch(() => undefined);
-      held429 = response;
-      failures.push(`${hop.name}: upstream_429`);
-      continue;
+      if (item.kind === 'direct') return response;
+      const proxy = item.proxy;
+      return countBody(response, (bytesReceived) =>
+        emit({ scope, hop, proxy, destination, startedAt, bytesSent, bytesReceived }),
+      );
     }
-
-    if (held429) void held429.body?.cancel().catch(() => undefined);
-    if (item.kind === 'direct') return response;
-    const proxy = item.proxy;
-    return countBody(response, (bytesReceived) =>
-      emit({ scope, hop, proxy, destination, startedAt, bytesSent, bytesReceived }),
-    );
   }
 
   // Everything after a 429 failed: hand back that 429 so key rotation runs.
@@ -840,10 +896,11 @@ export async function outboundFetch(
 ): Promise<Response> {
   const href = typeof url === 'string' ? url : url.href;
   const pin = opts.pinDestination === true;
+  const allowPrivate = opts.allowPrivateDestination !== false;
   const scope = currentOutboundScope();
   const chain = scope?.chain;
   if (scope && chain && chain.length > 0) {
-    return runChain(scope, chain, href, init, pin);
+    return runChain(scope, chain, href, init, pin, allowPrivate);
   }
   const global = getGlobalProxyConfig();
   const hostname = new URL(href).hostname;
@@ -851,7 +908,7 @@ export async function outboundFetch(
     return viaGlobal(global, scope, href, init);
   }
   const started = performance.now();
-  const response = await directFetch(href, init, pin);
+  const response = await directFetch(href, init, pin, allowPrivate);
   scope?.hops.push({
     kind: 'direct',
     proxy_id: null,

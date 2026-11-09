@@ -1,5 +1,6 @@
 import {
   toGoogleRequest,
+  googleResponseFailure,
   fromGoogleResponse,
   transformGoogleStreamChunk as transformGoogleStreamChunkRaw,
   createGoogleStreamState,
@@ -63,6 +64,7 @@ describe('Google Adapter', () => {
         messages: [
           { role: 'user', content: 'Hi' },
           { role: 'assistant', content: 'Hello!' },
+          { role: 'user', content: 'How are you?' },
         ],
       };
       const result = toGoogleRequest(body, 'gemini-2.0-flash');
@@ -1237,7 +1239,7 @@ describe('Google Adapter', () => {
       });
     });
 
-    it('falls back to unknown name when tool_call_id has no matching assistant call', () => {
+    it('sends an orphan tool result as text (no unmatched functionResponse)', () => {
       const body = {
         messages: [
           { role: 'user', content: 'Do something' },
@@ -1254,17 +1256,12 @@ describe('Google Adapter', () => {
         role: string;
         parts: Array<Record<string, unknown>>;
       }>;
-      // The id is still preserved (so the functionResponse can be paired if
-      // a later turn has the originating call), but the name degrades to the
-      // explicit placeholder because we have no way to resolve it.
-      expect(contents[1].parts[0].functionResponse).toEqual({
-        id: 'call_orphan',
-        name: 'unknown',
-        response: { result: '{"ok": true}' },
-      });
+      // Gemini 3.x/4 reject a functionResponse that matches no earlier call.
+      expect(contents[1].parts[0].functionResponse).toBeUndefined();
+      expect(contents[1].parts[0].text).toBe('Tool result call_orphan:\n{"ok": true}');
     });
 
-    it('omits functionResponse.id when tool_call_id is missing entirely', () => {
+    it('sends a tool result without tool_call_id as text', () => {
       const body = {
         messages: [
           { role: 'user', content: 'Do something' },
@@ -1277,10 +1274,7 @@ describe('Google Adapter', () => {
         role: string;
         parts: Array<Record<string, unknown>>;
       }>;
-      expect(contents[1].parts[0].functionResponse).toEqual({
-        name: 'unknown',
-        response: { result: '{"ok": true}' },
-      });
+      expect(contents[1].parts[0]).toEqual({ text: 'Tool result:\n{"ok": true}' });
     });
 
     it('sends tool message content parts as a functionResponse', () => {
@@ -2744,6 +2738,54 @@ describe('Google Adapter', () => {
         name: 'write_file',
         response: { result: 'ok' },
       });
+    });
+  });
+
+  describe('assistant prefill', () => {
+    it('moves a trailing assistant text turn into the system instruction', () => {
+      const result = toGoogleRequest(
+        {
+          messages: [
+            { role: 'system', content: 'Be terse.' },
+            { role: 'user', content: 'Give JSON' },
+            { role: 'assistant', content: '{"a":' },
+          ],
+        },
+        'gemini-3.6-flash',
+      );
+      const contents = result.contents as Array<{ role: string }>;
+      expect(contents.map((c) => c.role)).toEqual(['user']);
+      const sys = result.systemInstruction as { parts: Array<{ text: string }> };
+      expect(sys.parts[0].text).toContain('Be terse.');
+      expect(sys.parts[0].text).toContain('{"a":');
+    });
+  });
+
+  describe('googleResponseFailure', () => {
+    it('turns a blocked prompt into a 400 and tool failures into a 502', () => {
+      expect(googleResponseFailure({ promptFeedback: { blockReason: 'SAFETY' } })?.status).toBe(
+        400,
+      );
+      expect(
+        googleResponseFailure({ candidates: [{ finishReason: 'MALFORMED_FUNCTION_CALL' }] })
+          ?.status,
+      ).toBe(502);
+      expect(googleResponseFailure({ candidates: [{ finishReason: 'STOP' }] })).toBeNull();
+    });
+
+    it('maps new block reasons to content_filter and CONTINUATION to length', () => {
+      const blocked = fromGoogleResponse(
+        { candidates: [{ finishReason: 'PROHIBITED_CONTENT', content: { parts: [] } }] },
+        'gemini-3.6-flash',
+      );
+      expect((blocked.choices as Array<{ finish_reason: string }>)[0].finish_reason).toBe(
+        'content_filter',
+      );
+      const cut = fromGoogleResponse(
+        { candidates: [{ finishReason: 'CONTINUATION', content: { parts: [{ text: 'a' }] } }] },
+        'gemini-3.6-flash',
+      );
+      expect((cut.choices as Array<{ finish_reason: string }>)[0].finish_reason).toBe('length');
     });
   });
 });

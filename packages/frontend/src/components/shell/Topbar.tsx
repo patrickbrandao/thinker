@@ -19,9 +19,11 @@ import {
   connectionBreadcrumbBackLabel,
   connectionBreadcrumbSignal,
 } from '../../services/connection-breadcrumb-store.js';
+import { pageBreadcrumbSignal } from '../../services/page-breadcrumb-store.js';
 import { THINKER_DOCS_URL, THINKER_PROVIDERS_DOCS_URL } from '../../services/thinker-links.js';
 import { effectiveTheme, themePreference, toggleTheme } from '../../lib/theme.js';
 import { useSignal } from '../../lib/signal.js';
+import { brandingSignal } from '../../services/branding.js';
 import { themedIcon } from '../setup-ui.js';
 import { t } from '../../i18n/index.js';
 import { IconButton, Menu, MenuItem } from '../ui.jsx';
@@ -41,6 +43,7 @@ export default function Topbar({
   const displayName = useSignal(agentDisplayNameSignal);
   useSignal(agentPlatformSignal);
   const connection = useSignal(connectionBreadcrumbSignal);
+  const pageCrumb = useSignal(pageBreadcrumbSignal);
   useSignal(themePreference);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
 
@@ -58,6 +61,7 @@ export default function Topbar({
   const platformIcon = agentPlatformIcon();
   const crumbIcon = platformIcon ? themedIcon(platformIcon, dark) : null;
   const version = __THINKER_VERSION__;
+  const { hideInfo } = useSignal(brandingSignal);
 
   return (
     <header className="topbar">
@@ -114,6 +118,15 @@ export default function Topbar({
             <span className="crumb-current">{connection.name}</span>
             {connection.label ? <span className="badge">{connection.label}</span> : null}
           </>
+        ) : section && pageCrumb.name && pageCrumb.path === pathname ? (
+          <>
+            <Link to={section.to} className="inline-flex items-center gap-1.5">
+              <section.icon aria-hidden="true" />
+              {navLabel(section)}
+            </Link>
+            <ChevronRight aria-hidden="true" />
+            <span className="crumb-current">{pageCrumb.name}</span>
+          </>
         ) : addPageLabel && section ? (
           <>
             <Link to={section.to} className="inline-flex items-center gap-1.5">
@@ -132,21 +145,23 @@ export default function Topbar({
       </nav>
 
       <div className="topbar-actions">
-        {version ? (
+        {version && !hideInfo ? (
           <span className="topbar-version" title={t('nav.version', { version })}>
             v{version}
           </span>
         ) : null}
-        <a
-          href={docsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="icon-btn"
-          aria-label={t('nav.docs')}
-          title={t('nav.docs')}
-        >
-          <BookOpen aria-hidden="true" />
-        </a>
+        {hideInfo ? null : (
+          <a
+            href={docsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="icon-btn"
+            aria-label={t('nav.docs')}
+            title={t('nav.docs')}
+          >
+            <BookOpen aria-hidden="true" />
+          </a>
+        )}
         <IconButton label={t('shell.topbar.search')} onClick={onOpenSearch}>
           <Search />
         </IconButton>

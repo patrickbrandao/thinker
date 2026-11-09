@@ -72,7 +72,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (206 BEM blocks, 222 classes)
+## Blocks (225 BEM blocks, 244 classes)
 actions (shell.css): actions
 agent-type-select (shell.css): agent-type-select__option
 alert-row (shell.css): alert-row
@@ -81,6 +81,8 @@ alerts (shell.css): alerts
 alerts-foot (shell.css): alerts-foot
 alerts-head (shell.css): alerts-head
 alerts-list (shell.css): alerts-list
+alerts-section (shell.css): alerts-section
+alerts-table (shell.css): alerts-table
 app (shell.css): app
 app-content (shell.css): app-content
 app-main (shell.css): app-main
@@ -121,8 +123,8 @@ edge-idle (canvas.css): edge-idle
 edge-saving (canvas.css): edge-saving
 empty (base.css): empty
 eyebrow (base.css): eyebrow
-field (base.css, shell.css): field
-floating-window (shell.css): floating-window floating-window--wide
+field (base.css, canvas.css, shell.css): field
+floating-window (shell.css): floating-window floating-window--fit floating-window--wide floating-window--xwide
 floating-window-body (shell.css): floating-window-body
 floating-window-foot (shell.css): floating-window-foot
 floating-window-head (shell.css): floating-window-head
@@ -135,6 +137,7 @@ form-notice (shell.css): form-notice
 full (shell.css): full
 function_ (syntax-highlight.css): function_
 gate (shell.css): gate
+has-badge (canvas.css): has-badge
 hint (base.css): hint
 hljs (shell.css, syntax-highlight.css): hljs
 hljs-addition (syntax-highlight.css): hljs-addition
@@ -173,8 +176,12 @@ is-off (base.css): is-off
 is-ok (base.css): is-ok
 is-outline (base.css): is-outline
 is-pulse (base.css): is-pulse
+is-round (canvas.css): is-round
 is-selected (base.css, canvas.css): is-selected
+is-selecting (canvas.css): is-selecting
+is-sink (canvas.css): is-sink
 is-success (shell.css): is-success
+is-unread (shell.css): is-unread
 is-unseen (shell.css): is-unseen
 is-warn (base.css, shell.css): is-warn
 is-warning (shell.css): is-warning
@@ -184,9 +191,13 @@ kv (shell.css): kv
 label (base.css): label
 link-action (base.css): link-action
 liquid-metal (shell.css): liquid-metal liquid-metal--flash
+login-form (shell.css): login-form
+login-mark (shell.css): login-mark
 logo-dark (shell.css): logo-dark
 logo-light (shell.css): logo-light
+logo-text (shell.css): logo-text
 logo-word (shell.css): logo-word
+lucide (canvas.css): lucide
 menu (shell.css): menu
 menu-card (shell.css): menu-card
 menu-heading (shell.css): menu-heading
@@ -199,6 +210,7 @@ modal (shell.css): modal
 modal-body (shell.css): modal-body
 modal-head (shell.css): modal-head
 mono (base.css): mono
+n8n-badge (canvas.css): n8n-badge
 n8n-box (canvas.css): n8n-box
 n8n-icon (canvas.css): n8n-icon
 n8n-name (canvas.css): n8n-name
@@ -231,10 +243,12 @@ panel (base.css): panel
 panel-body (base.css): panel-body
 panel-head (base.css): panel-head
 panel-hint (base.css): panel-hint
-react-flow (canvas.css): react-flow react-flow__attribution react-flow__controls react-flow__controls-button react-flow__edge-path react-flow__edge-text react-flow__edge-textbg react-flow__handle react-flow__minimap react-flow__node
+provider-type-card (shell.css): provider-type-card
+react-flow (canvas.css): react-flow react-flow__attribution react-flow__controls react-flow__controls-button react-flow__edge-path react-flow__edge-text react-flow__edge-textbg react-flow__handle react-flow__minimap react-flow__node react-flow__pane
 row-actions (base.css): row-actions
 row-sub (base.css): row-sub
 row-title (base.css): row-title
+scroll-section (shell.css): scroll-section
 search-bar (shell.css): search-bar
 sec (shell.css): sec
 segmented (base.css): segmented
@@ -251,6 +265,7 @@ stage-actions (canvas.css): stage-actions
 stage-head (canvas.css): stage-head
 stage-hint (canvas.css): stage-hint
 stage-legend (canvas.css): stage-legend
+stage-range (canvas.css): stage-range
 stage-wrap (canvas.css): stage-wrap
 stat-label (shell.css): stat-label
 stat-tile (shell.css): stat-tile
@@ -260,6 +275,8 @@ status (base.css): status
 sub (canvas.css, shell.css): sub
 switch (base.css): switch
 tab (shell.css): tab
+tabbed-window (shell.css): tabbed-window
+tabbed-window-tabs (shell.css): tabbed-window-tabs
 table-wrap (base.css): table-wrap
 tabs (shell.css): tabs
 toast (shell.css): toast
@@ -273,6 +290,8 @@ tool-str (shell.css): tool-str
 topbar (shell.css): topbar
 topbar-actions (shell.css): topbar-actions
 topbar-version (shell.css): topbar-version
+trigger-editor (shell.css): trigger-editor
+trigger-template (shell.css): trigger-template
 user-name (shell.css): user-name
 user-org (shell.css): user-org
 user-text (shell.css): user-text
@@ -305,18 +324,18 @@ Tabs: src/components/ui.tsx
 (empty until primitives exist)
 
 ## Canonical rules — same selector+property declared twice with different values; the winner renders (5)
-.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1008  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1008  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1017  [@media (max-width: 900px)]
-.liquid-metal::after { inset: -5px }  ← shell.css:1183
-.liquid-metal::after { padding: 5px }  ← shell.css:1184
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1073  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1073  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1082  [@media (max-width: 900px)]
+.liquid-metal::after { inset: -5px }  ← shell.css:1248
+.liquid-metal::after { padding: 5px }  ← shell.css:1249
 
 ## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (5)
-.app.is-collapsed .nav-action { display: revert }  at shell.css:1001 loses to shell.css:1008
-.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1001 loses to shell.css:1008
-.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1013 loses to shell.css:1017
-.liquid-metal::after { inset: -2px }  at shell.css:1139 loses to shell.css:1183
-.liquid-metal::after { padding: 2px }  at shell.css:1141 loses to shell.css:1184
+.app.is-collapsed .nav-action { display: revert }  at shell.css:1066 loses to shell.css:1073
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1066 loses to shell.css:1073
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1078 loses to shell.css:1082
+.liquid-metal::after { inset: -2px }  at shell.css:1204 loses to shell.css:1248
+.liquid-metal::after { padding: 2px }  at shell.css:1206 loses to shell.css:1249
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

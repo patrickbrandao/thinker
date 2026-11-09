@@ -33,7 +33,8 @@ interface BootResult {
 
 /**
  * Starts `src/main.ts` with exactly the given encryption-related variables
- * (everything else inherited, minus any key the runner set) and waits for it
+ * (everything else inherited, minus any key the runner set; an `.env` file in
+ * the working directory cannot add one back) and waits for it
  * to exit. `egress-recorder.cjs` keeps the child off the network.
  */
 function bootExpectingExit(extraEnv: NodeJS.ProcessEnv): Promise<BootResult> {
@@ -57,6 +58,13 @@ function bootExpectingExit(extraEnv: NodeJS.ProcessEnv): Promise<BootResult> {
     BETTER_AUTH_SECRET: SESSION_SECRET,
     THINKER_CATALOG_SYNC: 'false',
     EGRESS_LOG: egressLog,
+    // Set but empty on purpose. The server loads `.env` from its working
+    // directory (here `packages/backend`) without overriding variables that
+    // are already set, so merely leaving these out would let a developer's
+    // git-ignored `.env` supply a key and the "missing key" case would boot
+    // instead of failing. An empty value is read as "not set".
+    THINKER_ENCRYPTION_KEY: '',
+    THINKER_ENCRYPTION_KEY_PREVIOUS: '',
     ...extraEnv,
   });
   for (const [key, value] of Object.entries(env)) if (value === undefined) delete env[key];

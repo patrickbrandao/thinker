@@ -27,6 +27,7 @@ function setup(opts: {
     upsert: jest.fn(async (row: Member) => {
       members.push({ ...row, created_at: '2026-10-27' });
     }),
+    count: jest.fn(async () => 0),
   };
   const profileRepo = { findOne: jest.fn(async () => opts.profile ?? null) };
   const service = new TenantCacheService(
@@ -132,5 +133,25 @@ describe('TenantCacheService (ADR 0006)', () => {
     const { service, tenantRepo } = setup({ members: [m('t1', 'member')] });
     await expect(service.ensureForUser('u1')).resolves.toBe('t1');
     expect(tenantRepo.insert).not.toHaveBeenCalled();
+  });
+
+  it('ensureForUser joins its own personal organization created by a concurrent request', async () => {
+    const { service, tenantRepo, memberRepo } = setup({});
+    tenantRepo.insert.mockRejectedValueOnce(new Error('duplicate key'));
+    tenantRepo.findOne.mockResolvedValueOnce({ id: 'p1', is_active: true });
+    await expect(service.ensureForUser('u1')).resolves.toBe('p1');
+    expect(memberRepo.upsert).toHaveBeenCalledWith(
+      { tenant_id: 'p1', user_id: 'u1', role: 'owner' },
+      ['tenant_id', 'user_id'],
+    );
+  });
+
+  it('ensureForUser never re-adds a removed creator to an organization with other members', async () => {
+    const { service, tenantRepo, memberRepo } = setup({});
+    tenantRepo.insert.mockRejectedValueOnce(new Error('duplicate key'));
+    tenantRepo.findOne.mockResolvedValueOnce({ id: 'org', is_active: true });
+    memberRepo.count.mockResolvedValueOnce(2);
+    await expect(service.ensureForUser('u1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(memberRepo.upsert).not.toHaveBeenCalled();
   });
 });

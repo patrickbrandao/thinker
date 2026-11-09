@@ -78,6 +78,11 @@ export const THINKER_ERRORS = {
     template:
       'Model "{model}" is not available for this agent. Use GET /v1/models to list available model IDs, or make the provider available for this agent here: {dashboardUrl}',
   },
+  M303: {
+    title: 'Stored response state not supported',
+    template:
+      '`{field}` is not supported: Thinker does not store responses. Send the full conversation in `input` and set `store: false`.',
+  },
   M500: {
     title: 'Internal server error',
     template: 'Something broke on our end. Try again in a moment.',

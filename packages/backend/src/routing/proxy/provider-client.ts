@@ -1,6 +1,10 @@
 import { createHash } from 'crypto';
 import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
-import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
+import {
+  OPENAI_RESPONSES_ONLY_RE,
+  openAiToolsNeedResponses,
+  stripVendorPrefix,
+} from '../../common/constants/openai-models';
 import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
 import {
   PROVIDER_ENDPOINTS,
@@ -8,6 +12,7 @@ import {
   resolveBedrockEndpointKey,
   resolveEndpointKey,
 } from './provider-endpoints';
+import { applyParamPolicy } from './param-policy';
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
 import {
@@ -27,6 +32,7 @@ import {
 } from './proxy-transport';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
 import { isAnthropicHost, mergeAnthropicBeta } from './anthropic-beta';
+import { stripModelPrefix } from './model-prefix';
 import { mergeExtraHeaders } from './extra-headers';
 import { injectOpenAiMessageCacheControl, injectOpenRouterCacheControl } from './cache-injection';
 import {
@@ -35,6 +41,7 @@ import {
   applyAnthropicMessagesMutations,
   hasMessageCacheControl,
   toGoogleRequest,
+  googleResponseFailure,
   toAnthropicRequest,
   toResponsesRequest,
   sanitizeOpenAiBody,
@@ -61,7 +68,11 @@ import { dropUnsupportedAnthropicTools } from './anthropic-messages-adapter';
 import { responsesToolNames, ResponsesToolNames } from './responses-tools';
 import { forwardKiroChat } from './kiro-adapter';
 import { markProviderSent, timeProviderResponse } from './request-timeline';
-import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
+import {
+  OpencodeCatalogService,
+  type OpencodeApiFormat,
+  type OpencodeCatalogProvider,
+} from '../../model-discovery/opencode-catalog.service';
 import { ProviderModelRegistryService } from '../../model-discovery/provider-model-registry.service';
 import { qualifyChatGptResponse } from './chatgpt-response-qualifier';
 import { isBedrockProvider } from '../bedrock-region';
@@ -98,6 +109,12 @@ export interface ForwardResult {
    * they selected up front.
    */
   servedByKey?: { tenantProviderId: string; keyLabel: string };
+  /**
+   * Longest gap between two upstream chunks for this call: the connection's
+   * override, else a local server's request timeout. Unset: the global
+   * STREAM_IDLE_TIMEOUT_MS.
+   */
+  streamIdleTimeoutMs?: number;
 }
 
 function wireFormat(endpoint: ProviderEndpoint): ProviderWireFormat | undefined {
@@ -204,6 +221,30 @@ function isEmptyChatCompletion(body: unknown): boolean {
       isRecord(choice.message) &&
       !hasChatCompletionOutput(choice.message),
   );
+}
+
+/** Turn a blocked or failed Gemini answer into an error (api-gemini G4). */
+async function qualifyGoogleResponse(
+  response: Response,
+  codeAssist: boolean,
+  attempt?: ProviderAttemptRef,
+): Promise<Response> {
+  if (response.status !== HttpStatus.OK) return response;
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return response;
+  }
+  if (!isRecord(body)) return response;
+  const inner = codeAssist && isRecord(body.response) ? body.response : body;
+  const failure = googleResponseFailure(inner);
+  if (!failure) return response;
+  await attempt?.finishRecording?.({ type: 'json', body });
+  return new Response(JSON.stringify(failure.body), {
+    status: failure.status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 async function qualifyEmptyChatCompletion(
@@ -323,41 +364,6 @@ function openRouterCacheMode(model: string): 'anthropic' | 'message' | null {
   return null;
 }
 
-/**
- * Strip vendor prefix from model name (e.g. "anthropic/claude-sonnet-4" → "claude-sonnet-4").
- * Models synced from OpenRouter use vendor prefixes, but native APIs expect bare names.
- */
-function stripModelPrefix(model: string, endpointKey: string): string {
-  // OpenRouter expects vendor prefixes.
-  if (endpointKey === 'openrouter') return model;
-  if (endpointKey === 'commandcode' || endpointKey === 'commandcode-anthropic') {
-    return model.startsWith('commandcode/') ? model.slice('commandcode/'.length) : model;
-  }
-  // Custom providers, Fireworks, Groq, Hugging Face, Kilo, Nous, NVIDIA NIM, Ollama, Pioneer, and ClinePass: model IDs from these APIs contain
-  // legitimate slash segments (e.g. "accounts/fireworks/models/deepseek-v3p1",
-  // "MiniMaxAI/MiniMax-2.7", "meta-llama/llama-guard-4-12b", "anthropic/claude-sonnet-4.5",
-  // "cline-pass/deepseek-v4-flash"). Stripping would mangle the name the upstream API expects.
-  if (
-    endpointKey === 'custom' ||
-    endpointKey === 'fireworks' ||
-    endpointKey === 'groq' ||
-    endpointKey === 'huggingface' ||
-    endpointKey === 'kilo' ||
-    endpointKey === 'nous' ||
-    endpointKey === 'nvidia' ||
-    endpointKey === 'cline-pass' ||
-    endpointKey === 'ollama' ||
-    endpointKey === 'ollama-cloud' ||
-    // LM Studio serves hub ids such as `qwen/qwen3-8b`; llama-server echoes
-    // whatever `--alias` or file path it was started with.
-    endpointKey === 'lmstudio' ||
-    endpointKey === 'llamacpp' ||
-    endpointKey === 'pioneer'
-  )
-    return model;
-  return stripVendorPrefix(model);
-}
-
 @Injectable()
 export class ProviderClient {
   private readonly logger = new Logger(ProviderClient.name);
@@ -365,7 +371,7 @@ export class ProviderClient {
 
   constructor(
     @Optional()
-    private readonly opencodeGoCatalog?: OpencodeGoCatalogService,
+    private readonly opencodeCatalog?: OpencodeCatalogService,
     @Optional()
     private readonly modelRegistry?: ProviderModelRegistryService,
     @Optional()
@@ -424,6 +430,7 @@ export class ProviderClient {
       authType,
       model,
       opts.apiMode,
+      body,
     );
     const isGoogle = endpoint.format === 'google';
     const isAnthropic = endpoint.format === 'anthropic';
@@ -491,9 +498,24 @@ export class ProviderClient {
       thinkingRouteContext: opts.thinkingRouteContext,
       clientAnthropicBeta: opts.clientAnthropicBeta,
       providerResource: opts.providerResource,
+      oauthToken: opts.oauthToken,
       sessionKey: opts.sessionKey,
       providerCacheKey: opts.providerCacheKey,
     });
+    const policyApplied = applyParamPolicy(requestBody, {
+      endpointKey,
+      format: endpoint.format,
+      model: bareModel,
+      source: chatBody ?? body,
+    });
+    if (policyApplied.length > 0) {
+      this.logger.debug(
+        `Param policy for ${endpointKey}/${bareModel}: ${policyApplied.join(', ')}`,
+      );
+    }
+    if (endpointKey === 'copilot' || endpointKey === 'copilot-responses') {
+      Object.assign(headers, copilotRequestHeaders(requestBody));
+    }
 
     // The Codex backend only serves prompt-cache hits with session affinity
     // headers the real Codex CLI sends — see CodexSessionAffinity.
@@ -523,10 +545,12 @@ export class ProviderClient {
     // names and plaintext to public hosts early with a clear message; it cannot
     // stop DNS rebinding on its own, so the request itself goes through
     // ssrfSafeFetch, which validates the address it actually connects to.
-    // LAN destinations are allowed (local models are a feature).
+    // LAN destinations are allowed (local models are a feature), unless the
+    // URL was registered by someone the private-URL policy did not allow
+    // (`allowPrivateDestination: false`, ADR 0006 item 7).
     if (endpoint.requiresSsrfRevalidation) {
       try {
-        await validatePublicUrl(url, { allowPrivate: true });
+        await validatePublicUrl(url, { allowPrivate: endpoint.allowPrivateDestination !== false });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         throw new ProviderUrlBlockedError(`Refusing to forward to disallowed URL: ${message}`);
@@ -552,14 +576,22 @@ export class ProviderClient {
       },
       endpoint.requiresSsrfRevalidation === true,
       endpoint.timeoutMs,
+      endpoint.allowPrivateDestination !== false,
     );
-    const result = { ...fetched, response: timeProviderResponse(fetched.response, attempt) };
+    const result = {
+      ...fetched,
+      response: timeProviderResponse(fetched.response, attempt),
+      // A local server may legitimately pause as long as its request runs.
+      ...(endpoint.timeoutMs ? { streamIdleTimeoutMs: endpoint.timeoutMs } : {}),
+    };
     const response =
       !stream &&
       endpoint.format === 'openai' &&
       (opts.apiMode === undefined || opts.apiMode === 'chat_completions')
         ? await qualifyEmptyChatCompletion(result.response, attempt)
-        : result.response;
+        : !stream && endpoint.format === 'google'
+          ? await qualifyGoogleResponse(result.response, !!endpoint.codeAssistEnvelope, attempt)
+          : result.response;
     const qualifiedResult =
       endpointKey === 'openai-subscription'
         ? {
@@ -581,6 +613,7 @@ export class ProviderClient {
     authType: string | undefined,
     model: string,
     apiMode: ForwardOptions['apiMode'],
+    body?: Record<string, unknown>,
   ): Promise<{ endpoint: ProviderEndpoint; endpointKey: string }> {
     if (customEndpoint) {
       return { endpoint: customEndpoint, endpointKey: 'custom' };
@@ -612,6 +645,10 @@ export class ProviderClient {
     if (resolved === 'openai' && OPENAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
       resolved = 'openai-responses';
     }
+    // GPT-6 models reject function tools on /v1/chat/completions (#440).
+    if (resolved === 'openai' && openAiToolsNeedResponses(stripVendorPrefix(model), body)) {
+      resolved = 'openai-responses';
+    }
     // xAI multi-agent models are Responses API-only; route them to /v1/responses
     // while still accepting Chat Completions-shaped client requests.
     if (resolved === 'xai' && XAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
@@ -627,17 +664,8 @@ export class ProviderClient {
         resolved = 'copilot-responses';
       }
     }
-    if (resolved === 'opencode-go') {
-      const bareOpenCodeModel = stripVendorPrefix(model).toLowerCase();
-      const catalogFormat = await this.resolveOpencodeGoFormat(bareOpenCodeModel);
-      if (catalogFormat === 'responses') {
-        resolved = 'opencode-go-responses';
-      } else {
-        const knownAnthropicFamily = this.isKnownOpencodeGoAnthropicFamily(bareOpenCodeModel);
-        if (catalogFormat === 'anthropic' || (!catalogFormat && knownAnthropicFamily)) {
-          resolved = 'opencode-go-anthropic';
-        }
-      }
+    if (resolved === 'opencode-go' || resolved === 'opencode') {
+      resolved = await this.resolveOpencodeEndpoint(resolved, model);
     }
     if (resolved === 'commandcode') {
       const bareCommandCodeModel = model.startsWith('commandcode/')
@@ -647,39 +675,31 @@ export class ProviderClient {
         resolved = 'commandcode-anthropic';
       }
     }
-    if (
-      resolved === 'opencode-zen' &&
-      stripVendorPrefix(model).toLowerCase().startsWith('gemini-')
-    ) {
-      // TODO(opencode-zen): once Zen's gateway stops forwarding the client
-      // Authorization header to Vertex AI, drop this branch and let Gemini
-      // ride the unified /v1/chat/completions route like every other family.
-      // Today, sending `Authorization: Bearer <zen_key>` against the unified
-      // path triggers GCP OVERLOADED_CREDENTIALS (Zen also attaches its own
-      // GCP creds upstream). The dedicated Gemini route uses Google's
-      // `x-goog-api-key` header against `/v1/models/{id}:generateContent`,
-      // which Zen documents at https://opencode.ai/docs/zen/ and does not
-      // leak through to Vertex AI.
-      resolved = 'opencode-zen-google';
-    }
     return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved };
   }
 
-  private async resolveOpencodeGoFormat(
-    bareModel: string,
-  ): Promise<'openai' | 'anthropic' | 'responses' | null> {
-    if (!this.opencodeGoCatalog) return null;
-    try {
-      return await this.opencodeGoCatalog.resolveFormat(bareModel);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`OpenCode Go catalog format lookup failed: ${message}`);
-      return null;
+  /**
+   * OpenCode and OpenCode Go serve each model on one wire protocol, published
+   * in their catalog. Without the catalog (fetch failed), the model family
+   * picks it: Claude, MiniMax and Qwen 3.7+ speak Messages, GPT/Grok/Muse speak
+   * Responses, Gemini speaks Google, the rest Chat Completions.
+   */
+  private async resolveOpencodeEndpoint(
+    provider: OpencodeCatalogProvider,
+    model: string,
+  ): Promise<string> {
+    const bare = stripVendorPrefix(model).toLowerCase();
+    let format: OpencodeApiFormat | null = null;
+    if (this.opencodeCatalog) {
+      try {
+        format = await this.opencodeCatalog.resolveFormat(provider, bare);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`${provider} catalog format lookup failed: ${message}`);
+      }
     }
-  }
-
-  private isKnownOpencodeGoAnthropicFamily(bareModel: string): boolean {
-    return bareModel.startsWith('minimax-') || bareModel.startsWith('qwen3.7');
+    format ??= opencodeFamilyFormat(provider, bare);
+    return format === 'openai' ? provider : `${provider}-${format}`;
   }
 
   private resolveCopilotEndpointFromMetadata(
@@ -737,6 +757,7 @@ export class ProviderClient {
     thinkingRouteContext?: ForwardOptions['thinkingRouteContext'];
     clientAnthropicBeta?: ForwardOptions['clientAnthropicBeta'];
     providerResource?: string;
+    oauthToken?: boolean;
     sessionKey?: string;
     providerCacheKey?: string;
   }): BuiltProviderRequest {
@@ -756,6 +777,12 @@ export class ProviderClient {
       let url = `${endpoint.baseUrl}${path}`;
       if (stream) url += '?alt=sse';
       const innerBody = toGoogleRequest(requestSource, bareModel, ctx.signatureLookup);
+      // New paid Gemini API projects store requests by default since
+      // 2026-10-26; Thinker opts out unless THINKER_GEMINI_STORE=true
+      // (api-gemini G9, maintainer decision 2026-11-05).
+      if (endpointKey === 'google' && process.env.THINKER_GEMINI_STORE !== 'true') {
+        innerBody.store = false;
+      }
       const requestBody = endpoint.codeAssistEnvelope
         ? // CodeAssist routes by `cloudaicompanionProject` rather than URL
           // path; the project id was stashed in the OAuth blob's `u` field
@@ -765,7 +792,7 @@ export class ProviderClient {
         : innerBody;
       return {
         url,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        headers: endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
         requestBody,
       };
     }
@@ -814,7 +841,7 @@ export class ProviderClient {
       return {
         url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
         headers: withClientAnthropicBeta(
-          endpoint.buildHeaders(apiKey, authType),
+          endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
           // Native Messages traffic to Anthropic itself, and nothing else.
           //
           // Host, not the registry key: a tenant can reach Anthropic through a
@@ -827,7 +854,11 @@ export class ProviderClient {
           // type would have its output silently dropped on the way back, which
           // is worse than the 400 we are fixing. Native Messages responses pass
           // through byte-for-byte, so unknown blocks survive there.
-          ctx.apiMode === 'messages' && isAnthropicHost(endpoint.baseUrl)
+          // The Anthropic connection's own base URL counts too: the operator
+          // pointed the Anthropic provider there (a proxy, a simulator), and
+          // without the flags Claude Code's beta-only fields are refused.
+          ctx.apiMode === 'messages' &&
+            (isAnthropicHost(endpoint.baseUrl) || endpoint.anthropicAccountOverride === true)
             ? ctx.clientAnthropicBeta
             : undefined,
         ),
@@ -914,7 +945,7 @@ export class ProviderClient {
       }
       return {
         url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        headers: endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
         requestBody,
       };
     }
@@ -928,6 +959,7 @@ export class ProviderClient {
       // tools next to their default reasoning effort (mnfst/llm-gateway#3065).
       requireMaxCompletionTokens: isBedrockRuntimeGpt,
       forwardReasoningEffort: isBedrockRuntimeGpt,
+      nativeReasoningEffort: endpoint.nativeReasoningEffort === true,
     });
     if (stream && endpoint.streamUsageReporting === 'openai_stream_options') {
       const existing =
@@ -973,7 +1005,7 @@ export class ProviderClient {
     }
     return {
       url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-      headers: endpoint.buildHeaders(apiKey, authType),
+      headers: endpoint.buildHeaders(apiKey, authType, ctx.oauthToken),
       requestBody,
     };
   }
@@ -997,6 +1029,8 @@ export class ProviderClient {
     pinDestination = false,
     // Per-endpoint upper bound (local servers); PROVIDER_TIMEOUT_MS otherwise.
     timeoutMs = PROVIDER_TIMEOUT_MS,
+    // False: the pinned connection also refuses private/LAN addresses.
+    allowPrivateDestination = true,
   ): Promise<ForwardResult> {
     let fetchSignal: AbortSignal;
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -1028,7 +1062,9 @@ export class ProviderClient {
         redirect: 'error',
       };
       // Both honor the outbound proxy chain of the active scope.
-      response = pinDestination ? await ssrfSafeFetch(url, init) : await outboundFetch(url, init);
+      response = pinDestination
+        ? await ssrfSafeFetch(url, init, { allowPrivate: allowPrivateDestination })
+        : await outboundFetch(url, init);
     } catch (err) {
       // Every proxy of the chain failed: its own transport error (502).
       if (isProviderProxyFailedError(err)) throw err;
@@ -1077,4 +1113,39 @@ export class ProviderClient {
   readonly createAnthropicStreamTransformer = createAnthropicTransformer;
   readonly createReasoningContentStreamTransformer = reasoningContentStreamTransformer;
   readonly collectChatGptSseResponse = chatGptSseCollector;
+}
+
+function opencodeFamilyFormat(
+  provider: OpencodeCatalogProvider,
+  bareModel: string,
+): OpencodeApiFormat {
+  if (bareModel.startsWith('claude-')) return 'anthropic';
+  if (provider === 'opencode-go' && /^(minimax-|qwen3\.)/.test(bareModel)) return 'anthropic';
+  if (/^(gpt-|grok-|muse-)/.test(bareModel)) return 'responses';
+  if (bareModel.startsWith('gemini-')) return 'google';
+  return 'openai';
+}
+
+/**
+ * Per-request Copilot headers the official client sends (sub-copilot G3):
+ * `Copilot-Vision-Request` when the turn carries an image, and `X-Initiator`
+ * (`user` for a fresh user turn, `agent` for tool continuations).
+ */
+export function copilotRequestHeaders(body: Record<string, unknown>): Record<string, string> {
+  const items = (
+    Array.isArray(body.messages) ? body.messages : Array.isArray(body.input) ? body.input : []
+  ) as Array<Record<string, unknown>>;
+  const hasImage = items.some(
+    (item) =>
+      Array.isArray(item?.content) &&
+      (item.content as Array<{ type?: unknown }>).some(
+        (part) => part?.type === 'image_url' || part?.type === 'input_image',
+      ),
+  );
+  const last = items[items.length - 1];
+  const fromUser = last?.role === 'user' && last?.type !== 'function_call_output';
+  return {
+    ...(hasImage ? { 'Copilot-Vision-Request': 'true' } : {}),
+    'X-Initiator': fromUser ? 'user' : 'agent',
+  };
 }

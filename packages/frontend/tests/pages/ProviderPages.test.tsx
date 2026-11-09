@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,7 +8,7 @@ const mockGetAgents = vi.fn();
 const mockGetAgentProviders = vi.fn();
 const mockGetCustomProviders = vi.fn();
 const mockGetPlaygroundAgent = vi.fn();
-const mockProviderSelectModal = vi.fn();
+const mockProviderSelectContent = vi.fn();
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', async (orig) => ({
@@ -42,11 +42,11 @@ const renderPage = (node: ReactNode, path = '/providers') =>
     </MemoryRouter>,
   );
 
-vi.mock('../../src/components/ProviderSelectModal.jsx', () => ({
+vi.mock('../../src/components/ProviderSelectContent.jsx', () => ({
   default: (props: Record<string, unknown>) => {
-    mockProviderSelectModal(props);
+    mockProviderSelectContent(props);
     return (
-      <div role="dialog" aria-label="provider modal">
+      <div data-testid="new-connection-flow">
         <button onClick={() => (props.onUpdate as () => Promise<void>)()}>update</button>
         <button onClick={() => (props.onClose as () => void)()}>close</button>
       </div>
@@ -179,6 +179,11 @@ import LocalAdd from '../../src/pages/providers/LocalAdd';
 const ByokBoth = () => <ProviderConnectionsPage kind="byok" />;
 const SubscriptionsBoth = () => <ProviderConnectionsPage kind="subscriptions" />;
 
+/** The catalog's provider-type cards (or list rows): each is an "Add <name>"
+ * button. Excludes the page toolbar's "Add provider" / "Add custom provider". */
+const addCards = () =>
+  screen.getAllByRole('button', { name: /^Add (?!provider$|custom provider$)/ });
+
 const connection = (id: string, label: string, active = true) => ({
   id,
   label,
@@ -282,7 +287,7 @@ describe('provider pages', () => {
     await waitFor(() => expect(mockGetCustomProviders).toHaveBeenCalledWith('demo-agent'));
   };
 
-  it('renders the subscriptions page and opens the connect modal', async () => {
+  it('renders the subscriptions page and opens the new-connection window', async () => {
     renderPage(<SubscriptionsBoth />);
 
     await waitFor(() => {
@@ -290,13 +295,16 @@ describe('provider pages', () => {
       expect(screen.getByText('ChatGPT')).toBeDefined();
     });
 
-    fireEvent.click(screen.getAllByText('Connect')[0]!);
+    fireEvent.click(addCards()[0]!);
     await waitFor(() => {
-      expect(screen.getByRole('dialog', { name: 'provider modal' })).toBeDefined();
-      expect(mockProviderSelectModal).toHaveBeenCalledWith(
+      // A non-modal window titled after the provider, straight into its new connection.
+      expect(screen.getByRole('dialog', { name: 'New connection: OpenAI' })).toBeDefined();
+      expect(screen.getByTestId('new-connection-flow')).toBeDefined();
+      expect(mockProviderSelectContent).toHaveBeenCalledWith(
         expect.objectContaining({
           agentName: 'demo-agent',
           providers: [{ id: 'route-provider' }],
+          newConnection: true,
         }),
       );
     });
@@ -306,7 +314,7 @@ describe('provider pages', () => {
     });
     fireEvent.click(screen.getByText('close'));
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'provider modal' })).toBeNull();
+      expect(screen.queryByTestId('new-connection-flow')).toBeNull();
     });
   });
 
@@ -410,12 +418,14 @@ describe('provider pages', () => {
     // than the generic picker list. Index 0 is the first supported provider
     // (OpenAI). Wait until the agents resource resolves so the button enables.
     await waitFor(() => {
-      expect((screen.getAllByText('Connect')[0] as HTMLButtonElement).disabled).toBe(false);
+      expect(
+        (addCards()[0] as HTMLButtonElement).disabled,
+      ).toBe(false);
     });
 
-    fireEvent.click(screen.getAllByText('Connect')[0]!);
+    fireEvent.click(addCards()[0]!);
     await waitFor(() => {
-      expect(mockProviderSelectModal).toHaveBeenCalledWith(
+      expect(mockProviderSelectContent).toHaveBeenCalledWith(
         expect.objectContaining({
           providerDeepLink: { providerId: 'openai', authType: 'subscription' },
         }),
@@ -440,7 +450,7 @@ describe('provider pages', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Supported subscription providers')).toBeDefined();
-      expect(screen.getAllByText('Connect').length).toBeGreaterThan(0);
+      expect(addCards().length).toBeGreaterThan(0);
     });
     expect(screen.queryByText('ChatGPT')).toBeNull();
   });
@@ -489,7 +499,7 @@ describe('provider pages', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Supported usage-based providers')).toBeDefined();
-      expect(screen.getAllByText('Connect').length).toBeGreaterThan(0);
+      expect(addCards().length).toBeGreaterThan(0);
     });
     expect(screen.queryByText('Production')).toBeNull();
     expect(screen.queryByText('Add custom provider')).toBeNull();
@@ -545,18 +555,19 @@ describe('provider pages', () => {
 
     await waitFor(() => expect(screen.getByLabelText('List view')).toBeDefined());
     expect(screen.queryByText('Supported local providers')).toBeNull();
-    expect(screen.getAllByText('Add server').length).toBeGreaterThan(0);
+    expect(addCards().length).toBeGreaterThan(0);
   });
 
-  it('auto-opens the modal from add=true and clears the query param', async () => {
+  it('lands on the catalog from add=true and clears the query param', async () => {
     renderPage(<LocalAdd />, '/providers?add=true&keep=1');
 
     await waitFor(() => {
       // The deep-link handling lives in an effect (not the render body), and
       // clears the param so a refresh/back-nav can't re-trigger it.
       expect(screen.getByTestId('where').textContent).toBe('?keep=1');
-      expect(screen.getByRole('dialog', { name: 'provider modal' })).toBeDefined();
     });
+    // The catalog is the picker: no provider chosen yet, so no window opens.
+    expect(screen.queryByTestId('new-connection-flow')).toBeNull();
   });
 
   it('does not auto-open the modal without the add=true deep-link', async () => {
@@ -567,7 +578,7 @@ describe('provider pages', () => {
     });
     // No deep-link → the effect must not touch the params or open the modal.
     expect(screen.getByTestId('where').textContent).toBe('?keep=1');
-    expect(screen.queryByRole('dialog', { name: 'provider modal' })).toBeNull();
+    expect(screen.queryByTestId('new-connection-flow')).toBeNull();
   });
 
   it('keeps Connect enabled with no harness by falling back to the Playground agent', async () => {
@@ -576,11 +587,13 @@ describe('provider pages', () => {
     renderPage(<ByokBoth />);
 
     await waitFor(() => {
-      expect((screen.getAllByText('Connect')[0] as HTMLButtonElement).disabled).toBe(false);
+      expect(
+        (addCards()[0] as HTMLButtonElement).disabled,
+      ).toBe(false);
     });
-    fireEvent.click(screen.getAllByText('Connect')[0]!);
+    fireEvent.click(addCards()[0]!);
     await waitFor(() => {
-      expect(mockProviderSelectModal).toHaveBeenCalledWith(
+      expect(mockProviderSelectContent).toHaveBeenCalledWith(
         expect.objectContaining({ agentName: 'playground' }),
       );
     });
@@ -592,7 +605,7 @@ describe('provider pages', () => {
     renderPage(<ByokBoth />);
 
     await waitFor(() => {
-      const addButton = screen.getAllByText('Connect')[0] as HTMLButtonElement;
+      const addButton = addCards()[0] as HTMLButtonElement;
       expect(addButton.disabled).toBe(true);
     });
   });
@@ -608,7 +621,9 @@ describe('provider pages', () => {
     await waitFor(() => {
       expect(screen.getByText('Supported subscription providers')).toBeDefined();
       expect(screen.getByText('OpenAI')).toBeDefined();
-      expect((screen.getAllByText('Connect')[0] as HTMLButtonElement).disabled).toBe(true);
+      expect(
+        (addCards()[0] as HTMLButtonElement).disabled,
+      ).toBe(true);
     });
   });
 
@@ -616,10 +631,16 @@ describe('provider pages', () => {
     mockGetAgentProviders.mockRejectedValue(new Error('agent providers failed'));
     mockGetCustomProviders.mockRejectedValue(new Error('custom providers failed'));
 
-    renderPage(<ByokAdd />, '/providers?add=true');
+    renderPage(<ByokAdd />);
 
     await waitFor(() => {
-      expect(mockProviderSelectModal).toHaveBeenCalledWith(
+      expect(
+        (addCards()[0] as HTMLButtonElement).disabled,
+      ).toBe(false);
+    });
+    fireEvent.click(addCards()[0]!);
+    await waitFor(() => {
+      expect(mockProviderSelectContent).toHaveBeenCalledWith(
         expect.objectContaining({
           agentName: 'demo-agent',
           providers: [],
@@ -812,25 +833,25 @@ describe('provider pages', () => {
 
     // OpenAI has one active subscription connection → the active-count label
     // renders in the list row.
-    await waitFor(() => expect(screen.getByText('1 active connection')).toBeDefined());
+    await waitFor(() => expect(screen.getByText('1 session')).toBeDefined());
 
     // The list-view per-provider Connect button opens the modal deep-linked to
     // that provider. Scope to the OpenAI row inside the supported-provider list
     // table (the connected-rows table also shows "OpenAI", but its first button
-    // is the rename pencil — pick the row whose button actually reads "Connect").
+    // is the rename pencil — pick the row whose button is "Add OpenAI").
     const openaiConnect = screen
       .getAllByText('OpenAI')
       .map((el) => el.closest('tr'))
       .map((tr) =>
         Array.from(tr?.querySelectorAll('button') ?? []).find(
-          (btn) => btn.textContent?.trim() === 'Connect',
+          (btn) => btn.getAttribute('aria-label') === 'Add OpenAI',
         ),
       )
       .find((btn): btn is HTMLButtonElement => !!btn)!;
     fireEvent.click(openaiConnect);
 
     await waitFor(() => {
-      expect(mockProviderSelectModal).toHaveBeenCalledWith(
+      expect(mockProviderSelectContent).toHaveBeenCalledWith(
         expect.objectContaining({
           providerDeepLink: { providerId: 'openai', authType: 'subscription' },
         }),
@@ -846,12 +867,12 @@ describe('provider pages', () => {
     fireEvent.click(screen.getByLabelText('List view'));
 
     await waitFor(() => {
-      const connectButtons = screen.getAllByText('Connect') as HTMLButtonElement[];
+      const connectButtons = addCards() as HTMLButtonElement[];
       expect(connectButtons.every((btn) => btn.disabled)).toBe(true);
     });
   });
 
-  it('pluralizes the active-connection label for multiple connections', async () => {
+  it('pluralizes the session label for multiple connections', async () => {
     // Two active connections under one provider → plural "connections".
     mockGetGlobalProviders.mockResolvedValue({
       providers: [
@@ -875,16 +896,16 @@ describe('provider pages', () => {
     await waitFor(() => expect(screen.getByText('Plan A')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
-    await waitFor(() => expect(screen.getByText('2 active connections')).toBeDefined());
+    await waitFor(() => expect(screen.getByText('2 sessions')).toBeDefined());
   });
 
-  it('labels local providers as "Connected" in the list view', async () => {
+  it('labels local providers with their session count in the list view', async () => {
     renderPage(<LocalAdd />);
     await waitFor(() => expect(screen.getByLabelText('List view')).toBeDefined());
 
     fireEvent.click(screen.getByLabelText('List view'));
-    // Local providers use the "Connected" label rather than an active-count.
-    await waitFor(() => expect(screen.getAllByText('Connected').length).toBeGreaterThan(0));
+    // Local providers show the same session count as the other kinds.
+    await waitFor(() => expect(screen.getAllByText(/^\d+ sessions?$/).length).toBeGreaterThan(0));
   });
 
   it('opens and closes the custom provider modal on the BYOK page', async () => {
@@ -907,8 +928,7 @@ describe('provider pages', () => {
     );
 
     // Close via Escape key.
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.keyDown(overlay, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Add custom provider' })).toBeNull(),
     );
@@ -917,18 +937,14 @@ describe('provider pages', () => {
     expect(mockGetCustomProviders.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('closes the custom modal via overlay click', async () => {
+  it('closes the custom provider window via its close button', async () => {
     renderPage(<Byok />);
     await waitFor(() => expect(mockGetCustomProviders).toHaveBeenCalledWith('demo-agent'));
 
     fireEvent.click(screen.getByText('Add custom provider'));
-    await waitFor(() =>
-      expect(screen.getByRole('dialog', { name: 'Add custom provider' })).toBeDefined(),
-    );
-
-    // Press on the backdrop itself (target === currentTarget).
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.mouseDown(overlay);
+    const win = await screen.findByRole('dialog', { name: 'Add custom provider' });
+    // A floating window has no backdrop: only its own X closes it.
+    fireEvent.click(within(win).getByLabelText('Close'));
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Add custom provider' })).toBeNull(),
     );

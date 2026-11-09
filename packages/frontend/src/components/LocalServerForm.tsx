@@ -16,6 +16,7 @@ import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { providerIcon } from './ProviderIcon.js';
 import { Badge, Button, Field, cx } from './ui.js';
+import type { FormLayout } from './TabbedWindow.js';
 
 export const LOCAL_SERVER_TYPE_NAMES: Record<LocalServerType, string> = {
   ollama: 'Ollama',
@@ -34,6 +35,10 @@ interface Props {
   /** After Remove server; defaults to onSaved. */
   onDeleted?: () => void;
   onCancel: () => void;
+  /** Inside a window whose title already names the server: no title row. */
+  embedded?: boolean;
+  /** Lay the form out as window tabs (server, models) with its actions in a footer. */
+  layout?: FormLayout;
 }
 
 interface FormState {
@@ -271,30 +276,36 @@ export default function LocalServerForm(props: Props) {
   // Edits keep the stored model list until a new test replaces it.
   const listed: LocalProbeModel[] = probe?.models ?? props.editData?.models ?? [];
   const id = (field: string) => `ls-${props.type}-${field}`;
+  const defaultsHint = defaults.data
+    ? t('providerSetup.localServer.defaultsHint', {
+        port: String(defaults.data.default_port),
+        env: defaults.data.env,
+      })
+    : null;
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex size-8 items-center justify-center">
-          {providerIcon(props.type, 28)}
-        </span>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-ink">
-            {isEdit
-              ? t('providerSetup.localServer.editTitle', { type: typeName })
-              : t('providerSetup.localServer.addTitle', { type: typeName })}
-          </div>
-          <div className="text-xs text-muted">
-            {defaults.data
-              ? t('providerSetup.localServer.defaultsHint', {
-                  port: String(defaults.data.default_port),
-                  env: defaults.data.env,
-                })
-              : null}
+  const header = (
+    <>
+      {props.embedded ? (
+        <div className="text-xs text-muted">{defaultsHint}</div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <span className="inline-flex size-8 items-center justify-center">
+            {providerIcon(props.type, 28)}
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-ink">
+              {isEdit
+                ? t('providerSetup.localServer.editTitle', { type: typeName })
+                : t('providerSetup.localServer.addTitle', { type: typeName })}
+            </div>
+            <div className="text-xs text-muted">{defaultsHint}</div>
           </div>
         </div>
-      </div>
-
+      )}
+    </>
+  );
+  const serverSection = (
+    <div className="flex flex-col gap-4">
       <form
         className="flex flex-col gap-3"
         onSubmit={(e) => {
@@ -320,7 +331,9 @@ export default function LocalServerForm(props: Props) {
               value={current.scheme}
               onChange={(e) => set({ scheme: e.currentTarget.value as 'http' | 'https' })}
             >
+              {/* i18n-ignore: URL scheme */}
               <option value="http">http</option>
+              {/* i18n-ignore: URL scheme */}
               <option value="https">https</option>
             </select>
           </Field>
@@ -438,9 +451,17 @@ export default function LocalServerForm(props: Props) {
           </span>
         </div>
       ) : null}
-
+    </div>
+  );
+  const modelsSection = (
+    <>
       {listed.length > 0 ? (
-        <div className="flex max-h-60 flex-col overflow-y-auto border-t border-line">
+        <div
+          className={cx(
+            'flex flex-col border-t border-line',
+            !props.layout && 'max-h-60 overflow-y-auto',
+          )}
+        >
           {listed.map((m) => {
             const on = selected.has(m.model_name);
             return (
@@ -488,31 +509,64 @@ export default function LocalServerForm(props: Props) {
           {t('providerSetup.local.noModelsLoaded', { url: probe.base_url, name: typeName })}
         </div>
       ) : null}
-
-      <div className="flex items-center justify-end gap-3">
-        {isEdit ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="mr-auto"
-            busy={deleting}
-            onClick={() => void remove()}
-          >
-            {t('providerSetup.localServer.remove')}
-          </Button>
-        ) : null}
-        <Button size="sm" variant="ghost" onClick={props.onCancel}>
-          {t('common.cancel')}
-        </Button>
+    </>
+  );
+  const actions = (
+    <div className="flex w-full items-center justify-end gap-3">
+      {isEdit ? (
         <Button
           size="sm"
-          busy={saving}
-          disabled={selected.size === 0 || probing || (!isEdit && !probe)}
-          onClick={() => void save()}
+          variant="ghost"
+          className="mr-auto"
+          busy={deleting}
+          onClick={() => void remove()}
         >
-          {isEdit ? t('common.saveChanges') : t('providerSetup.local.connectModels', selected.size)}
+          {t('providerSetup.localServer.remove')}
         </Button>
-      </div>
+      ) : null}
+      <Button size="sm" variant="ghost" onClick={props.onCancel}>
+        {t('common.cancel')}
+      </Button>
+      <Button
+        size="sm"
+        busy={saving}
+        disabled={selected.size === 0 || probing || (!isEdit && !probe)}
+        onClick={() => void save()}
+      >
+        {isEdit ? t('common.saveChanges') : t('providerSetup.local.connectModels', selected.size)}
+      </Button>
+    </div>
+  );
+
+  if (props.layout) {
+    return props.layout({
+      sections: [
+        {
+          key: 'server',
+          label: t('providers.detail.manageTab.server'),
+          content: (
+            <div className="flex flex-col gap-4">
+              {header}
+              {serverSection}
+            </div>
+          ),
+        },
+        {
+          key: 'models',
+          label: t('providers.detail.manageTab.models'),
+          content: modelsSection,
+        },
+      ],
+      actions,
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {header}
+      {serverSection}
+      {modelsSection}
+      {actions}
     </div>
   );
 }

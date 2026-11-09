@@ -330,6 +330,7 @@ export class ProviderKeyService {
             apiKey: '',
             region: record.region,
             streamWarmupMs: record.stream_warmup_ms,
+            streamIdleTimeoutMs: record.stream_idle_timeout_ms,
           },
         ];
       }
@@ -342,7 +343,10 @@ export class ProviderKeyService {
             priority: record.priority,
             apiKey: '',
             region: record.region,
+            baseUrl: record.auth_type === 'api_key' ? (record.base_url ?? null) : null,
+            baseUrlAllowsPrivate: record.allow_private_destination !== false,
             streamWarmupMs: record.stream_warmup_ms,
+            streamIdleTimeoutMs: record.stream_idle_timeout_ms,
           },
         ];
       }
@@ -356,7 +360,10 @@ export class ProviderKeyService {
           priority: record.priority,
           apiKey: decryptWithAny(record.api_key_encrypted, getDecryptionSecrets()).plaintext,
           region: record.region,
+          baseUrl: record.auth_type === 'api_key' ? (record.base_url ?? null) : null,
+          baseUrlAllowsPrivate: record.allow_private_destination !== false,
           streamWarmupMs: record.stream_warmup_ms,
+          streamIdleTimeoutMs: record.stream_idle_timeout_ms,
         },
       ];
     } catch {

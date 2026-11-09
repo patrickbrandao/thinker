@@ -1,10 +1,12 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { Subscription } from 'rxjs';
+import { SYSTEM_EVENT_CATEGORY, type SystemEventType, type TriggerEventType } from 'thinker-shared';
 import {
   TriggerSignalService,
   type TriggerSignal,
 } from '../common/services/trigger-signal.service';
+import { SystemEventsService } from '../common/services/system-events.service';
 import { TriggerDispatchService } from './trigger-dispatch.service';
 
 /** Request rows are written before their attempts; wait for those to land. */
@@ -12,6 +14,29 @@ const REQUEST_SETTLE_MS = 2_000;
 /** At most one provider.failure per harness and provider per window. */
 export const PROVIDER_FAILURE_WINDOW_MS = 5 * 60_000;
 const MAX_TRACKED = 5_000;
+/** At most one model.error per connection and model per hour. */
+export const MODEL_ERROR_WINDOW_MS = 60 * 60_000;
+/** Consecutive failures of one model on one connection that raise model.error. */
+export const MODEL_ERROR_STREAK = 5;
+
+const MODEL_GONE_RE =
+  /model[_ ]not[_ ]found|unknown model|no such model|invalid model|model .*(does not exist|not exist|not found|is not available|unavailable|not supported|deprecated|decommissioned)/;
+
+/** The provider says the model does not exist or is not available. */
+export function isModelUnavailable(
+  httpStatus: number | null,
+  message: string | null,
+  model: string | null,
+): boolean {
+  const text = (message ?? '').toLowerCase();
+  if (MODEL_GONE_RE.test(text)) return true;
+  if (httpStatus === 404 && /model/.test(text)) return true;
+  if (httpStatus === 400 && model) {
+    const bare = model.toLowerCase().split('/').pop() ?? '';
+    return bare.length > 2 && text.includes(bare) && /model/.test(text);
+  }
+  return false;
+}
 
 type Signal<K extends TriggerSignal['kind']> = Extract<TriggerSignal, { kind: K }>;
 
@@ -46,11 +71,16 @@ export class TriggerListenerService implements OnModuleInit, OnModuleDestroy {
   private readonly failureWindows = new Map<string, { since: number; count: number }>();
   /** Connections reported as expired, cleared on their next success. */
   private readonly expired = new Set<string>();
+  /** Connections already in Alerts as expired, cleared on their next success. */
+  private readonly alertedExpired = new Set<string>();
+  /** `${connection}|${model}` → consecutive failures. */
+  private readonly modelStreaks = new Map<string, number>();
 
   constructor(
     private readonly signals: TriggerSignalService,
     private readonly dispatch: TriggerDispatchService,
     private readonly ds: DataSource,
+    @Optional() private readonly alerts?: SystemEventsService,
   ) {}
 
   onModuleInit(): void {
@@ -77,6 +107,8 @@ export class TriggerListenerService implements OnModuleInit, OnModuleDestroy {
         return this.onLimit(signal);
       case 'harness':
         return this.onHarness(signal);
+      case 'system':
+        return this.onSystem(signal);
     }
   }
 
@@ -176,27 +208,100 @@ export class TriggerListenerService implements OnModuleInit, OnModuleDestroy {
 
   private async onAttempt(signal: Signal<'attempt'>): Promise<void> {
     if (!signal.tenantProviderId) return;
+    this.trackModel(signal);
     if (signal.ok) {
       this.expired.delete(signal.tenantProviderId);
+      this.alertedExpired.delete(signal.tenantProviderId);
       return;
     }
     // A Thinker error code (M100/M102 credential hops) is our own config
     // error carrying a synthetic 401, not the provider rejecting the key.
     if (signal.errorCode || (signal.httpStatus !== 401 && signal.httpStatus !== 403)) return;
+    const label = signal.keyLabel ? ` "${signal.keyLabel}"` : '';
+    const title = `Credential rejected: ${signal.provider ?? 'provider'}${label}`;
+    const message =
+      `${signal.provider ?? 'The provider'} rejected the connection${label} with HTTP ${signal.httpStatus}` +
+      ` while serving ${signal.agentName}. Reconnect or replace the key.`;
+    if (this.alerts && !this.alertedExpired.has(signal.tenantProviderId)) {
+      this.alertedExpired.add(signal.tenantProviderId);
+      if (this.alertedExpired.size > MAX_TRACKED) this.alertedExpired.clear();
+      this.alerts.record({
+        tenantId: signal.tenantId,
+        level: 'error',
+        type: 'credential.expired',
+        title,
+        message,
+        entityType: 'connection',
+        entityId: signal.tenantProviderId,
+        entityName: `${signal.provider ?? ''}${label}`.trim(),
+        metadata: { http_status: signal.httpStatus, harness: signal.agentName },
+      });
+    }
     if (this.expired.has(signal.tenantProviderId)) return;
     if (!(await this.dispatch.isSubscribed(signal.agentId, 'credential.expired'))) return;
     this.expired.add(signal.tenantProviderId);
     if (this.expired.size > MAX_TRACKED) this.expired.clear();
-    const label = signal.keyLabel ? ` "${signal.keyLabel}"` : '';
     await this.dispatch.emit({
       tenantId: signal.tenantId,
       eventType: 'credential.expired',
       agentId: signal.agentId,
       agentName: signal.agentName,
-      title: `Credential rejected: ${signal.provider ?? 'provider'}${label}`,
-      message:
-        `${signal.provider ?? 'The provider'} rejected the connection${label} with HTTP ${signal.httpStatus}` +
-        ` while serving ${signal.agentName}. Reconnect or replace the key.`,
+      title,
+      message,
+      vars: {
+        'connection.id': signal.tenantProviderId,
+        'connection.provider': fmt(signal.provider),
+        'connection.label': fmt(signal.keyLabel),
+        'connection.http_status': fmt(signal.httpStatus),
+        'connection.error': fmt(signal.errorMessage),
+      },
+    });
+  }
+
+  /**
+   * model.error: the provider says the model is unknown or unavailable, or
+   * the same model failed MODEL_ERROR_STREAK times in a row on a connection.
+   * At most one alert per connection and model per hour.
+   */
+  private trackModel(signal: Signal<'attempt'>): void {
+    if (!this.alerts || !signal.model || !signal.tenantProviderId) return;
+    const key = `${signal.tenantProviderId}|${signal.model}`;
+    if (signal.ok) {
+      this.modelStreaks.delete(key);
+      return;
+    }
+    if (signal.errorCode || signal.errorOrigin === 'thinker') return;
+    const streak = (this.modelStreaks.get(key) ?? 0) + 1;
+    this.modelStreaks.set(key, streak);
+    this.trim(this.modelStreaks);
+    const unavailable = isModelUnavailable(signal.httpStatus, signal.errorMessage, signal.model);
+    if (!unavailable && streak < MODEL_ERROR_STREAK) return;
+    this.modelStreaks.delete(key);
+    const label = signal.keyLabel ? ` (${signal.keyLabel})` : '';
+    const where = `${signal.model} on ${signal.provider ?? 'provider'}${label}`;
+    const status = signal.httpStatus ? ` HTTP ${signal.httpStatus}` : '';
+    const error = signal.errorMessage ?? 'no error message';
+    this.alerts.record({
+      tenantId: signal.tenantId,
+      level: 'error',
+      type: 'model.error',
+      title: unavailable ? `Model unavailable: ${where}` : `Model failing: ${where}`,
+      message: unavailable
+        ? `${signal.provider ?? 'The provider'} answered${status} for ${signal.model}: ${error}`
+        : `${streak} requests in a row to ${signal.model} failed (last:${status || ' no status'}): ${error}`,
+      entityType: 'model',
+      entityId: signal.model,
+      entityName: signal.model,
+      metadata: {
+        connection_id: signal.tenantProviderId,
+        provider: signal.provider,
+        key_label: signal.keyLabel,
+        http_status: signal.httpStatus,
+        reason: unavailable ? 'unavailable' : 'consecutive_failures',
+        harness: signal.agentName,
+      },
+      dedupeKey: `model.error:${signal.tenantId}:${key}`,
+      dedupeWindowMs: MODEL_ERROR_WINDOW_MS,
       vars: {
         'connection.id': signal.tenantProviderId,
         'connection.provider': fmt(signal.provider),
@@ -216,17 +321,38 @@ export class TriggerListenerService implements OnModuleInit, OnModuleDestroy {
     const soft = signal.alertType === 'soft';
     const value = (n: number) =>
       signal.metric === 'cost' ? `$${Number(n).toFixed(2)}` : `${Math.round(Number(n))} tokens`;
+    const title = soft
+      ? `${signal.agentName} exceeded the ${signal.metric} threshold`
+      : `${signal.agentName} has been blocked`;
+    const message = soft
+      ? `${signal.agentName} used ${value(signal.actual)} this ${signal.period}, over the ${value(signal.threshold)} threshold. Requests are still being processed.`
+      : `${signal.agentName} reached the ${value(signal.threshold)}${signal.metric === 'cost' ? ' cost' : ''} limit per ${signal.period} (${value(signal.actual)}). New requests are blocked until the period resets${signal.periodReset ? ` on ${signal.periodReset}` : ''}.`;
+    this.alerts?.record({
+      tenantId: signal.tenantId,
+      level: soft ? 'warning' : 'error',
+      type: soft ? 'limit.alert' : 'limit.block',
+      title,
+      message,
+      entityType: 'harness',
+      entityId: agents[0].id,
+      entityName: signal.agentName,
+      metadata: {
+        rule_id: signal.ruleId,
+        metric: signal.metric,
+        threshold: signal.threshold,
+        actual: signal.actual,
+        period: signal.period,
+      },
+      dedupeKey: `limit:${signal.ruleId}:${signal.alertType}:${signal.periodStart}`,
+      dedupeWindowMs: 24 * 60 * 60_000,
+    });
     await this.dispatch.emit({
       tenantId: signal.tenantId,
       eventType: soft ? 'limit.alert' : 'limit.block',
       agentId: agents[0].id,
       agentName: signal.agentName,
-      title: soft
-        ? `${signal.agentName} exceeded the ${signal.metric} threshold`
-        : `${signal.agentName} has been blocked`,
-      message: soft
-        ? `${signal.agentName} used ${value(signal.actual)} this ${signal.period}, over the ${value(signal.threshold)} threshold. Requests are still being processed.`
-        : `${signal.agentName} reached the ${value(signal.threshold)} ${signal.metric} limit per ${signal.period} (${value(signal.actual)}). New requests are blocked until the period resets${signal.periodReset ? ` on ${signal.periodReset}` : ''}.`,
+      title,
+      message,
       vars: {
         'rule.id': signal.ruleId,
         'rule.metric': signal.metric,
@@ -257,6 +383,34 @@ export class TriggerListenerService implements OnModuleInit, OnModuleDestroy {
       title: `Harness ${signal.displayName} ${created ? 'created' : 'deleted'}`,
       message: `The harness ${signal.displayName} (${signal.agentName}) was ${created ? 'created' : 'deleted'}${actor ? ` by ${actor}` : ''}.`,
       vars: { 'actor.email': actor },
+    });
+  }
+
+  /** Alerts that are workspace trigger events go to the triggers that subscribed to them. */
+  private async onSystem(signal: Signal<'system'>): Promise<void> {
+    const actor = signal.actorUserId
+      ? ((await this.ds.query(`SELECT email FROM "user" WHERE id = $1`, [
+          signal.actorUserId,
+        ])) as Array<{ email: string | null }>)
+      : [];
+    await this.dispatch.emit({
+      tenantId: signal.tenantId,
+      eventType: signal.type as TriggerEventType,
+      title: signal.title,
+      message: signal.message,
+      excludeTriggerId: signal.excludeTriggerId,
+      vars: {
+        'alert.id': signal.eventId,
+        'alert.level': signal.level,
+        'alert.category': SYSTEM_EVENT_CATEGORY[signal.type as SystemEventType] ?? '',
+        'alert.url': this.dispatch.alertsUrl(),
+        'entity.type': fmt(signal.entityType),
+        'entity.id': fmt(signal.entityId),
+        'entity.name': fmt(signal.entityName),
+        'actor.email': actor[0]?.email ?? '',
+        'actor.ip': fmt(signal.actorIp),
+        ...signal.vars,
+      },
     });
   }
 

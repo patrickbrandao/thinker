@@ -231,7 +231,11 @@ export function getPythonSnippets(
   apiKey: string,
   customHeaders?: CustomHeaders,
 ): Snippet[] {
-  const langchainHeaders = headerLine(customHeaders, 'py-kwarg', 'default_headers');
+  // LangChain sends no session id of its own: a per-conversation
+  // x-session-key groups the conversation in Thinker (harness-langchain G1).
+  const langchainHeaders =
+    headerLine(customHeaders, 'py-kwarg', 'default_headers') ||
+    '\n    # default_headers={"x-session-key": "<conversation id>"},';
   const openaiHeaders = headerLine(customHeaders, 'py-kwarg', 'default_headers');
   return [
     {
@@ -262,29 +266,6 @@ response = client.responses.create(
   ];
 }
 
-export function getVercelPythonSnippet(
-  baseUrl: string,
-  apiKey: string,
-  customHeaders?: CustomHeaders,
-): Snippet {
-  const headersLine = headerLine(customHeaders, 'py-kwarg', 'default_headers');
-  return {
-    title: 'Vercel AI SDK (Python)',
-    code: `# pip install ai-sdk
-from ai_sdk import AIClient
-
-client = AIClient(
-    base_url="${baseUrl}",
-    api_key="${apiKey}",${headersLine}
-)
-
-response = client.generate_text(
-    model="auto",
-    prompt="Hello",
-)`,
-  };
-}
-
 export function getTypeScriptSnippets(
   baseUrl: string,
   apiKey: string,
@@ -294,13 +275,18 @@ export function getTypeScriptSnippets(
   const openaiHeaders = headerLine(customHeaders, 'ts-prop', 'defaultHeaders');
   return [
     {
+      // createOpenAI(...)(id) calls the Responses API since AI SDK 5; the
+      // OpenAI-compatible provider stays on Chat Completions, and
+      // includeUsage asks for the final usage chunk when streaming.
       title: 'Vercel AI SDK',
-      code: `import { createOpenAI } from "@ai-sdk/openai";
+      code: `import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
 
-const thinker = createOpenAI({
+const thinker = createOpenAICompatible({
+  name: "thinker",
   baseURL: "${baseUrl}",
-  apiKey: "${apiKey}",${vercelHeaders}
+  apiKey: "${apiKey}",
+  includeUsage: true,${vercelHeaders}
 });
 
 const { text } = await generateText({
@@ -465,9 +451,8 @@ function getAutoSnippetForToolkit(
         ? getAnthropicPythonSnippet(baseUrl, apiKey, customHeaders)
         : getAnthropicTypeScriptSnippet(baseUrl, apiKey, customHeaders);
     case 'vercel-ai-sdk':
-      return openaiLang === 'python'
-        ? getVercelPythonSnippet(baseUrl, apiKey, customHeaders)
-        : getTypeScriptSnippets(baseUrl, apiKey, customHeaders)[0]!;
+      // The AI SDK is TypeScript only.
+      return getTypeScriptSnippets(baseUrl, apiKey, customHeaders)[0]!;
     case 'langchain':
       return getPythonSnippets(baseUrl, apiKey, customHeaders)[0]!;
     case 'curl':
@@ -482,7 +467,7 @@ export function getLangForToolkit(id: ToolkitId, openaiLang?: OpenAILangId): str
     case 'anthropic-sdk':
       return openaiLang === 'typescript' ? 'typescript' : 'python';
     case 'vercel-ai-sdk':
-      return openaiLang === 'typescript' ? 'typescript' : 'python';
+      return 'typescript';
     case 'langchain':
       return 'python';
     case 'curl':

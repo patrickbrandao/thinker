@@ -1,3 +1,4 @@
+import { ProviderWizard } from '../../components/ProviderWizard.js';
 import { useEffect, useMemo, useState, type KeyboardEvent, type SyntheticEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { LayoutGrid, List, Pencil, Plus, Shapes } from 'lucide-react';
@@ -16,17 +17,17 @@ import { analyticsPing, routingPing } from '../../services/sse.js';
 import { renameProviderKey } from '../../services/api/routing.js';
 import { getPlaygroundAgent } from '../../services/api/playground.js';
 import type { AuthType, CustomProviderData, RoutingProvider } from '../../services/api.js';
-import type { CustomProviderPrefill, ProviderDeepLink } from '../../services/routing-params.js';
+import type { ProviderDeepLink } from '../../services/routing-params.js';
 import { PROVIDERS, subscriptionCatalog, type ProviderDef } from '../../services/providers.js';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import { toast } from '../../services/toast-store.js';
 import { t } from '../../i18n/index.js';
 import { me, roleCan } from '../../services/session-store.js';
-import ProviderSelectModal from '../../components/ProviderSelectModal.jsx';
+import ProviderSelectContent from '../../components/ProviderSelectContent.jsx';
 import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import LocalServerForm from '../../components/LocalServerForm.jsx';
 import type { LocalServerType } from '../../services/api.js';
-import { Badge, Button, Modal, cx } from '../../components/ui.js';
+import { Badge, Button, FloatingWindow, cx } from '../../components/ui.js';
 import { useResource } from '../../lib/use-resource.js';
 import { useSignal } from '../../lib/signal.js';
 
@@ -49,7 +50,6 @@ interface PageCopy {
   title: string;
   heading: string;
   subtitle: string;
-  addLabel: string;
   customAddLabel?: string;
   /** Catalog page the list's add button opens (pages split into list + catalog). */
   addPath?: string;
@@ -58,7 +58,6 @@ interface PageCopy {
   connectedHeading: string;
   supportedHeading: string;
   authType: AuthType;
-  activeLabel: (count: number) => string;
 }
 
 /** Page copy, read at render time so it follows the active language. */
@@ -68,21 +67,18 @@ const pageCopy = (kind: ProviderPageKind): PageCopy => {
       title: t('providers.page.subscriptions.title'),
       heading: t('providers.kind.subscriptions'),
       subtitle: t('providers.page.subscriptions.subtitle'),
-      addLabel: t('providers.connect'),
       addPath: '/providers/subscriptions/add',
       addPageLabel: t('providers.page.connectProvider'),
       emptyLabel: t('providers.page.noSubscriptionConnections'),
       connectedHeading: t('providers.page.subscriptions.connectedHeading'),
       supportedHeading: t('providers.page.subscriptions.supportedHeading'),
       authType: 'subscription',
-      activeLabel: (n) => t('providers.page.activeConnections', n),
     };
   if (kind === 'byok')
     return {
       title: t('providers.page.byok.title'),
       heading: t('providers.kind.byok'),
       subtitle: t('providers.page.byok.subtitle'),
-      addLabel: t('providers.connect'),
       customAddLabel: t('providers.page.addCustomProvider'),
       addPath: '/providers/usage-based/add',
       addPageLabel: t('providers.page.addProvider'),
@@ -90,20 +86,17 @@ const pageCopy = (kind: ProviderPageKind): PageCopy => {
       connectedHeading: t('providers.page.byok.connectedHeading'),
       supportedHeading: t('providers.page.byok.supportedHeading'),
       authType: 'api_key',
-      activeLabel: (n) => t('providers.page.activeKeys', n),
     };
   return {
     title: t('providers.page.local.title'),
     heading: t('providers.kind.local'),
     subtitle: t('providers.page.local.subtitle'),
-    addLabel: t('providers.connect'),
     connectedHeading: t('providers.page.local.connectedHeading'),
     supportedHeading: '',
     addPath: '/providers/local/add',
     addPageLabel: t('providers.page.addAiServer'),
     emptyLabel: t('providers.page.noLocalServers'),
     authType: 'local',
-    activeLabel: (n) => t('providers.page.activeConnections', n),
   };
 };
 
@@ -111,7 +104,10 @@ const providerListForKind = (
   kind: ProviderPageKind,
   hasConnection: (providerId: string) => boolean,
 ): ProviderDef[] => {
-  if (kind === 'subscriptions') return subscriptionCatalog(PROVIDERS, hasConnection);
+  // One OpenCode card per page: on Subscriptions it opens the wizard's
+  // Console / Go choice, so the separate OpenCode Go card is hidden.
+  if (kind === 'subscriptions')
+    return subscriptionCatalog(PROVIDERS, hasConnection).filter((p) => p.id !== 'opencode-go');
   if (kind === 'local') return PROVIDERS.filter((provider) => provider.localOnly);
   return PROVIDERS.filter((provider) => !provider.subscriptionOnly && !provider.localOnly);
 };
@@ -167,44 +163,6 @@ function ProviderMark({
     >
       {(name || providerId).charAt(0).toUpperCase()}
     </span>
-  );
-}
-
-/** The servers of one local type, each with its address and an Edit action. */
-function LocalServerList({
-  servers,
-  canManage,
-  onEdit,
-}: {
-  servers: CustomProviderData[];
-  canManage: boolean;
-  onEdit: (cp: CustomProviderData) => void;
-}) {
-  if (servers.length === 0) {
-    return <div className="text-xs text-muted">{t('providerSetup.localServer.noServers')}</div>;
-  }
-  return (
-    <ul className="m-0 flex list-none flex-col gap-1 p-0">
-      {servers.map((cp) => {
-        const c = cp.local_config;
-        const address = c ? `${c.host}:${c.port}${c.path_prefix}` : cp.base_url;
-        return (
-          <li key={cp.id} className="flex items-center justify-between gap-2 text-sm">
-            <span className="min-w-0">
-              <span className="block truncate font-medium text-ink">{cp.name}</span>
-              <span className="block truncate font-mono text-xs text-muted">
-                {address} · {t('providerSetup.localServer.modelCount', cp.models.length)}
-              </span>
-            </span>
-            {canManage ? (
-              <Button variant="ghost" size="sm" onClick={() => onEdit(cp)}>
-                {t('providerSetup.localServer.edit')}
-              </Button>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 
@@ -324,7 +282,6 @@ export default function ProviderConnectionsPage({
   const canManage = roleCan.manageProviders();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showModal, setShowModal] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
   // Local page: the server being added (no editData) or edited.
   const [localEditor, setLocalEditor] = useState<{
@@ -332,9 +289,6 @@ export default function ProviderConnectionsPage({
     editData?: CustomProviderData;
   } | null>(null);
   const [deepLink, setDeepLink] = useState<ProviderDeepLink | null>(null);
-  const [customProviderPrefill, setCustomProviderPrefill] = useState<CustomProviderPrefill | null>(
-    null,
-  );
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   // Inline rename state
@@ -459,11 +413,6 @@ export default function ProviderConnectionsPage({
     connectedByProvider.get(providerId)?.connections.filter((connection) => connection.is_active)
       .length ?? 0;
 
-  const activeLabel = (count: number) => {
-    if (kind === 'local') return t('providers.connected');
-    return copy.activeLabel(count);
-  };
-
   const startRename = (connectionId: string, currentLabel: string, e: SyntheticEvent) => {
     e.stopPropagation();
     setRenamingId(connectionId);
@@ -514,20 +463,17 @@ export default function ProviderConnectionsPage({
     }
   };
 
-  const openModal = (providerId?: string) => {
-    setCustomProviderPrefill(null);
-    // Deep-link with the page's auth type so the connection form opens in the
-    // matching mode (e.g. the Subscriptions page opens the OAuth/subscription
-    // flow rather than the API-key form for providers that support both).
-    setDeepLink(providerId ? { providerId, authType: copy.authType } : null);
+  // Picking a provider in the catalog always sets up a new connection; the
+  // existing ones are managed on their own records. The page's auth type picks
+  // the flow (e.g. Subscriptions opens OAuth rather than the API-key form).
+  const openNewConnection = (providerId: string) => {
+    setDeepLink({ providerId, authType: copy.authType });
     void modalProviders.reload();
-    setShowModal(true);
   };
 
-  // Deep-link support: visiting a provider page with ?add=true auto-opens the
-  // connect modal so onboarding surfaces can route a user straight into adding
-  // a provider. React on every navigation (not just initial mount) and clear the
-  // param (replace) so a refresh or back-nav doesn't re-trigger it.
+  // Onboarding links reach the catalog with ?add=true: the list page forwards
+  // to its catalog, which drops the param (replace) so a refresh or back-nav
+  // doesn't re-trigger it.
   const addParam = searchParams.get('add');
   useEffect(() => {
     if (addParam !== 'true') return;
@@ -543,7 +489,6 @@ export default function ProviderConnectionsPage({
       },
       { replace: true },
     );
-    openModal();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addParam]);
 
@@ -553,10 +498,8 @@ export default function ProviderConnectionsPage({
     void customProviders.reload();
   };
 
-  const handleModalClose = () => {
-    setShowModal(false);
+  const handleNewConnectionClose = () => {
     setDeepLink(null);
-    setCustomProviderPrefill(null);
     void refetchGlobalProviders();
   };
 
@@ -573,36 +516,15 @@ export default function ProviderConnectionsPage({
     void Promise.all([refetchGlobalProviders(), customProviders.reload(), modalProviders.reload()]);
   };
 
-  const localServers = (type: string) =>
-    (customProviders.data ?? []).filter((cp) => cp.local_type === type);
-
   const goToConnection = (id: string) => navigate(`/providers/connections/${id}`);
 
-  const addServerButton = (type: string) =>
-    canManage ? (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="whitespace-nowrap"
-        disabled={!firstAgentName}
-        onClick={() => setLocalEditor({ type: type as LocalServerType })}
-      >
-        {t('providerSetup.localServer.addServer')}
-      </Button>
-    ) : null;
-
-  const connectButton = (providerId: string) =>
-    canManage ? (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="whitespace-nowrap"
-        disabled={!firstAgentName}
-        onClick={() => openModal(providerId)}
-      >
-        {copy.addLabel}
-      </Button>
-    ) : null;
+  // Each catalog entry is itself the control that adds a new connection (or
+  // local server) of that provider type.
+  const startNew = (providerId: string) =>
+    kind === 'local'
+      ? setLocalEditor({ type: providerId as LocalServerType })
+      : openNewConnection(providerId);
+  const addLabel = (name: string) => `${t('common.add')} ${name}`;
 
   return (
     <div className="page wide">
@@ -820,35 +742,33 @@ export default function ProviderConnectionsPage({
                 <tbody>
                   {catalogProviders.map((provider) => {
                     const activeCount = activeConnectionCount(provider.id);
+                    const mark = (
+                      <>
+                        <ProviderMark providerId={provider.id} name={provider.name} />
+                        <span className="row-title">{provider.name}</span>
+                      </>
+                    );
                     return (
                       <tr key={provider.id}>
                         <td>
-                          <span className="flex items-center gap-2.5">
-                            <ProviderMark providerId={provider.id} name={provider.name} />
-                            <span className="row-title">{provider.name}</span>
-                          </span>
-                          {kind === 'local' ? (
-                            <LocalServerList
-                              servers={localServers(provider.id)}
-                              canManage={canManage}
-                              onEdit={(cp) =>
-                                setLocalEditor({
-                                  type: provider.id as LocalServerType,
-                                  editData: cp,
-                                })
-                              }
-                            />
-                          ) : null}
+                          {canManage ? (
+                            <button
+                              type="button"
+                              className="flex w-full cursor-pointer items-center gap-2.5 rounded-control border-0 bg-transparent p-0 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label={addLabel(provider.name)}
+                              disabled={!firstAgentName}
+                              onClick={() => startNew(provider.id)}
+                            >
+                              {mark}
+                            </button>
+                          ) : (
+                            <span className="flex items-center gap-2.5">{mark}</span>
+                          )}
                         </td>
-                        <td className="row-actions">
-                          <span className="inline-flex items-center justify-end gap-2">
-                            {activeCount > 0 ? (
-                              <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
-                            ) : null}
-                            {kind === 'local'
-                              ? addServerButton(provider.id)
-                              : connectButton(provider.id)}
-                          </span>
+                        <td className="text-right">
+                          {activeCount > 0 ? (
+                            <ActiveLabel>{t('providers.page.sessions', activeCount)}</ActiveLabel>
+                          ) : null}
                         </td>
                       </tr>
                     );
@@ -860,31 +780,39 @@ export default function ProviderConnectionsPage({
             <div className="card-grid">
               {catalogProviders.map((provider) => {
                 const activeCount = activeConnectionCount(provider.id);
-                return (
-                  <div key={provider.id} className="card flex flex-col gap-3">
+                const body = (
+                  <>
+                    {/* The session count sits under the name, so the card keeps
+                        the icon's height with or without connections. */}
                     <div className="flex min-w-0 items-center gap-3">
                       <ProviderMark providerId={provider.id} name={provider.name} size={48} />
-                      <span className="truncate text-[1.25rem] leading-tight font-semibold text-ink">
-                        {provider.name}
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate text-[1.25rem] leading-tight font-semibold text-ink">
+                          {provider.name}
+                        </span>
+                        {activeCount > 0 ? (
+                          <ActiveLabel>{t('providers.page.sessions', activeCount)}</ActiveLabel>
+                        ) : null}
                       </span>
                     </div>
-                    {kind === 'local' ? (
-                      <LocalServerList
-                        servers={localServers(provider.id)}
-                        canManage={canManage}
-                        onEdit={(cp) =>
-                          setLocalEditor({ type: provider.id as LocalServerType, editData: cp })
-                        }
-                      />
-                    ) : null}
-                    <div className="flex items-center justify-between gap-3">
-                      {activeCount > 0 ? (
-                        <ActiveLabel>{activeLabel(activeCount)}</ActiveLabel>
-                      ) : (
-                        <span />
-                      )}
-                      {kind === 'local' ? addServerButton(provider.id) : connectButton(provider.id)}
-                    </div>
+                  </>
+                );
+                // The card is the "add" control; hovering or focusing it rings it
+                // in the same liquid-metal silver as the chosen harness.
+                return canManage ? (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    className="card provider-type-card liquid-metal flex cursor-pointer flex-col gap-3 text-left focus-visible:outline-offset-4 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={addLabel(provider.name)}
+                    disabled={!firstAgentName}
+                    onClick={() => startNew(provider.id)}
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div key={provider.id} className="card flex flex-col gap-3">
+                    {body}
                   </div>
                 );
               })}
@@ -893,49 +821,79 @@ export default function ProviderConnectionsPage({
         </>
       ) : null}
 
-      {showModal && firstAgentName ? (
-        <ProviderSelectModal
-          agentName={firstAgentName}
-          providers={modalProviders.data ?? []}
-          customProviders={customProviders.data ?? []}
-          customProviderPrefill={customProviderPrefill}
-          providerDeepLink={deepLink}
-          initialTab={copy.authType}
-          onUpdate={handleModalUpdate}
-          onClose={handleModalClose}
-        />
-      ) : null}
+      <FloatingWindow
+        open={!!deepLink && !!firstAgentName}
+        onClose={handleNewConnectionClose}
+        className="floating-window--fit"
+        title={t('providerSetup.shared.newConnectionFor', {
+          name: deepLink
+            ? providerDisplayName(deepLink.providerId, customProviders.data ?? [])
+            : '',
+        })}
+        icon={deepLink ? <ProviderMark providerId={deepLink.providerId} name="" /> : null}
+      >
+        {deepLink ? (
+          <ProviderWizard
+            key={deepLink.providerId}
+            providerId={deepLink.providerId}
+            authType={deepLink.authType ?? copy.authType}
+            render={(providerId) => (
+              <ProviderSelectContent
+                key={providerId}
+                agentName={firstAgentName}
+                providers={modalProviders.data ?? []}
+                customProviders={customProviders.data ?? []}
+                providerDeepLink={{ ...deepLink, providerId }}
+                initialTab={copy.authType}
+                onUpdate={handleModalUpdate}
+                onClose={handleNewConnectionClose}
+                newConnection
+              />
+            )}
+          />
+        ) : null}
+      </FloatingWindow>
 
-      <Modal
+      <FloatingWindow
         open={!!localEditor && !!firstAgentName}
         onClose={() => setLocalEditor(null)}
-        label={t('providerSetup.localServer.addServer')}
-        wide
+        className="floating-window--fit"
+        title={
+          localEditor
+            ? t(`providerSetup.localServer.${localEditor.editData ? 'editTitle' : 'addTitle'}`, {
+                type: standardProviderName(localEditor.type) ?? localEditor.type,
+              })
+            : ''
+        }
+        icon={localEditor ? <ProviderMark providerId={localEditor.type} name="" /> : null}
       >
         {localEditor ? (
           <LocalServerForm
+            key={localEditor.editData?.id ?? localEditor.type}
             agentName={firstAgentName}
             type={localEditor.type}
             editData={localEditor.editData}
             takenNames={(customProviders.data ?? []).map((cp) => cp.name)}
             onSaved={closeLocalEditor}
             onCancel={() => setLocalEditor(null)}
+            embedded
           />
         ) : null}
-      </Modal>
+      </FloatingWindow>
 
-      <Modal
+      <FloatingWindow
         open={showCustomModal && !!firstAgentName}
         onClose={handleCustomModalClose}
-        label={t('providers.page.addCustomProvider')}
-        wide
+        title={t('providers.customForm.addTitle')}
+        className="floating-window--wide"
       >
         <CustomProviderForm
           agentName={firstAgentName}
           onCreated={handleCustomModalClose}
           onBack={handleCustomModalClose}
+          embedded
         />
-      </Modal>
+      </FloatingWindow>
     </div>
   );
 }

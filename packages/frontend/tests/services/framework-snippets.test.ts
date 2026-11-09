@@ -13,7 +13,6 @@ import {
   OPENAI_SDK_LANGS,
   SDK_LANG_TOGGLE,
   OPENAI_API_TOGGLE,
-  getVercelPythonSnippet,
   getStoredToolkit,
   storeToolkit,
   getStoredOpenAILang,
@@ -99,21 +98,6 @@ describe('OPENAI_API_TOGGLE', () => {
       { id: 'responses', label: 'Responses API' },
       { id: 'chat-completions', label: 'Chat Completions' },
     ]);
-  });
-});
-
-describe('getVercelPythonSnippet', () => {
-  it('returns a snippet with Vercel AI SDK Python title', () => {
-    const snippet = getVercelPythonSnippet('http://localhost/v1', 'thk_key');
-    expect(snippet.title).toBe('Vercel AI SDK (Python)');
-  });
-
-  it('includes AI SDK Python client code', () => {
-    const snippet = getVercelPythonSnippet('http://example.com/v1', 'thk_abc');
-    expect(snippet.code).toContain('from ai_sdk import AIClient');
-    expect(snippet.code).toContain('http://example.com/v1');
-    expect(snippet.code).toContain('thk_abc');
-    expect(snippet.code).toContain('model="auto"');
   });
 });
 
@@ -265,7 +249,11 @@ describe('getTypeScriptSnippets', () => {
   it('includes Vercel AI SDK snippet', () => {
     const snippets = getTypeScriptSnippets('http://example.com/v1', 'thk_xyz');
     expect(snippets[0].title).toBe('Vercel AI SDK');
-    expect(snippets[0].code).toContain('createOpenAI');
+    // Chat Completions provider with streaming usage, not createOpenAI (Responses).
+    expect(snippets[0].code).toContain('createOpenAICompatible');
+    expect(snippets[0].code).toContain('includeUsage: true');
+    expect(snippets[0].code).toContain('thinker("auto")');
+    expect(snippets[0].code).not.toContain('createOpenAI(');
     expect(snippets[0].code).toContain('http://example.com/v1');
     expect(snippets[0].code).toContain('thk_xyz');
   });
@@ -473,22 +461,12 @@ describe('getSnippetForToolkit', () => {
     expect(result.code).toContain('base_url="https://gw.example.com"');
   });
 
-  it('returns Vercel AI SDK Python snippet by default', () => {
-    const result = getSnippetForToolkit('vercel-ai-sdk', 'http://x/v1', 'key');
-    expect(result.title).toBe('Vercel AI SDK (Python)');
-    expect(result.code).toContain('from ai_sdk import AIClient');
-  });
-
-  it('returns Vercel AI SDK Python snippet with python lang', () => {
-    const result = getSnippetForToolkit('vercel-ai-sdk', 'http://x/v1', 'key', 'python');
-    expect(result.title).toBe('Vercel AI SDK (Python)');
-    expect(result.code).toContain('from ai_sdk import AIClient');
-  });
-
-  it('returns Vercel AI SDK TypeScript snippet with typescript lang', () => {
-    const result = getSnippetForToolkit('vercel-ai-sdk', 'http://x/v1', 'key', 'typescript');
-    expect(result.title).toBe('Vercel AI SDK');
-    expect(result.code).toContain('createOpenAI');
+  it('returns the Vercel AI SDK TypeScript snippet whatever the language', () => {
+    for (const lang of ['python', 'typescript'] as const) {
+      const result = getSnippetForToolkit('vercel-ai-sdk', 'http://x/v1', 'key', lang);
+      expect(result.title).toBe('Vercel AI SDK');
+      expect(result.code).toContain('createOpenAICompatible');
+    }
   });
 
   it('returns LangChain snippet for langchain', () => {
@@ -523,16 +501,9 @@ describe('getLangForToolkit', () => {
     expect(getLangForToolkit('openai-sdk', 'python')).toBe('python');
   });
 
-  it('returns python for vercel-ai-sdk default', () => {
-    expect(getLangForToolkit('vercel-ai-sdk')).toBe('python');
-  });
-
-  it('returns typescript for vercel-ai-sdk with typescript', () => {
-    expect(getLangForToolkit('vercel-ai-sdk', 'typescript')).toBe('typescript');
-  });
-
-  it('returns python for vercel-ai-sdk with python', () => {
-    expect(getLangForToolkit('vercel-ai-sdk', 'python')).toBe('python');
+  it('returns typescript for vercel-ai-sdk (TypeScript only)', () => {
+    expect(getLangForToolkit('vercel-ai-sdk')).toBe('typescript');
+    expect(getLangForToolkit('vercel-ai-sdk', 'python')).toBe('typescript');
   });
 
   it('returns python for langchain', () => {
@@ -562,7 +533,9 @@ describe('customHeaders weaving', () => {
 
   it('python: omitting customHeaders leaves the snippet unchanged', () => {
     const [lc, openai] = getPythonSnippets('https://api.local/v1', 'k');
-    expect(lc!.code).not.toContain('default_headers');
+    // LangChain only carries the commented x-session-key hint.
+    expect(lc!.code).toContain('# default_headers={"x-session-key": "<conversation id>"},');
+    expect(lc!.code.replace(/#.*$/gm, '')).not.toContain('default_headers');
     expect(openai!.code).not.toContain('default_headers');
   });
 
@@ -576,16 +549,6 @@ describe('customHeaders weaving', () => {
     const [vercel, openai] = getTypeScriptSnippets('https://api.local/v1', 'k');
     expect(vercel!.code).not.toContain('headers:');
     expect(openai!.code).not.toContain('defaultHeaders');
-  });
-
-  it('vercel python: getVercelPythonSnippet adds default_headers', () => {
-    const s = getVercelPythonSnippet('https://api.local/v1', 'k', headers);
-    expect(s.code).toContain('default_headers={"x-thinker-tier": "premium"}');
-  });
-
-  it('vercel python: omitting customHeaders leaves the snippet unchanged', () => {
-    const s = getVercelPythonSnippet('https://api.local/v1', 'k');
-    expect(s.code).not.toContain('default_headers');
   });
 
   it('curl: getCurlSnippet adds -H flags for each header in declared order', () => {
@@ -606,7 +569,8 @@ describe('customHeaders weaving', () => {
     // Guards the empty-entries branch in renderHeadersDict — passing `{}` must
     // not splice an empty `default_headers={}` into the snippet.
     const [lc, openai] = getPythonSnippets('https://api.local/v1', 'k', {});
-    expect(lc!.code).not.toContain('default_headers');
+    expect(lc!.code).not.toContain('default_headers={}');
+    expect(lc!.code.replace(/#.*$/gm, '')).not.toContain('default_headers');
     expect(openai!.code).not.toContain('default_headers');
   });
 
@@ -614,11 +578,6 @@ describe('customHeaders weaving', () => {
     const [vercel, openai] = getTypeScriptSnippets('https://api.local/v1', 'k', {});
     expect(vercel!.code).not.toContain('headers:');
     expect(openai!.code).not.toContain('defaultHeaders');
-  });
-
-  it('vercel python: empty customHeaders object renders no default_headers kwarg', () => {
-    const s = getVercelPythonSnippet('https://api.local/v1', 'k', {});
-    expect(s.code).not.toContain('default_headers');
   });
 
   it('getSnippetsForFramework forwards customHeaders to python', () => {
@@ -655,11 +614,6 @@ describe('customHeaders weaving', () => {
       headers,
     );
     expect(s.code).toContain('defaultHeaders: { "x-thinker-tier": "premium" }');
-  });
-
-  it('getSnippetForToolkit forwards customHeaders for vercel-ai-sdk python', () => {
-    const s = getSnippetForToolkit('vercel-ai-sdk', 'https://api.local/v1', 'k', 'python', headers);
-    expect(s.code).toContain('default_headers={"x-thinker-tier": "premium"}');
   });
 
   it('getSnippetForToolkit forwards customHeaders for vercel-ai-sdk typescript', () => {

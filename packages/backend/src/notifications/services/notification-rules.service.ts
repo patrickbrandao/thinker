@@ -6,7 +6,11 @@ import { NotificationRule } from '../../entities/notification-rule.entity';
 import { NotificationLog } from '../../entities/notification-log.entity';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { Agent } from '../../entities/agent.entity';
-import { CreateNotificationRuleDto, UpdateNotificationRuleDto } from '../dto/notification-rule.dto';
+import {
+  CreateNotificationRuleDto,
+  UpdateNotificationRuleDto,
+  thresholdError,
+} from '../dto/notification-rule.dto';
 import { toSqlTimestamp } from '../../common/utils/postgres-sql';
 
 export interface NotificationRuleWithTriggerCount extends NotificationRule {
@@ -87,6 +91,14 @@ export class NotificationRulesService {
     dto: UpdateNotificationRuleDto,
   ): Promise<NotificationRule | undefined> {
     await this.verifyOwnership(tenantId, ruleId);
+
+    if (dto.threshold !== undefined || dto.metric_type !== undefined) {
+      const current = await this.ruleRepo.findOneBy({ id: ruleId });
+      const metric = dto.metric_type ?? current?.metric_type;
+      const threshold = dto.threshold ?? (current ? Number(current.threshold) : undefined);
+      const error = thresholdError(metric, threshold);
+      if (error) throw new BadRequestException(error);
+    }
 
     const patch: Partial<NotificationRule> = {};
     if (dto.metric_type !== undefined) patch.metric_type = dto.metric_type;

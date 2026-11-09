@@ -88,8 +88,8 @@ export default function FrameworkSnippets({
   const snippetFor = (key: string) =>
     getSnippetForToolkit(activeTab, baseUrl, key, openaiLang, customHeaders, openaiApi, model);
   const language = getLangForToolkit(activeTab, openaiLang);
-  const isSdk =
-    activeTab === 'openai-sdk' || activeTab === 'anthropic-sdk' || activeTab === 'vercel-ai-sdk';
+  // The Vercel AI SDK is TypeScript only, so it has no language toggle.
+  const isSdk = activeTab === 'openai-sdk' || activeTab === 'anthropic-sdk';
   const headerEntries = customHeaders ? Object.entries(customHeaders) : [];
 
   return (

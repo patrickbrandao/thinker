@@ -31,6 +31,20 @@ export function canUsePrivateDestinations(
   return ctx.isInstanceAdmin === true || ctx.role === 'owner';
 }
 
+/**
+ * Whether a stored destination may reach private and LAN addresses at connect
+ * time. `stored` is what the policy said for whoever registered it
+ * (`allow_private_destination`); `allow` lets every destination through.
+ * Rows registered before the column existed default to true, so destinations
+ * already in use keep working (ADR 0006 item 7).
+ */
+export function allowsPrivateDestination(
+  stored: boolean | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return privateUrlPolicy(env) === 'allow' || stored !== false;
+}
+
 export function assertCanUseLocalRunners(
   ctx: Pick<TenantContext, 'role' | 'isInstanceAdmin'>,
   env: NodeJS.ProcessEnv = process.env,

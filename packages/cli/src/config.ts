@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CliError } from './errors';
+import { signRootToken } from './root-token';
 
 /**
  * Origin used when no `--url`, `THINKER_URL` or stored login selects one: a
@@ -87,13 +88,14 @@ export interface ResolvedTarget {
   origin: string;
   apiKey: string | null;
   /** Where the credential came from; null when unauthenticated. */
-  source: 'env' | 'config' | null;
+  source: 'env' | 'config' | 'root' | null;
 }
 
 /**
  * Resolution order — url: --url flag, then THINKER_URL, then the active
  * config host, then DEFAULT_URL (this machine). Credential: THINKER_API_KEY, then the stored
- * credential whose origin EXACTLY matches the target. A credential stored
+ * credential whose origin EXACTLY matches the target, then a root token when
+ * THINKER_ENCRYPTION_KEY is set (the server's own env; THINKER_ROOT_USER picks the account). A credential stored
  * for another host is never sent.
  */
 export function resolveTarget(
@@ -101,7 +103,9 @@ export function resolveTarget(
   env: Env,
   config: CliConfig,
 ): ResolvedTarget {
-  const origin = normalizeOrigin(flagUrl ?? env['THINKER_URL'] ?? config.activeHost ?? DEFAULT_URL);
+  const origin = normalizeOrigin(
+    flagUrl ?? env['THINKER_URL'] ?? config.activeHost ?? serverLocalUrl(env) ?? DEFAULT_URL,
+  );
   const envKey = env['THINKER_API_KEY'];
   if (envKey) {
     return { origin, apiKey: envKey, source: 'env' };
@@ -110,5 +114,46 @@ export function resolveTarget(
   if (stored) {
     return { origin, apiKey: stored, source: 'config' };
   }
+  // Running with the server's own environment (inside the container, or a
+  // `docker run` with the same env file): THINKER_ENCRYPTION_KEY proves root,
+  // so mint a short-lived root token instead of asking for a login.
+  // The token is never minted for another host: it carries no audience, so a
+  // remote server (or anyone on a plain-HTTP path) could replay it against
+  // this instance for its whole 5-minute window. THINKER_ROOT_REMOTE=1 opts in.
+  const rootSecret = env['THINKER_ENCRYPTION_KEY'];
+  if (rootSecret && (isLoopbackOrigin(origin) || env['THINKER_ROOT_REMOTE'] === '1')) {
+    return {
+      origin,
+      apiKey: signRootToken(rootSecret, env['THINKER_ROOT_USER'] ?? ''),
+      source: 'root',
+    };
+  }
   return { origin, apiKey: null, source: null };
+}
+
+/**
+ * Inside the server's own environment (THINKER_ENCRYPTION_KEY is set), the
+ * gateway listens on PORT, which the image and compose let operators change.
+ */
+function serverLocalUrl(env: Env): string | undefined {
+  const port = env['PORT'];
+  if (!env['THINKER_ENCRYPTION_KEY'] || !port || !/^\d{1,5}$/.test(port)) return undefined;
+  return `http://localhost:${port}`;
+}
+
+/** True for this machine: localhost, *.localhost, 127.0.0.0/8 and ::1. */
+export function isLoopbackOrigin(origin: string): boolean {
+  let host: string;
+  try {
+    host = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    /^127(?:\.\d{1,3}){3}$/.test(host) ||
+    host === '[::1]' ||
+    host === '::1'
+  );
 }

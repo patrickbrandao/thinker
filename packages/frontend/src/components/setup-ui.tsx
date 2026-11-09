@@ -3,7 +3,7 @@
  * OpenClaw, Hermes…) and the toolkit snippets. Class names prefixed `setup-`
  * are stable hooks for tests; the look comes from tokens and utilities.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { DARK_ICON_VARIANTS } from 'thinker-shared';
 import { Eye, EyeOff } from 'lucide-react';
 import CopyButton from './CopyButton.jsx';
@@ -183,6 +183,27 @@ export function OnboardField({
       </span>
     </div>
   );
+}
+
+/**
+ * Masked/revealed state of the harness key in a setup guide: `shown` is what
+ * the guide displays, `copy` what the copy buttons write (the real key when
+ * loaded).
+ */
+export function useSetupKey(apiKey: string | null, keyPrefix: string | null) {
+  const [revealed, setRevealed] = useState(false);
+  const masked = keyPrefix ? `${keyPrefix}...` : 'thk_YOUR_KEY';
+  const shown = revealed && apiKey ? apiKey : masked;
+  const copy = apiKey ?? masked;
+  const toggle = () => setRevealed((v) => !v);
+  return {
+    shown,
+    copy,
+    /** Eye toggle for a `SnippetBlock`, or null while only the prefix is known. */
+    reveal: apiKey ? <RevealButton revealed={revealed} onToggle={toggle} /> : null,
+    /** Props for a `KeyValue` cell. */
+    cell: { shown, copyText: copy, canReveal: !!apiKey, revealed, onToggle: toggle },
+  };
 }
 
 /** Value cell for a masked key: the key, its eye toggle and a copy button. */

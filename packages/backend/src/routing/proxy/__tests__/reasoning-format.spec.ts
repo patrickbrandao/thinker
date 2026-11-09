@@ -16,59 +16,57 @@ function catalogOf(entries: Record<string, boolean>): ReasoningModelCatalog {
 }
 
 describe('supportsReasoningContent', () => {
-  describe('opencode-zen', () => {
-    it('preserves reasoning_content for a Zen DeepSeek slug', () => {
+  describe('opencode', () => {
+    it('preserves reasoning_content for a OpenCode DeepSeek slug', () => {
       expect(
         supportsReasoningContent(
-          'opencode-zen',
-          'opencode-zen/deepseek-v4-flash-free',
-          catalogOf({ 'opencode-zen/deepseek-v4-flash-free': true }),
+          'opencode',
+          'opencode/deepseek-v4-flash-free',
+          catalogOf({ 'opencode/deepseek-v4-flash-free': true }),
         ),
       ).toBe(true);
     });
 
-    it('preserves reasoning_content for a Zen codename the catalog marks as reasoning', () => {
+    it('preserves reasoning_content for a OpenCode codename the catalog marks as reasoning', () => {
       expect(
         supportsReasoningContent(
-          'opencode-zen',
-          'opencode-zen/big-pickle',
-          catalogOf({ 'opencode-zen/big-pickle': true }),
+          'opencode',
+          'opencode/big-pickle',
+          catalogOf({ 'opencode/big-pickle': true }),
         ),
       ).toBe(true);
     });
 
-    it('strips reasoning_content for Zen slugs backed by a translated dialect', () => {
+    it('strips reasoning_content for OpenCode slugs backed by a translated dialect', () => {
       const catalog = catalogOf({
-        'opencode-zen/claude-opus-5': true,
-        'opencode-zen/gpt-5.4': true,
-        'opencode-zen/gemini-3-pro': true,
-        'opencode-zen/grok-4.5': true,
+        'opencode/claude-opus-5': true,
+        'opencode/gpt-5.4': true,
+        'opencode/gemini-3-pro': true,
+        'opencode/grok-4.5': true,
       });
       for (const model of [
-        'opencode-zen/claude-opus-5',
-        'opencode-zen/gpt-5.4',
-        'opencode-zen/gemini-3-pro',
-        'opencode-zen/grok-4.5',
+        'opencode/claude-opus-5',
+        'opencode/gpt-5.4',
+        'opencode/gemini-3-pro',
+        'opencode/grok-4.5',
       ]) {
-        expect(supportsReasoningContent('opencode-zen', model, catalog)).toBe(false);
+        expect(supportsReasoningContent('opencode', model, catalog)).toBe(false);
       }
     });
 
     it('strips reasoning_content for models the catalog marks as non-reasoning', () => {
       expect(
         supportsReasoningContent(
-          'opencode-zen',
-          'opencode-zen/kimi-k2',
-          catalogOf({ 'opencode-zen/kimi-k2': false }),
+          'opencode',
+          'opencode/kimi-k2',
+          catalogOf({ 'opencode/kimi-k2': false }),
         ),
       ).toBe(false);
     });
 
     it('falls back to the reasoning model families when the catalog is unavailable', () => {
-      expect(supportsReasoningContent('opencode-zen', 'opencode-zen/deepseek-v4-flash-free')).toBe(
-        true,
-      );
-      expect(supportsReasoningContent('opencode-zen', 'opencode-zen/big-pickle')).toBe(false);
+      expect(supportsReasoningContent('opencode', 'opencode/deepseek-v4-flash-free')).toBe(true);
+      expect(supportsReasoningContent('opencode', 'opencode/big-pickle')).toBe(false);
     });
   });
 
@@ -131,12 +129,12 @@ describe('supportsReasoningContent', () => {
   });
 
   describe('stream format', () => {
-    it('normalizes reasoning deltas for a Zen model the catalog vouches for', () => {
+    it('normalizes reasoning deltas for a OpenCode model the catalog vouches for', () => {
       expect(
         getOpenAiReasoningStreamFormat(
-          'opencode-zen',
-          'opencode-zen/big-pickle',
-          catalogOf({ 'opencode-zen/big-pickle': true }),
+          'opencode',
+          'opencode/big-pickle',
+          catalogOf({ 'opencode/big-pickle': true }),
         ),
       ).toEqual({
         outputStreamDeltaPaths: ['reasoning_content'],
@@ -144,8 +142,8 @@ describe('supportsReasoningContent', () => {
       });
     });
 
-    it('leaves uncatalogued Zen codenames without a reasoning stream format', () => {
-      expect(getOpenAiReasoningStreamFormat('opencode-zen', 'opencode-zen/big-pickle')).toBeNull();
+    it('leaves uncatalogued OpenCode codenames without a reasoning stream format', () => {
+      expect(getOpenAiReasoningStreamFormat('opencode', 'opencode/big-pickle')).toBeNull();
     });
   });
 });

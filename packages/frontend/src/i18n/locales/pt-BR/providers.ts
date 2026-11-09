@@ -62,6 +62,7 @@ const ptBR: Catalog<typeof en> = {
     cost30d: 'Custo (30d)',
     activeConnections: (n: number) => (n === 1 ? `${n} conexão ativa` : `${n} conexões ativas`),
     activeKeys: (n: number) => (n === 1 ? `${n} chave ativa` : `${n} chaves ativas`),
+    sessions: (n: number) => (n === 1 ? `${n} sessão` : `${n} sessões`),
     colName: 'Nome',
     colUrl: 'URL',
     colModels: 'Modelos',
@@ -77,6 +78,20 @@ const ptBR: Catalog<typeof en> = {
     listView: 'Visualização em lista',
   },
   detail: {
+    tabActivity: 'Atividade',
+    tabModels: 'Modelos',
+    manageTab: {
+      general: 'Geral',
+      streaming: 'Streaming',
+      credential: 'Credencial',
+      proxy: 'Proxy de saída',
+      server: 'Servidor',
+      models: 'Modelos',
+      keys: 'Chaves',
+    },
+    accountModelsEmpty:
+      'Esta conta ainda não tem modelos. Use Atualizar modelos para buscá-los no provedor.',
+    changesSaved: 'Alterações salvas',
     loadErrorTitle: 'Não foi possível carregar a conexão | Thinker',
     loadErrorHeading: 'Não foi possível carregar esta conexão',
     loadErrorBody: 'Algo deu errado ao carregar esta conexão. Tente de novo.',
@@ -136,6 +151,11 @@ const ptBR: Catalog<typeof en> = {
     warmupHint:
       'Opcional. Quanto tempo uma requisição em stream espera pelo primeiro token antes de passar para o fallback. Deixe vazio para usar o padrão.',
     warmupSaved: 'Aquecimento do stream salvo',
+    streamIdle: 'Timeout de inatividade do stream (segundos)',
+    idleHint:
+      'Pausa máxima permitida entre dois trechos de uma resposta em stream antes de a tentativa falhar. Vazio herda o timeout de requisição do servidor local e, depois, STREAM_IDLE_TIMEOUT_MS (180 s).',
+    idleSaved: 'Timeout de inatividade do stream salvo',
+    baseUrlSaved: 'URL base salva; os modelos estão sendo descobertos de novo.',
     credential: 'Credencial',
     credentialKeyHint:
       'Troca a chave nesta mesma conexão. O acesso dos harnesses, as rotas e o histórico continuam como estão.',
@@ -145,6 +165,11 @@ const ptBR: Catalog<typeof en> = {
     replaceKey: 'Substituir',
     replacingKey: 'Substituindo...',
     keyReplaced: 'Credencial substituída',
+    currentKey: 'Chave atual',
+    showKey: 'Mostrar chave completa',
+    hideKey: 'Ocultar chave',
+    revealingKey: 'Carregando chave...',
+    revealKeyFailed: 'Não foi possível mostrar a chave',
     reauthenticate: 'Autenticar novamente',
     reauthFailed: 'Não foi possível iniciar a autenticação',
     saveFailed: 'Não foi possível salvar',
@@ -211,6 +236,9 @@ const ptBR: Catalog<typeof en> = {
     inherit: 'Herdar',
     warmupHint:
       'Quanto tempo uma requisição em stream espera pelo primeiro token antes de passar para o fallback. Aumente para modelos locais que demoram a carregar. Deixe vazio para usar o padrão.',
+    streamIdle: 'Timeout de inatividade do stream (segundos)',
+    idleHint:
+      'Pausa máxima permitida entre dois trechos de uma resposta em stream antes de a tentativa falhar. Vazio herda o timeout de requisição do servidor local e, depois, STREAM_IDLE_TIMEOUT_MS (180 s).',
     apiKey: 'Chave de API',
     apiKeyOptional: '(opcional para provedores locais)',
     noKeySet: 'Nenhuma chave definida',
@@ -275,6 +303,49 @@ const ptBR: Catalog<typeof en> = {
     byokDesc:
       'Conecte provedores que você paga por token ou por uso com suas próprias chaves de API.',
     localDesc: 'Conecte-se a servidores de LLM rodando na sua máquina.',
+  },
+  models: {
+    subtitle:
+      'Todos os modelos que as suas contas oferecem, com as contas que os servem, preço, janela de contexto e capacidades.',
+    refresh: 'Atualizar modelos',
+    refreshed: 'Modelos atualizados',
+    search: 'Buscar modelos',
+    allProviders: 'Todos os provedores',
+    allTypes: 'Todos os tipos',
+    allCapabilities: 'Todas as capacidades',
+    includeInactive: 'Incluir contas inativas',
+    count: '{{ shown }} de {{ total }} modelos',
+    viewByModel: 'Por modelo',
+    viewByAccount: 'Por conta',
+    emptyTitle: 'Nenhum modelo',
+    emptyBody: 'Conecte um provedor ou atualize os modelos das suas contas.',
+    reasoning: 'Raciocínio',
+    kind: {
+      api_key: 'Chave de API',
+      subscription: 'Assinatura',
+      local: 'Local',
+    },
+    col: {
+      model: 'Modelo',
+      provider: 'Provedor',
+      accounts: 'Contas',
+      account: 'Conta',
+      type: 'Tipo',
+      price: 'Entrada / saída por 1M',
+      context: 'Contexto',
+      capabilities: 'Capacidades',
+    },
+    detail: {
+      id: 'Id do modelo',
+      longContext: 'Contexto longo',
+      longContextValue: 'Acima de {{ tokens }} tokens: {{ input }} / {{ output }}',
+      input: 'Entrada',
+      output: 'Saída',
+      endpoints: 'Endpoints',
+      discovered: 'Descoberto em',
+      priceHint:
+        'Preços por milhão de tokens, como cada conta informa; assinaturas e servidores locais não têm preço por token.',
+    },
   },
 };
 

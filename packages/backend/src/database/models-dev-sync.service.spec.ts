@@ -329,7 +329,7 @@ const MOCK_API_RESPONSE = {
   },
   opencode: {
     id: 'opencode',
-    name: 'OpenCode Zen',
+    name: 'OpenCode',
     models: {
       'ring-2.6-1t-free': {
         id: 'ring-2.6-1t-free',
@@ -754,7 +754,7 @@ describe('ModelsDevSyncService', () => {
 
     it('should map OpenCode providers to their models.dev provider IDs', () => {
       expect(service.getModelsForProvider('opencode-go').map((m) => m.id)).toEqual(['glm-5.2']);
-      expect(service.getModelsForProvider('opencode-zen').map((m) => m.id)).toEqual([
+      expect(service.getModelsForProvider('opencode').map((m) => m.id)).toEqual([
         'ring-2.6-1t-free',
       ]);
     });
@@ -775,7 +775,7 @@ describe('ModelsDevSyncService', () => {
       expect(service.isProviderSupported('nvidia')).toBe(true);
       expect(service.isProviderSupported('qwen')).toBe(true);
       expect(service.isProviderSupported('opencode-go')).toBe(true);
-      expect(service.isProviderSupported('opencode-zen')).toBe(true);
+      expect(service.isProviderSupported('opencode')).toBe(true);
       expect(service.isProviderSupported('fireworks')).toBe(true);
       expect(service.isProviderSupported('bedrock')).toBe(true);
       expect(service.isProviderSupported('cerebras')).toBe(true);
@@ -1366,17 +1366,16 @@ describe('ModelsDevSyncService', () => {
         ]);
       });
 
-      it('bills Pro on the Flash card from 2026-09-14 04:00 UTC', async () => {
-        jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-14T04:00:00Z'));
+      it('keeps billing Pro on its own card after 2026-09-14 (api-deepseek G1)', async () => {
+        jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-05T12:00:00Z'));
         fetchSpy.mockResolvedValue({ ok: true, json: async () => proResponse });
 
         await service.refreshCache();
 
         const pro = service.lookupModel('deepseek', 'deepseek-v4-pro');
-        expect(pro!.inputPricePerToken).toBe(0.15 / 1_000_000);
-        expect(pro!.outputPricePerToken).toBe(0.6 / 1_000_000);
-        expect(pro!.cacheReadPricePerToken).toBe(0.003 / 1_000_000);
-        expect(pro!.timeTiers).toEqual([flashPeakTier]);
+        expect(pro!.inputPricePerToken).toBe(0.66 / 1_000_000);
+        expect(pro!.outputPricePerToken).toBe(1.98 / 1_000_000);
+        expect(pro!.cacheReadPricePerToken).toBe(0.022 / 1_000_000);
       });
     });
 

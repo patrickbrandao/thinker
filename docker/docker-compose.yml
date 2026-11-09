@@ -177,6 +177,12 @@ services:
       # provider exists. Set false for air-gapped installs; costs then come
       # from the bundled data only and most models show $0.
       - THINKER_CATALOG_SYNC=${THINKER_CATALOG_SYNC:-true}
+      - THINKER_ALERTS_RETENTION_DAYS=${THINKER_ALERTS_RETENTION_DAYS:-90}
+      - THINKER_GEMINI_STORE=${THINKER_GEMINI_STORE:-false}
+      # Dashboard branding: sidebar title, logo URL, hide version/docs link.
+      - THINKER_TITLE=${THINKER_TITLE:-}
+      - THINKER_LOGO_URL=${THINKER_LOGO_URL:-}
+      - THINKER_HIDE_INFO=${THINKER_HIDE_INFO:-}
       # Global outbound proxy (fails closed) and its bypass list.
       - THINKER_HTTP_PROXY=${THINKER_HTTP_PROXY:-}
       - THINKER_NO_PROXY=${THINKER_NO_PROXY:-}

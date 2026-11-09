@@ -75,6 +75,12 @@ export interface MessageDetailResponse {
      *  keys configured for (provider, auth_type). `null` (or `'Default'` in
      *  the legacy single-key case) means the priority-0 key was used. */
     provider_key_label: string | null;
+    /** Upstream that actually served the request (e.g. an OpenRouter sub-provider). */
+    served_provider: string | null;
+    /** Generation id the upstream reported for this response. */
+    upstream_generation_id: string | null;
+    /** Model the upstream reported serving; may differ from `model`. */
+    served_model: string | null;
     skill_name: string | null;
     fallback_from_model: string | null;
     fallback_index: number | null;
@@ -136,6 +142,8 @@ export interface MessageDetailResponse {
 
 export interface MessageListParams extends Record<string, string | undefined> {
   range?: string;
+  /** Harness session id: its requests and those of its subagent sessions. */
+  session?: string;
   provider?: string;
   /** Comma-separated tenant_providers ids (connection filter). */
   connections?: string;
@@ -152,6 +160,8 @@ export interface MessageListParams extends Record<string, string | undefined> {
   status?: string;
   trigger?: string;
   routing_tier?: string;
+  /** Upstream that served the request (case-insensitive equality). */
+  served_provider?: string;
   specificity_category?: string;
   include_total?: string;
   cache_total?: string;

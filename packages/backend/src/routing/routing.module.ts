@@ -20,6 +20,7 @@ import { TenantProvidersController } from './tenant-providers.controller';
 import { AgentEnabledProvidersController } from './agent-enabled-providers.controller';
 import { OllamaSyncService } from '../database/ollama-sync.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
 import { Agent } from '../entities/agent.entity';
@@ -50,6 +51,7 @@ import { SpecificityAssignment } from '../entities/specificity-assignment.entity
     ResolveModule,
     VirtualModelsModule,
     RouteModelParamsModule,
+    OrganizationsModule,
   ],
   controllers: [
     ProviderController,

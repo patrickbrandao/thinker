@@ -7,6 +7,7 @@ import {
   ForbiddenException,
   INestApplication,
   Injectable,
+  ModuleMetadata,
   UnauthorizedException,
   ValidationPipe,
 } from '@nestjs/common';
@@ -57,8 +58,11 @@ import {
 import {
   ProxyAssignment,
   ProxyBinding,
+  ProxyLog,
   ProxyProfile,
+  ProxyProfileLine,
   ProxyServer,
+  ProxyUsageDaily,
 } from '../src/entities/proxy-server.entity';
 import { TopologyPosition } from '../src/entities/topology-position.entity';
 import { AuthModule } from '../src/auth/auth.module';
@@ -113,7 +117,10 @@ const entities = [
   ProxyServer,
   ProxyBinding,
   ProxyProfile,
+  ProxyProfileLine,
   ProxyAssignment,
+  ProxyLog,
+  ProxyUsageDaily,
   TopologyPosition,
 ];
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
@@ -176,6 +183,8 @@ const OPENROUTER_MODELS_FIXTURE = {
 } as const;
 
 export interface CreateTestAppOptions {
+  /** Extra modules mounted next to the default set (e.g. a module the helper does not import). */
+  extraImports?: NonNullable<ModuleMetadata['imports']>;
   configureApp?: (app: INestApplication) => void;
   dropSchema?: boolean;
   seed?: boolean;
@@ -316,6 +325,7 @@ export async function createTestApp(options: CreateTestAppOptions = {}): Promise
         SetupModule,
         OrganizationsModule,
         ConsoleModule,
+        ...(options.extraImports ?? []),
       ],
       providers: [
         { provide: APP_GUARD, useClass: MockSessionGuard },

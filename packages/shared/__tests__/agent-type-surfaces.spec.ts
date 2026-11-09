@@ -18,8 +18,9 @@ describe('PLATFORM_API_SURFACES', () => {
     expect(PLATFORM_API_SURFACES['openclaw']).toBe('chat_completions');
   });
 
-  it('routes Codex through the Responses API and n8n through chat completions', () => {
+  it('routes Codex and n8n (node 1.3 default) through the Responses API', () => {
     expect(PLATFORM_API_SURFACES['codex']).toBe('responses');
-    expect(PLATFORM_API_SURFACES['n8n']).toBe('chat_completions');
+    expect(PLATFORM_API_SURFACES['n8n']).toBe('responses');
+    expect(PLATFORM_API_SURFACES['deepseek-harness']).toBe('messages');
   });
 });

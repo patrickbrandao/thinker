@@ -1,3 +1,5 @@
+import { Audit } from '../alerts/audit.decorator';
+import { parseVertexDeployment } from './vertex-deployment';
 import {
   BadRequestException,
   Body,
@@ -40,9 +42,15 @@ import {
   isMinimaxRegion,
 } from './oauth/minimax/minimax-oauth-helpers';
 import { MinRole } from '../common/decorators/roles.decorator';
+import { providerKeyDisplay } from '../common/utils/provider-key-mask';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
-import { assertCanUseLocalRunners } from '../common/utils/private-url-policy';
+import {
+  assertCanUseLocalRunners,
+  canUsePrivateDestinations,
+} from '../common/utils/private-url-policy';
 import { PROVIDER_CONNECTION_SCOPE } from './routing-core/resolve-agent.service';
+import { checkAccountBaseUrl } from './account-base-url-check';
+import { supportsAccountBaseUrl } from './account-base-url';
 
 @MinRole('admin')
 @Controller('api/v1/routing')
@@ -109,7 +117,7 @@ export class ProviderController {
       auth_type: p.auth_type ?? 'api_key',
       is_active: p.is_active,
       has_api_key: !!p.api_key_encrypted,
-      key_prefix: p.key_prefix ?? null,
+      ...providerKeyDisplay(p),
       label: p.label,
       priority: p.priority,
       region: p.region ?? null,
@@ -119,6 +127,7 @@ export class ProviderController {
     }));
   }
 
+  @Audit({ entity: 'connection', action: 'created' })
   @Post(':agentName/providers')
   async upsertProvider(
     @TenantCtx() ctx: TenantContext,
@@ -168,6 +177,13 @@ export class ProviderController {
         if (!subscriptionRegionConfig.isRegion(body.region)) {
           throw new BadRequestException(subscriptionRegionConfig.validationMessage);
         }
+      } else if (lowerProvider === 'vertex') {
+        // `express` (or empty) keeps express mode; otherwise `project/location`.
+        if (body.region && body.region !== 'express' && !parseVertexDeployment(body.region)) {
+          throw new BadRequestException(
+            'Vertex AI needs project/location (for example my-project/us-central1) or express',
+          );
+        }
       } else if (isMinimaxApiKey) {
         if (!isMinimaxRegion(body.region)) {
           throw new BadRequestException(MINIMAX_API_KEY_REGION_VALIDATION_MESSAGE);
@@ -179,6 +195,16 @@ export class ProviderController {
       }
     }
 
+    const accountBaseUrl =
+      body.accountBaseUrl !== undefined
+        ? await checkAccountBaseUrl(body.accountBaseUrl, ctx)
+        : undefined;
+    if (accountBaseUrl && !supportsAccountBaseUrl(lowerProvider, body.authType)) {
+      throw new BadRequestException(
+        'Only API-key connections of a built-in provider take a base URL',
+      );
+    }
+
     // Sync Ollama models before connecting so tier assignment has data
     if (body.provider.toLowerCase() === 'ollama') {
       await this.ollamaSync.sync();
@@ -187,7 +213,7 @@ export class ProviderController {
     // The service handles enabled-provider rows itself: new rows fan out to
     // every owned agent, updates re-enable the connecting agent via
     // afterProviderChange — no controller-side insert needed.
-    const { provider: result } = await this.providerService.upsertProvider(
+    let { provider: result } = await this.providerService.upsertProvider(
       agent.id,
       agent.tenant_id,
       body.provider,
@@ -197,6 +223,14 @@ export class ProviderController {
       label,
       ctx.userId,
     );
+    if (accountBaseUrl !== undefined) {
+      result = await this.providerService.setBaseUrl(
+        agent.tenant_id,
+        result.id,
+        accountBaseUrl,
+        canUsePrivateDestinations(ctx),
+      );
+    }
 
     // Discover models before returning so the frontend sees updated model
     // availability immediately (typically ~1-3s). Route choices remain
@@ -221,6 +255,12 @@ export class ProviderController {
     };
   }
 
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    idParam: 'label',
+    nameParams: ['provider', 'label'],
+  })
   @Patch(':agentName/providers/:provider/keys/:label')
   async renameProviderKey(
     @TenantCtx() ctx: TenantContext,
@@ -249,6 +289,7 @@ export class ProviderController {
     };
   }
 
+  @Audit({ entity: 'connection', action: 'updated', idParam: 'provider', nameParams: ['provider'] })
   @Put(':agentName/providers/:provider/keys/order')
   async reorderProviderKeys(
     @TenantCtx() ctx: TenantContext,
@@ -276,6 +317,12 @@ export class ProviderController {
       }));
   }
 
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    idParam: 'agentName',
+    nameParams: ['agentName'],
+  })
   @Post(':agentName/providers/deactivate-all')
   async deactivateAllProviders(
     @TenantCtx() ctx: TenantContext,
@@ -290,6 +337,7 @@ export class ProviderController {
     return { ok: true };
   }
 
+  @Audit({ entity: 'connection', action: 'deleted', idParam: 'provider', nameParams: ['provider'] })
   @Delete(':agentName/providers/:provider')
   async removeProvider(
     @TenantCtx() ctx: TenantContext,

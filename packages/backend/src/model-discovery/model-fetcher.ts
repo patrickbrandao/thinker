@@ -14,6 +14,39 @@ import type { AuthType, ModelCapability, ModelModality } from 'thinker-shared';
  */
 export const DEFAULT_CONTEXT_WINDOW = 1_000_000;
 
+/**
+ * The context-window fields of a discovered model: the reported value when it
+ * is a positive number, else DEFAULT_CONTEXT_WINDOW marked `default`.
+ */
+export function contextWindowFields(
+  value: number | null | undefined,
+): Pick<DiscoveredModel, 'contextWindow' | 'contextWindowSource'> {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? { contextWindow: value }
+    : { contextWindow: DEFAULT_CONTEXT_WINDOW, contextWindowSource: 'default' };
+}
+
+/** Plausible published context windows (NOC Norte bounds): anything else is noise. */
+export const MIN_PUBLISHED_CONTEXT_WINDOW = 1_024;
+export const MAX_PUBLISHED_CONTEXT_WINDOW = 10_000_000;
+
+/**
+ * The window a model may publish (`/v1/models` `context_length`, the smallest
+ * window of `auto` and virtual models): null for a stand-in default or a value
+ * outside the plausible range.
+ */
+export function publishableContextWindow(
+  model: Pick<DiscoveredModel, 'contextWindow' | 'contextWindowSource'>,
+): number | null {
+  if (model.contextWindowSource === 'default') return null;
+  const value = model.contextWindow;
+  return Number.isFinite(value) &&
+    value >= MIN_PUBLISHED_CONTEXT_WINDOW &&
+    value <= MAX_PUBLISHED_CONTEXT_WINDOW
+    ? value
+    : null;
+}
+
 export interface LongContextPricing {
   /** Default rates apply through this many prompt tokens; long-context rates apply above it. */
   thresholdTokens: number;
@@ -28,8 +61,12 @@ export interface DiscoveredModel {
   displayName: string;
   provider: string;
   contextWindow: number;
-  /** Identifies context windows that can be recalculated without replacing provider metadata. */
-  contextWindowSource?: 'provider' | 'subscription_config';
+  /**
+   * Identifies context windows that can be recalculated without replacing
+   * provider metadata. `default`: nobody reported a window and
+   * DEFAULT_CONTEXT_WINDOW stands in, so it is never published as a fact.
+   */
+  contextWindowSource?: 'provider' | 'subscription_config' | 'default';
   inputPricePerToken: number | null;
   outputPricePerToken: number | null;
   cacheReadPricePerToken?: number;
@@ -43,6 +80,8 @@ export interface DiscoveredModel {
   supportedEndpoints?: readonly string[];
   qualityScore: number;
   authType?: AuthType;
+  /** Labels of the connections (accounts) whose cached list holds this model, by priority. */
+  keyLabels?: string[];
   /** Custom providers only: the display name the user gave the provider. */
   providerName?: string;
   /**

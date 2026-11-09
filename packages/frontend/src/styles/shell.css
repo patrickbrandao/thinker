@@ -48,6 +48,10 @@
     border-right: 1px solid var(--border);
     overflow: hidden;
   }
+  /* The account menu (272px) is wider than the sidebar, collapsed or not. */
+  .sidebar:has(.sidebar-foot .menu) {
+    overflow: visible;
+  }
   .sidebar-brand {
     display: flex;
     align-items: center;
@@ -58,12 +62,18 @@
     flex-shrink: 0;
   }
   .sidebar-brand img {
-    height: 22px;
+    height: 28px;
   }
   .sidebar-brand .logo-word {
     display: flex;
     align-items: center;
+    gap: 8px;
     min-width: 0;
+  }
+  .sidebar-brand .logo-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
   }
   .sidebar-brand .collapse-btn {
     margin-left: auto;
@@ -594,6 +604,14 @@
     width: min(840px, calc(100vw - 32px));
     height: min(760px, calc(100vh - 32px));
   }
+  .floating-window--xwide {
+    width: min(1180px, calc(100vw - 32px));
+    height: min(800px, calc(100vh - 32px));
+  }
+  /* Height follows the content, up to the viewport. */
+  .floating-window--fit {
+    height: auto;
+  }
   .floating-window-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -605,6 +623,24 @@
     gap: 8px;
     padding: 12px 18px;
     border-top: 1px solid var(--border);
+  }
+  /* Variable-height sections inside a floating window scroll on their own. */
+  .floating-window .scroll-section {
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .trigger-editor .trigger-template {
+    resize: vertical;
+    max-height: 320px;
+  }
+  /* Settings window: the tab strip stays under the title while the tab scrolls. */
+  .tabbed-window .tabbed-window-tabs {
+    position: sticky;
+    top: -18px;
+    z-index: 1;
+    margin: -18px -18px 16px;
+    padding: 6px 18px 0;
+    background: var(--bg-elev);
   }
   .floating-window-head {
     flex: none;
@@ -817,6 +853,22 @@
     font-size: 13px;
     font-weight: 500;
   }
+  .alerts-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-faint);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .alerts-table tr.is-unread td:first-child {
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
   .alerts-foot {
     padding: 8px 14px;
     text-align: center;
@@ -944,6 +996,19 @@
   }
   .auth-logo img {
     height: 30px;
+  }
+  /* The login screen shows only the symbol, without the wordmark. */
+  .auth-card:has(.login-form) .auth-logo {
+    display: none;
+  }
+  .login-mark {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0 40px;
+  }
+  .login-mark img {
+    height: 96px;
+    width: auto;
   }
   .logo-light {
     display: inline;
@@ -1213,6 +1278,16 @@
 }
 .dark .agent-type-select__option.liquid-metal {
   background: #000;
+}
+/* A provider-type card on Providers: the same ring, only while hovered or
+   keyboard-focused, with the harness picker's hover gray. */
+.provider-type-card.liquid-metal:is(:not(:hover, :focus-visible), :disabled)::before,
+.provider-type-card.liquid-metal:is(:not(:hover, :focus-visible), :disabled)::after {
+  display: none;
+}
+.provider-type-card.liquid-metal:is(:hover, :focus-visible):not(:disabled) {
+  border-color: transparent;
+  background: var(--surface-2);
 }
 @media (prefers-reduced-motion: reduce) {
   .liquid-metal::before,

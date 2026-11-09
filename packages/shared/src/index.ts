@@ -21,6 +21,15 @@ export {
   getNanobotConfigSnippet,
   getCodexConfigSnippet,
   getCodexKeyExportSnippet,
+  getCopilotCliProvidersSnippet,
+  getPiModelsSnippet,
+  getDeepSeekHarnessNativeSnippet,
+  getDeepSeekHarnessPiAiSnippet,
+  getClaudeAppConfigSnippet,
+  OPEN_WEBUI_SESSION_HEADERS,
+  ZAPIER_REQUEST_BODY,
+  SNIPPET_CONTEXT_WINDOW,
+  SNIPPET_MAX_TOKENS,
   PLATFORM_SETUP_SNIPPETS,
 } from './setup-snippets';
 export {
@@ -234,6 +243,10 @@ export {
   SYSLOG_SEVERITIES,
   SYSLOG_FACILITIES,
   DEFAULT_SYSLOG_SEVERITIES,
+  GELF_TRANSPORTS,
+  GELF_COMPRESSIONS,
+  GELF_DEFAULT_PORT,
+  RELP_DEFAULT_PORT,
   TRIGGER_LIMITS,
   TRIGGER_VARIABLES,
   DEFAULT_TRIGGER_TEMPLATES,
@@ -250,4 +263,22 @@ export type {
   SyslogFormat,
   SyslogSeverity,
   SyslogFacility,
+  GelfTransport,
+  GelfCompression,
 } from './triggers';
+export {
+  SYSTEM_EVENT_LEVELS,
+  SYSTEM_EVENT_CATEGORIES,
+  OPERATIONAL_EVENT_CATEGORIES,
+  ADMIN_EVENT_CATEGORIES,
+  INSTANCE_EVENT_CATEGORIES,
+  SYSTEM_EVENT_TYPES,
+  SYSTEM_EVENT_CATEGORY,
+  DEFAULT_ALERTS_RETENTION_DAYS,
+} from './system-events';
+export type {
+  SystemEventLevel,
+  SystemEventCategory,
+  SystemEventType,
+  SystemEventView,
+} from './system-events';

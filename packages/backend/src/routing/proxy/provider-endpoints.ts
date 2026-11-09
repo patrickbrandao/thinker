@@ -4,8 +4,14 @@ import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 import {
   CODEX_CLI_ORIGINATOR,
   CODEX_CLI_USER_AGENT,
+  OPENCODE_CLIENT_NAME,
+  OPENCODE_USER_AGENT,
   COPILOT_EDITOR_VERSION,
   COPILOT_PLUGIN_VERSION,
+  COPILOT_USER_AGENT,
+  MISTRAL_VIBE_USER_AGENT,
+  GROK_CLI_HEADERS,
+  GROK_CLI_PROXY_BASE,
   buildClaudeCodeSubscriptionHeaders,
 } from '../../common/constants/subscription-clients';
 import { normalizeProviderBaseUrl } from '../provider-base-url';
@@ -27,7 +33,8 @@ import { buildKiroHeaders, KIRO_BASE_URL, KIRO_CHAT_TARGET } from './kiro-adapte
 
 export interface ProviderEndpoint {
   baseUrl: string;
-  buildHeaders: (apiKey: string, authType?: string) => Record<string, string>;
+  /** `oauth` is true when `apiKey` is an access token unwrapped from a stored OAuth login. */
+  buildHeaders: (apiKey: string, authType?: string, oauth?: boolean) => Record<string, string>;
   buildPath: (model: string) => string;
   /**
    * Optional override used when the request is a stream. Some upstreams
@@ -54,10 +61,29 @@ export interface ProviderEndpoint {
    */
   requiresSsrfRevalidation?: boolean;
   /**
+   * With requiresSsrfRevalidation: false refuses private, LAN and loopback
+   * addresses at connect time (a user URL registered by someone the
+   * private-URL policy did not allow, ADR 0006 item 7). Absent = allowed.
+   */
+  allowPrivateDestination?: boolean;
+  /**
+   * The Anthropic provider's own connection with an operator-set base URL
+   * (a proxy in front of Anthropic, a simulator). It is Anthropic as far as
+   * the caller's `anthropic-beta` flags go, though the host is not.
+   */
+  anthropicAccountOverride?: boolean;
+  /**
    * Upper bound of one forwarded request, overriding PROVIDER_TIMEOUT_MS.
    * Set per local server, whose first call may have to load the model.
    */
   timeoutMs?: number;
+  /**
+   * The server implements `reasoning_effort` itself (llama-server: `none`
+   * disables thinking, other values reach the chat template), so it is kept
+   * instead of stripped as an OpenAI-only field, and a disabled Anthropic
+   * `thinking` becomes `none`.
+   */
+  nativeReasoningEffort?: boolean;
   /**
    * When `true`, the proxy wraps the outgoing Google-shape request body in
    * the CodeAssist envelope (`{ model, project, request }`) and unwraps
@@ -106,6 +132,7 @@ const localServerEndpoint = (id: LocalServerId): ProviderEndpoint => ({
   buildPath: openaiPath,
   format: 'openai',
   ...openaiStreamUsage,
+  ...(id === 'llamacpp' ? { nativeReasoningEffort: true } : {}),
 });
 
 const BEDROCK_OPENAI_MODEL_RE = /(?:^|\.)openai\./i;
@@ -188,21 +215,50 @@ const XIAOMI_MIMO_BASE = 'https://api.xiaomimimo.com';
 const XIAOMI_TOKEN_PLAN_BASE = getXiaomiTokenPlanBaseUrl();
 const QWEN_TOKEN_PLAN_BASE = 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode';
 const ZAI_SUBSCRIPTION_BASE = getZaiCodingPlanBaseUrl('global');
-const OPENCODE_GO_BASE = 'https://opencode.ai/zen/go';
-const OPENCODE_ZEN_BASE = 'https://opencode.ai/zen';
+// OpenCode serves inference per wire protocol under /inference (models.dev
+// `opencode` / `opencode-go` entries); the older /zen paths are retired there.
+const OPENCODE_INFERENCE_BASE = 'https://opencode.ai/inference';
+const OPENCODE_GO_INFERENCE_BASE = 'https://opencode.ai/inference/go';
 const KILO_GATEWAY_BASE = 'https://api.kilo.ai/api/gateway';
 const NOUS_PORTAL_BASE = 'https://inference-api.nousresearch.com';
 const NVIDIA_NIM_BASE = 'https://integrate.api.nvidia.com';
 const FIREWORKS_INFERENCE_BASE = 'https://api.fireworks.ai/inference';
 const HUGGING_FACE_INFERENCE_BASE = 'https://router.huggingface.co';
-const PIONEER_BASE = 'https://api.pioneer.ai';
+const PIONEER_BASE = 'https://api.fastino.ai';
 const META_BASE = 'https://api.meta.ai';
-const chatgptSubscriptionHeaders = (apiKey: string) => ({
-  Authorization: `Bearer ${apiKey}`,
-  'Content-Type': 'application/json',
-  originator: CODEX_CLI_ORIGINATOR,
-  'user-agent': CODEX_CLI_USER_AGENT,
-});
+/**
+ * The `chatgpt_account_id` claim of a ChatGPT access token, which the Codex
+ * CLI sends as `ChatGPT-Account-ID` so multi-workspace accounts (Team,
+ * Business) land on the right workspace (sub-openai G5).
+ */
+export function chatgptAccountId(token: string): string | undefined {
+  const payload = token.split('.')[1];
+  if (!payload) return undefined;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<
+      string,
+      unknown
+    >;
+    const auth = claims['https://api.openai.com/auth'] as
+      { chatgpt_account_id?: unknown } | undefined;
+    return typeof auth?.chatgpt_account_id === 'string' && auth.chatgpt_account_id
+      ? auth.chatgpt_account_id
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const chatgptSubscriptionHeaders = (apiKey: string) => {
+  const accountId = chatgptAccountId(apiKey);
+  return {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    originator: CODEX_CLI_ORIGINATOR,
+    'user-agent': CODEX_CLI_USER_AGENT,
+    ...(accountId ? { 'ChatGPT-Account-ID': accountId } : {}),
+  };
+};
 
 export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   openai: {
@@ -235,7 +291,11 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   bedrock: {
     baseUrl: getBedrockMantleBaseUrl(),
     buildHeaders: openaiHeaders,
-    buildPath: openaiPath,
+    // GPT models served only on Mantle use the `/openai/v1` prefix (api-bedrock G1).
+    buildPath: (model: string) =>
+      BEDROCK_NAMESPACED_GPT_MODEL_RE.test(stripVendorPrefix(model))
+        ? '/openai/v1/chat/completions'
+        : '/v1/chat/completions',
     format: 'openai',
     ...openaiStreamUsage,
   },
@@ -366,7 +426,11 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   },
   mistral: {
     baseUrl: 'https://api.mistral.ai',
-    buildHeaders: openaiHeaders,
+    // The Vibe subscription key identifies as the Vibe CLI (sub-mistral G2).
+    buildHeaders: (apiKey: string, authType?: string) => ({
+      ...openaiHeaders(apiKey),
+      ...(authType === 'subscription' ? { 'User-Agent': MISTRAL_VIBE_USER_AGENT } : {}),
+    }),
     buildPath: openaiPath,
     format: 'openai',
     ...openaiStreamUsage,
@@ -390,6 +454,16 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     buildHeaders: openaiHeaders,
     buildPath: () => '/v1/responses',
     format: 'chatgpt',
+  },
+  // Grok subscription (OAuth): the official CLI's proxy, Responses only.
+  'xai-subscription': {
+    baseUrl: GROK_CLI_PROXY_BASE,
+    buildHeaders: (token: string) => ({ ...openaiHeaders(token), ...GROK_CLI_HEADERS }),
+    buildPath: () => '/v1/responses',
+    format: 'chatgpt',
+    forwardResponsesStream: true,
+    acceptsMaxOutputTokens: true,
+    acceptsPromptCacheKey: true,
   },
   minimax: {
     baseUrl: 'https://api.minimax.io',
@@ -547,6 +621,9 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
       'Editor-Version': COPILOT_EDITOR_VERSION,
       'Editor-Plugin-Version': COPILOT_PLUGIN_VERSION,
       'Copilot-Integration-Id': 'vscode-chat',
+      'User-Agent': COPILOT_USER_AGENT,
+      'OpenAI-Intent': 'conversation-panel',
+      'X-GitHub-Api-Version': '2025-05-01',
     }),
     buildPath: () => '/chat/completions',
     format: 'openai',
@@ -600,69 +677,71 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     buildPath: () => '/',
     format: 'kiro',
   },
-  'opencode-go': {
-    baseUrl: OPENCODE_GO_BASE,
-    buildHeaders: openaiHeaders,
-    buildPath: openaiPath,
-    format: 'openai',
-    ...openaiStreamUsage,
-  },
-  'opencode-go-anthropic': {
-    baseUrl: OPENCODE_GO_BASE,
-    buildHeaders: anthropicApiKeyHeaders,
-    buildPath: () => '/v1/messages',
-    format: 'anthropic',
-  },
-  // OpenCode Go's Responses-only models (Grok 4.5, GPT 5.6 Luna, Muse Spark)
-  // reject /v1/chat/completions — the docs Endpoints table sends them to
-  // /v1/responses instead.
-  'opencode-go-responses': {
-    baseUrl: OPENCODE_GO_BASE,
-    buildHeaders: openaiHeaders,
-    buildPath: () => '/v1/responses',
-    format: 'chatgpt',
-    forwardResponsesStream: true,
-    acceptsMaxOutputTokens: true,
-  },
-  // OpenCode Zen's /v1/chat/completions is a unified OpenAI-compatible
-  // endpoint that handles Claude, GPT, and the long tail of OpenAI-compatible
-  // models (Qwen, GLM, Kimi, MiniMax, …) on a single Bearer-auth route.
-  //
-  // Gemini models on Zen are currently broken upstream — Zen forwards our
-  // `Authorization: Bearer` header to Vertex AI verbatim, which rejects the
-  // request with OVERLOADED_CREDENTIALS because Zen also attaches its own
-  // GCP credentials. This is a Zen-side gateway bug; switching to `x-api-key`
-  // only makes Zen reject with "Missing API key" before the request even
-  // reaches GCP. There is no client-side workaround until Zen stops
-  // tunneling our auth header through.
-  'opencode-zen': {
-    baseUrl: OPENCODE_ZEN_BASE,
-    buildHeaders: openaiHeaders,
-    buildPath: () => '/v1/chat/completions',
-    format: 'openai',
-    ...openaiStreamUsage,
-  },
-  // TODO(opencode-zen): collapse this back into the single `opencode-zen`
-  // entry once Zen's gateway stops tunneling the client Authorization header
-  // through to Vertex AI on /v1/chat/completions. The unified path already
-  // works for Claude, GPT, and the OpenAI-compatible long tail; Gemini is
-  // the only family that still needs the Google-native combo today.
-  'opencode-zen-google': {
-    baseUrl: OPENCODE_ZEN_BASE,
-    buildHeaders: (apiKey: string) => ({
-      'x-goog-api-key': apiKey,
-      'Content-Type': 'application/json',
-    }),
-    buildPath: (model: string) => `/v1/models/${model}:generateContent`,
-    format: 'google',
-  },
+  // OpenCode (pay-as-you-go and free models) and OpenCode Go serve each model
+  // on one wire protocol, per their `/inference[/go]/v1/models` catalog;
+  // ProviderClient picks the entry. ADR 0009.
+  ...opencodeEndpoints('opencode', OPENCODE_INFERENCE_BASE),
+  ...opencodeEndpoints('opencode-go', OPENCODE_GO_INFERENCE_BASE),
 };
+
+// The free models answer only the OpenCode client, so every OpenCode request
+// identifies as it (ADR 0009); the session header rides in provider-hooks.
+const opencodeClientHeaders = {
+  'User-Agent': OPENCODE_USER_AGENT,
+  'x-opencode-client': OPENCODE_CLIENT_NAME,
+};
+
+function opencodeEndpoints(id: string, base: string): Record<string, ProviderEndpoint> {
+  const withClient =
+    (build: (apiKey: string, oauth?: boolean) => Record<string, string>) =>
+    (apiKey: string, _authType?: string, oauth?: boolean): Record<string, string> => ({
+      ...build(apiKey, oauth),
+      ...opencodeClientHeaders,
+    });
+  return {
+    [id]: {
+      baseUrl: `${base}/openai`,
+      buildHeaders: withClient(openaiHeaders),
+      buildPath: () => '/v1/chat/completions',
+      format: 'openai',
+      ...openaiStreamUsage,
+    },
+    [`${id}-responses`]: {
+      baseUrl: `${base}/openai`,
+      buildHeaders: withClient(openaiHeaders),
+      buildPath: () => '/v1/responses',
+      format: 'chatgpt',
+      forwardResponsesStream: true,
+      acceptsMaxOutputTokens: true,
+    },
+    // Like the client: a Console OAuth access token goes only as Bearer, a
+    // pasted OpenCode API key only as x-api-key.
+    [`${id}-anthropic`]: {
+      baseUrl: `${base}/anthropic`,
+      buildHeaders: withClient((apiKey: string, oauth?: boolean) =>
+        oauth ? anthropicBearerHeaders(apiKey) : anthropicApiKeyHeaders(apiKey),
+      ),
+      buildPath: () => '/v1/messages',
+      format: 'anthropic',
+    },
+    [`${id}-google`]: {
+      baseUrl: `${base}/google`,
+      buildHeaders: withClient((apiKey: string) => ({
+        'x-goog-api-key': apiKey,
+        'Content-Type': 'application/json',
+      })),
+      buildPath: (model: string) => `/v1beta/models/${model}:generateContent`,
+      buildStreamPath: (model: string) => `/v1beta/models/${model}:streamGenerateContent`,
+      format: 'google',
+    },
+  };
+}
 
 /** Build a ProviderEndpoint for a custom provider with the given base URL. */
 export function buildCustomEndpoint(
   baseUrl: string,
   apiKind: 'openai' | 'anthropic' = 'openai',
-  local?: { timeoutMs?: number },
+  local?: { timeoutMs?: number; localType?: string | null },
 ): ProviderEndpoint {
   // Strip trailing /v1 (or /v1/) since both buildPath callbacks include /v1.
   const normalized = normalizeProviderBaseUrl(baseUrl);
@@ -676,6 +755,7 @@ export function buildCustomEndpoint(
       ...openaiStreamUsage,
       requiresSsrfRevalidation: true,
       ...(local.timeoutMs ? { timeoutMs: local.timeoutMs } : {}),
+      ...(local.localType === 'llamacpp' ? { nativeReasoningEffort: true } : {}),
     };
   }
   if (apiKind === 'anthropic') {

@@ -2,7 +2,7 @@ import { ModelController } from './model.controller';
 import { ResolveAgentService } from './routing-core/resolve-agent.service';
 import { CustomProviderService } from './custom-provider/custom-provider.service';
 import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
-import { OpencodeGoCatalogService } from '../model-discovery/opencode-go-catalog.service';
+import { OpencodeCatalogService } from '../model-discovery/opencode-catalog.service';
 import { OllamaSyncService } from '../database/ollama-sync.service';
 import { PricingSyncService } from '../database/pricing-sync.service';
 import { ModelsDevSyncService } from '../database/models-dev-sync.service';
@@ -40,7 +40,7 @@ describe('ModelController', () => {
   let mockPricingSync: Record<string, jest.Mock>;
   let mockProviderParamSpecs: Record<string, jest.Mock>;
   let mockModelsDevSync: Record<string, jest.Mock>;
-  let mockOpencodeGoCatalog: Record<string, jest.Mock>;
+  let mockOpencodeCatalog: Record<string, jest.Mock>;
   let routingCache: RoutingCacheService;
 
   beforeEach(() => {
@@ -80,8 +80,7 @@ describe('ModelController', () => {
       lookupModelCapabilities: jest.fn().mockReturnValue(null),
       getModelsForProvider: jest.fn().mockReturnValue([]),
     };
-    mockOpencodeGoCatalog = {
-      resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+    mockOpencodeCatalog = {
       list: jest.fn().mockResolvedValue([]),
     };
     routingCache = new RoutingCacheService();
@@ -94,7 +93,7 @@ describe('ModelController', () => {
       mockPricingSync as unknown as PricingSyncService,
       mockProviderParamSpecs as unknown as ProviderParamSpecService,
       mockModelsDevSync as unknown as ModelsDevSyncService,
-      mockOpencodeGoCatalog as unknown as OpencodeGoCatalogService,
+      mockOpencodeCatalog as unknown as OpencodeCatalogService,
       routingCache,
     );
   });
@@ -352,39 +351,6 @@ describe('ModelController', () => {
       expect(result[0].input_modalities).toEqual(['text', 'image']);
     });
 
-    it('includes the per-request cost for OpenCode Go subscription models', async () => {
-      mockDiscoveryService.getModelsForAgent.mockResolvedValue([
-        makeDiscovered({
-          id: 'opencode-go/glm-5.1',
-          provider: 'opencode-go',
-          authType: 'subscription',
-        }),
-      ]);
-      mockOpencodeGoCatalog.resolveCostPerRequest.mockResolvedValue(0.013636);
-
-      const result = await controller.getAvailableModels(mockCtx, mockAgentName);
-
-      expect(mockOpencodeGoCatalog.resolveCostPerRequest).toHaveBeenCalledWith(
-        'opencode-go/glm-5.1',
-      );
-      expect(result[0].cost_per_request).toBe(0.013636);
-    });
-
-    it('omits cost_per_request when OpenCode Go has no published limit', async () => {
-      mockDiscoveryService.getModelsForAgent.mockResolvedValue([
-        makeDiscovered({
-          id: 'opencode-go/mimo-v25',
-          provider: 'opencode-go',
-          authType: 'subscription',
-        }),
-      ]);
-      mockOpencodeGoCatalog.resolveCostPerRequest.mockResolvedValue(null);
-
-      const result = await controller.getAvailableModels(mockCtx, mockAgentName);
-
-      expect(result[0]).not.toHaveProperty('cost_per_request');
-    });
-
     it('hides an unpublished OpenCode Go id a published one already stands for', async () => {
       mockDiscoveryService.getModelsForAgent.mockResolvedValue([
         makeDiscovered({
@@ -403,7 +369,7 @@ describe('ModelController', () => {
           authType: 'subscription',
         }),
       ]);
-      mockOpencodeGoCatalog.list.mockResolvedValue([{ id: 'deepseek-v4.1-flash' }]);
+      mockOpencodeCatalog.list.mockResolvedValue([{ id: 'deepseek-v4.1-flash' }]);
 
       const result = await controller.getAvailableModels(mockCtx, mockAgentName);
 
@@ -427,7 +393,7 @@ describe('ModelController', () => {
           authType: 'subscription',
         }),
       ]);
-      mockOpencodeGoCatalog.list.mockResolvedValue([{ id: 'hy3' }]);
+      mockOpencodeCatalog.list.mockResolvedValue([{ id: 'hy3' }]);
 
       const result = await controller.getAvailableModels(mockCtx, mockAgentName);
 
@@ -444,7 +410,6 @@ describe('ModelController', () => {
 
       const result = await controller.getAvailableModels(mockCtx, mockAgentName);
 
-      expect(mockOpencodeGoCatalog.resolveCostPerRequest).not.toHaveBeenCalled();
       expect(result[0]).not.toHaveProperty('cost_per_request');
     });
 

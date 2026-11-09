@@ -49,7 +49,11 @@ import {
   extractThinkingBlocksFromMessagesResponse,
   type ExtractedThinkingBlocks,
 } from './anthropic-adapter';
-import { getOpenAiReasoningStreamFormat, supportsReasoningContent } from './reasoning-format';
+import {
+  getOpenAiReasoningStreamFormat,
+  normalizeOpenAiReasoningMessage,
+  supportsReasoningContent,
+} from './reasoning-format';
 import type { CallerAttribution } from './caller-classifier';
 import {
   unwrapCodeAssistResponse,
@@ -538,6 +542,7 @@ export async function handleStreamResponse(
             ? ('openai_responses' as const)
             : ('openai_chat_completions' as const)),
     ...(capture ? { onUpstreamChunk: (chunk: string) => capture.appendRaw(chunk) } : {}),
+    ...(forward.streamIdleTimeoutMs ? { idleTimeoutMs: forward.streamIdleTimeoutMs } : {}),
   };
 
   const messagesTransformer =
@@ -716,6 +721,20 @@ function cacheReasoningContent(
   }
 }
 
+/** Lift provider-specific reasoning fields of each choice into `reasoning_content`. */
+function normalizeNonStreamReasoning(body: unknown, provider: string, model: string): void {
+  const format = getOpenAiReasoningStreamFormat(provider, model);
+  if (!format) return;
+  const choices = (body as Record<string, unknown> | undefined)?.choices;
+  if (!Array.isArray(choices)) return;
+  for (const choice of choices) {
+    const message = (choice as Record<string, unknown> | undefined)?.message;
+    if (message && typeof message === 'object' && !Array.isArray(message)) {
+      normalizeOpenAiReasoningMessage(message as Record<string, unknown>, format);
+    }
+  }
+}
+
 export async function handleNonStreamResponse(
   res: ExpressResponse,
   forward: ForwardResult,
@@ -802,6 +821,7 @@ export async function handleNonStreamResponse(
     }
   } else {
     responseBody = unwrapSuccessEnvelope(await forward.response.json());
+    normalizeNonStreamReasoning(responseBody, meta.provider, meta.model);
     if (supportsReasoningContent(meta.provider, meta.model, reasoningCache?.modelCatalog)) {
       cacheReasoningContent(responseBody, reasoningCache, sessionKey);
     }

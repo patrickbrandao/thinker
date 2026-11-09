@@ -3616,7 +3616,7 @@ describe('ProviderClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://opencode.ai/zen/go/v1/chat/completions',
+        'https://opencode.ai/inference/go/openai/v1/chat/completions',
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer og-token',
@@ -3644,7 +3644,7 @@ describe('ProviderClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://opencode.ai/zen/go/v1/messages',
+        'https://opencode.ai/inference/go/anthropic/v1/messages',
         expect.objectContaining({
           headers: expect.objectContaining({
             'x-api-key': 'og-token',
@@ -3671,7 +3671,7 @@ describe('ProviderClient', () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      expect(url).toBe('https://opencode.ai/zen/go/v1/messages');
+      expect(url).toBe('https://opencode.ai/inference/go/anthropic/v1/messages');
     });
 
     it('routes qwen3.7 models to Anthropic /v1/messages', async () => {
@@ -3687,7 +3687,7 @@ describe('ProviderClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://opencode.ai/zen/go/v1/messages',
+        'https://opencode.ai/inference/go/anthropic/v1/messages',
         expect.objectContaining({
           headers: expect.objectContaining({
             'x-api-key': 'og-token',
@@ -3718,7 +3718,7 @@ describe('ProviderClient', () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      expect(url).toBe('https://opencode.ai/zen/go/v1/messages');
+      expect(url).toBe('https://opencode.ai/inference/go/anthropic/v1/messages');
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.model).toBe('future-model');
     });
@@ -3740,7 +3740,7 @@ describe('ProviderClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://opencode.ai/zen/go/v1/responses',
+        'https://opencode.ai/inference/go/openai/v1/responses',
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer og-token',
@@ -3776,7 +3776,7 @@ describe('ProviderClient', () => {
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://opencode.ai/zen/go/v1/responses',
+        'https://opencode.ai/inference/go/openai/v1/responses',
         expect.any(Object),
       );
       expect(sentBody.max_output_tokens).toBe(1536);
@@ -3800,7 +3800,7 @@ describe('ProviderClient', () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      expect(url).toBe('https://opencode.ai/zen/go/v1/responses');
+      expect(url).toBe('https://opencode.ai/inference/go/openai/v1/responses');
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.model).toBe('grok-4.5');
       expect(sentBody.input).toBe('Hello');
@@ -3824,7 +3824,7 @@ describe('ProviderClient', () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      expect(url).toBe('https://opencode.ai/zen/go/v1/chat/completions');
+      expect(url).toBe('https://opencode.ai/inference/go/openai/v1/chat/completions');
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.model).toBe('minimax-experimental');
     });
@@ -3842,7 +3842,7 @@ describe('ProviderClient', () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      expect(url).toBe('https://opencode.ai/zen/go/v1/chat/completions');
+      expect(url).toBe('https://opencode.ai/inference/go/openai/v1/chat/completions');
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.model).toBe('mimo-v2.5-pro');
       expect(sentBody.stream).toBe(true);
@@ -3861,60 +3861,66 @@ describe('ProviderClient', () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      expect(url).toBe('https://opencode.ai/zen/go/v1/chat/completions');
+      expect(url).toBe('https://opencode.ai/inference/go/openai/v1/chat/completions');
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.model).toBe('kimi-k2.5');
     });
   });
 
-  describe('OpenCode Zen provider', () => {
+  describe('OpenCode provider', () => {
+    // Without a catalog the model family picks the wire protocol.
     it.each([
-      ['claude-opus-4-7', 'claude-opus-4-7'],
-      ['gpt-5.5', 'gpt-5.5'],
-      ['qwen3.6-plus', 'qwen3.6-plus'],
-    ])(
-      'routes %s through the unified /v1/chat/completions endpoint with Bearer auth',
-      async (modelName, expectedSentModel) => {
-        mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+      ['glm-5.3', 'https://opencode.ai/inference/openai/v1/chat/completions'],
+      ['claude-opus-4-7', 'https://opencode.ai/inference/anthropic/v1/messages'],
+      ['gpt-5.5', 'https://opencode.ai/inference/openai/v1/responses'],
+    ])('routes %s by its family protocol', async (modelName, url) => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
-        const result = await client.forward({
-          provider: 'opencode-zen',
-          apiKey: 'oz-token',
-          model: `opencode-zen/${modelName}`,
-          body,
-          stream: false,
-        });
+      await client.forward({
+        provider: 'opencode',
+        apiKey: 'oz-token',
+        model: `opencode/${modelName}`,
+        body,
+        stream: false,
+      });
 
-        expect(mockFetch).toHaveBeenCalledWith(
-          'https://opencode.ai/zen/v1/chat/completions',
-          expect.objectContaining({
-            headers: expect.objectContaining({
-              Authorization: 'Bearer oz-token',
-              'Content-Type': 'application/json',
-            }),
-          }),
-        );
-        const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-        expect(sentBody.model).toBe(expectedSentModel);
-        expect(result.isAnthropic).toBe(false);
-        expect(result.isChatGpt).toBe(false);
-        expect(result.isGoogle).toBe(false);
-      },
-    );
+      expect(mockFetch.mock.calls[0][0]).toBe(url);
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.model).toBe(modelName);
+    });
+
+    it('routes by the catalog protocol when the catalog knows the model', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+      const catalog = { resolveFormat: jest.fn().mockResolvedValue('anthropic') };
+      const catalogClient = new ProviderClient(catalog as never);
+
+      await catalogClient.forward({
+        provider: 'opencode',
+        apiKey: 'public',
+        model: 'opencode/qwen3.6-plus',
+        body,
+        stream: false,
+      });
+
+      expect(catalog.resolveFormat).toHaveBeenCalledWith('opencode', 'qwen3.6-plus');
+      expect(mockFetch.mock.calls[0][0]).toBe(
+        'https://opencode.ai/inference/anthropic/v1/messages',
+      );
+    });
 
     it('routes gemini-* models to the dedicated generateContent endpoint with x-goog-api-key auth', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
       const result = await client.forward({
-        provider: 'opencode-zen',
+        provider: 'opencode',
         apiKey: 'oz-token',
-        model: 'opencode-zen/gemini-3-flash',
+        model: 'opencode/gemini-3-flash',
         body,
         stream: false,
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://opencode.ai/zen/v1/models/gemini-3-flash:generateContent',
+        'https://opencode.ai/inference/google/v1beta/models/gemini-3-flash:generateContent',
         expect.objectContaining({
           headers: expect.objectContaining({
             'x-goog-api-key': 'oz-token',
@@ -5547,8 +5553,8 @@ describe('ProviderClient', () => {
       ['zai', 'glm-4.6'],
       ['copilot', 'gpt-4o-copilot'],
       ['commandcode', 'commandcode/deepseek/deepseek-v4-flash'],
-      ['opencode-go', 'claude-sonnet-4'],
-      ['opencode-zen', 'qwen3.6-plus'],
+      ['opencode-go', 'glm-5.3'],
+      ['opencode', 'qwen3.6-plus'],
     ])(
       'injects stream_options.include_usage for %s streaming requests',
       async (provider, model) => {
@@ -6051,13 +6057,13 @@ describe('ProviderClient provider-specific message fields', () => {
     ],
   };
 
-  it('preserves reasoning_content for Zen without consulting model capabilities', async () => {
+  it('preserves reasoning_content for OpenCode without consulting model capabilities', async () => {
     const bareClient = new ProviderClient();
 
     await bareClient.forward({
-      provider: 'opencode-zen',
+      provider: 'opencode',
       apiKey: 'zen-token',
-      model: 'opencode-zen/big-pickle',
+      model: 'opencode/big-pickle',
       body: reasoningBody,
       stream: false,
     });

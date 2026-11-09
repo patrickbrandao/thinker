@@ -21,6 +21,10 @@ export interface FlowNodeData extends Record<string, unknown> {
   kind: FlowNodeKind;
   /** Drawn inside the node. */
   icon: ReactNode;
+  /** For steps: a small icon below the main one. */
+  badge?: ReactNode;
+  /** Accessible name of the badge. */
+  badgeLabel?: string;
   /** Name below the node (`node`), or the text lines inside it (`source`). */
   title: string;
   /** For sources: lines drawn inside the node, next to the icon. */
@@ -37,6 +41,10 @@ export interface FlowNodeData extends Record<string, unknown> {
   outbound?: boolean;
   /** Border: `active` (traffic, no errors), `error` (errors in the window) or `idle`. */
   state?: 'active' | 'error' | 'idle';
+  /** For steps: a circle instead of a square (where traffic ends). */
+  round?: boolean;
+  /** For steps: the end of the flow (a destination host), with rounder corners. */
+  sink?: boolean;
   /** Where a double-click goes. */
   href?: string;
 }

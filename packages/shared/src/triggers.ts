@@ -1,10 +1,10 @@
 /**
  * Event triggers: workspace-scoped delivery targets (e-mail, HTTP webhook,
- * Telegram, remote log) that harnesses point at instead of each carrying its
+ * Telegram, remote log: syslog, GELF, RELP) that harnesses point at instead of each carrying its
  * own notification settings.
  */
 
-export const TRIGGER_TYPES = ['email', 'webhook', 'telegram', 'syslog'] as const;
+export const TRIGGER_TYPES = ['email', 'webhook', 'telegram', 'syslog', 'gelf', 'relp'] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 /** Events a harness can route to a trigger (stored on the harness binding). */
@@ -17,7 +17,22 @@ export const HARNESS_TRIGGER_EVENTS = [
 ] as const;
 
 /** Workspace events, subscribed on the trigger itself (no harness binding exists yet/anymore). */
-export const WORKSPACE_TRIGGER_EVENTS = ['harness.created', 'harness.deleted'] as const;
+export const WORKSPACE_TRIGGER_EVENTS = [
+  'harness.created',
+  'harness.deleted',
+  'model.added',
+  'model.removed',
+  'model.error',
+  'oauth.refresh_failed',
+  'trigger.failed',
+  'audit.created',
+  'audit.updated',
+  'audit.deleted',
+  'user.login',
+  'user.logout',
+  'user.login_failed',
+  'user.password_changed',
+] as const;
 
 export const TRIGGER_EVENT_TYPES = [
   ...HARNESS_TRIGGER_EVENTS,
@@ -42,6 +57,15 @@ export const SYSLOG_TRANSPORTS = ['udp', 'tcp'] as const;
 export const SYSLOG_FORMATS = ['rfc5424', 'rfc3164'] as const;
 export type SyslogTransport = (typeof SYSLOG_TRANSPORTS)[number];
 export type SyslogFormat = (typeof SYSLOG_FORMATS)[number];
+
+/** GELF 1.1 transports: UDP (chunked, optional gzip), TCP (`\0` framed) and HTTP(S) `POST /gelf`. */
+export const GELF_TRANSPORTS = ['udp', 'tcp', 'http'] as const;
+export type GelfTransport = (typeof GELF_TRANSPORTS)[number];
+export const GELF_COMPRESSIONS = ['none', 'gzip'] as const;
+export type GelfCompression = (typeof GELF_COMPRESSIONS)[number];
+export const GELF_DEFAULT_PORT = 12201;
+/** RELP (syslog over plain TCP with per-message acknowledgement). */
+export const RELP_DEFAULT_PORT = 20514;
 
 /** RFC 5424 severities, index = numeric code. */
 export const SYSLOG_SEVERITIES = [
@@ -98,6 +122,18 @@ export const DEFAULT_SYSLOG_SEVERITIES: Record<string, SyslogSeverity> = {
   'request.debug.failed': 'err',
   'harness.created': 'notice',
   'harness.deleted': 'notice',
+  'model.added': 'notice',
+  'model.removed': 'warning',
+  'model.error': 'err',
+  'oauth.refresh_failed': 'err',
+  'trigger.failed': 'err',
+  'audit.created': 'notice',
+  'audit.updated': 'notice',
+  'audit.deleted': 'notice',
+  'user.login': 'info',
+  'user.logout': 'info',
+  'user.login_failed': 'warning',
+  'user.password_changed': 'notice',
   test: 'info',
 };
 
@@ -107,6 +143,11 @@ export const TRIGGER_LIMITS = {
   retryDelaySeconds: { min: 1, max: 3600, default: 30 },
   timeoutSeconds: { min: 1, max: 60, default: 10 },
 } as const;
+
+/** Workspace events that come from Alerts (system events). */
+const ALERT_EVENTS: TriggerEventType[] = WORKSPACE_TRIGGER_EVENTS.filter(
+  (e) => e !== 'harness.created' && e !== 'harness.deleted',
+);
 
 /** Template variables, grouped by the events that fill them. */
 export const TRIGGER_VARIABLES: Array<{ name: string; events: 'all' | TriggerEventType[] }> = [
@@ -152,7 +193,16 @@ export const TRIGGER_VARIABLES: Array<{ name: string; events: 'all' | TriggerEve
   { name: 'connection.label', events: ['credential.expired'] },
   { name: 'connection.http_status', events: ['credential.expired'] },
   { name: 'connection.error', events: ['credential.expired'] },
-  { name: 'actor.email', events: ['harness.created', 'harness.deleted'] },
+  { name: 'actor.email', events: ['harness.created', 'harness.deleted', ...ALERT_EVENTS] },
+  { name: 'alert.id', events: ALERT_EVENTS },
+  { name: 'alert.level', events: ALERT_EVENTS },
+  { name: 'alert.category', events: ALERT_EVENTS },
+  { name: 'alert.url', events: ALERT_EVENTS },
+  { name: 'entity.type', events: ALERT_EVENTS },
+  { name: 'entity.id', events: ALERT_EVENTS },
+  { name: 'entity.name', events: ALERT_EVENTS },
+  { name: 'actor.ip', events: ALERT_EVENTS },
+  { name: 'audit.fields', events: ['audit.created', 'audit.updated', 'audit.deleted'] },
 ];
 
 export const DEFAULT_TRIGGER_TEMPLATES = {
@@ -160,4 +210,6 @@ export const DEFAULT_TRIGGER_TEMPLATES = {
   webhook: { body: '{{event.json}}', contentType: 'application/json' },
   telegram: { text: '<b>{{event.title}}</b>\n{{event.message}}' },
   syslog: { message: '{{event.title}}: {{event.message}}' },
+  gelf: { shortMessage: '{{event.title}}', fullMessage: '{{event.message}}' },
+  relp: { message: '{{event.title}}: {{event.message}}' },
 } as const;

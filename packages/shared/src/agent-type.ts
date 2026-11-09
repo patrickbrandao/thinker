@@ -77,7 +77,9 @@ export const PLATFORM_API_SURFACES: Readonly<Record<AgentPlatform, ApiSurface>> 
   nanobot: 'chat_completions',
   craft: 'chat_completions',
   'claude-app': 'messages',
-  n8n: 'chat_completions',
+  // OpenAI Chat Model node 1.3 (new workflows) defaults to the Responses API;
+  // nodes up to 1.2, or with "Use Responses API" off, send Chat Completions.
+  n8n: 'responses',
   zapier: 'chat_completions',
   langflow: 'chat_completions',
   chatwoot: 'chat_completions',
@@ -85,7 +87,9 @@ export const PLATFORM_API_SURFACES: Readonly<Record<AgentPlatform, ApiSurface>> 
   'claude-code': 'messages',
   opencode: 'chat_completions',
   codex: 'responses',
-  'deepseek-harness': 'chat_completions',
+  // The native dsh route speaks Messages; its "Custom model API" (pi-ai)
+  // route speaks Chat Completions. The setup guide offers both.
+  'deepseek-harness': 'messages',
   pi: 'chat_completions',
   cline: 'chat_completions',
   'copilot-cli': 'chat_completions',

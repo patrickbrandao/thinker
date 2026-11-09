@@ -19,7 +19,7 @@ import { Button, cx } from '../components/ui.js';
 import RoutingDefaultTierSection from './RoutingDefaultTierSection.js';
 import RoutingSpecificitySection from './RoutingSpecificitySection.js';
 import RoutingVirtualModelsSection from './RoutingVirtualModelsSection.js';
-import RoutingTierCard from './RoutingTierCard.js';
+import AutoChainCard from './AutoChainCard.js';
 import { RoutingLoadingSkeleton, ActiveProviderIcons } from './RoutingPanels.js';
 import { useRoutingActions } from './RoutingActions.js';
 import {
@@ -47,7 +47,7 @@ import {
   type ResponseMode,
 } from '../services/api.js';
 import { parseCustomProviderParams, parseProviderDeepLink } from '../services/routing-params.js';
-import { DEFAULT_STAGE, STAGES } from '../services/providers.js';
+import { STAGES } from '../services/providers.js';
 import NoConnectionsPrompt from '../components/NoConnectionsPrompt.jsx';
 
 const PREFILL_PARAMS = ['provider', 'name', 'baseUrl', 'apiKey', 'models'];
@@ -491,26 +491,13 @@ export default function Routing() {
   // of virtual models.
   const renderUnified = () =>
     virtualModels(
-      <RoutingTierCard
-        stage={DEFAULT_STAGE}
+      <AutoChainCard
+        agentName={agentName}
         tier={actions.getTier('default')}
         models={modelList}
         customProviders={customProviderList}
-        activeProviders={activeProviders}
-        tiersLoading={tiers.loading}
-        changingTier={actions.changingTier}
-        resettingTier={actions.resettingTier}
-        resettingAll={actions.resettingAll}
-        addingFallback={actions.addingFallback}
-        agentName={agentName}
-        onDropdownOpen={(tierId) => setDropdownTier(tierId)}
-        onOverride={handleOverride}
-        onPinKey={actions.handlePinKey}
-        onReset={actions.handleReset}
-        onFallbackUpdate={actions.handleFallbackUpdate}
-        onAddFallback={(tierId) => setFallbackPickerTier(tierId)}
-        getFallbacksFor={actions.getFallbacksFor}
         connectedProviders={enabledConnectedProviders}
+        reloadTiers={() => tiers.reload()}
         getModelParams={getModelParamsFor}
         setModelParams={setModelParamsFor}
       />,

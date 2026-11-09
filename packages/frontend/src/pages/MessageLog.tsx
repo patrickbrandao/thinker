@@ -200,6 +200,7 @@ export default function MessageLog() {
   const attemptsParam = searchParams.get('attempts');
   const modelParam = searchParams.get('model');
   const rangeParam = searchParams.get('range');
+  const servedProviderParam = searchParams.get('served_provider');
 
   useEffect(() => preloadModelDisplayNames(), []);
 
@@ -355,6 +356,27 @@ export default function MessageLog() {
   );
   useOnChange(rangeParam, (range) => setRangeFilterValue(normalizeRangeFilter(range)));
   const [tierFilter, setTierFilter] = useState('');
+  // `?served_provider=` narrows to the upstream that served the request (the
+  // "Served by" link in the request details deep-links here). The input is a
+  // draft applied after a short pause so typing does not fire a query per key.
+  const [servedProviderFilter, setServedProviderFilter] = useState(() =>
+    (servedProviderParam ?? '').trim(),
+  );
+  const [servedProviderDraft, setServedProviderDraft] = useState(servedProviderFilter);
+  useOnChange(servedProviderParam, (value) => {
+    const next = (value ?? '').trim();
+    setServedProviderFilter(next);
+    setServedProviderDraft((draft) => (draft.trim() === next ? draft : next));
+  });
+  useEffect(() => {
+    const next = servedProviderDraft.trim().slice(0, 120);
+    if (next === servedProviderFilter) return;
+    const timer = setTimeout(() => {
+      setServedProviderFilter(next);
+      writeParams({ served_provider: next || undefined });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [servedProviderDraft, servedProviderFilter, writeParams]);
   const [originFilter, setOriginFilter] = useState('');
   const [statusFilterValue, setStatusFilterValue] = useState<MessageStatusFilterValue>(() =>
     normalizeStatusFilter(statusParam),
@@ -414,6 +436,7 @@ export default function MessageLog() {
         q.routing_tier = tierFilter;
       }
     }
+    if (servedProviderFilter) q.served_provider = servedProviderFilter;
     if (statusFilterValue) q.status = statusFilterValue;
     if (rangeFilter) q.range = rangeFilter;
     if (originFilter) q.origin = originFilter;
@@ -426,6 +449,7 @@ export default function MessageLog() {
     attemptStatusFilter,
     modelsFilter,
     tierFilter,
+    servedProviderFilter,
     statusFilterValue,
     rangeFilter,
     originFilter,
@@ -505,6 +529,7 @@ export default function MessageLog() {
     attemptStatusFilter !== '' ||
     modelsFilter.length > 0 ||
     tierFilter !== '' ||
+    servedProviderFilter !== '' ||
     originFilter !== '' ||
     statusFilterValue !== '' ||
     rangeFilter !== '';
@@ -532,6 +557,8 @@ export default function MessageLog() {
     setAttemptStatusFilterValue('');
     setModelsFilterValue([]);
     setTierFilter('');
+    setServedProviderFilter('');
+    setServedProviderDraft('');
     setOriginFilter('');
     setStatusFilterValue('');
     setRangeFilterValue('');
@@ -541,6 +568,7 @@ export default function MessageLog() {
       trigger: undefined,
       attempts: undefined,
       model: undefined,
+      served_provider: undefined,
       status: undefined,
       range: undefined,
     });
@@ -861,6 +889,17 @@ export default function MessageLog() {
               </div>
               <div className={filterBox}>
                 <Select value={tierFilter} onChange={setTierFilter} options={tierOptions} />
+              </div>
+              <div className={filterBox}>
+                <input
+                  type="search"
+                  className="field w-full"
+                  value={servedProviderDraft}
+                  maxLength={120}
+                  onChange={(e) => setServedProviderDraft(e.currentTarget.value)}
+                  placeholder={t('messages.log.filters.servedByPlaceholder')}
+                  aria-label={t('messages.log.filters.servedBy')}
+                />
               </div>
               <div className={filterBox}>
                 <Select

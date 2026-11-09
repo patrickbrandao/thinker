@@ -493,7 +493,8 @@ export function FloatingWindow({
       return;
     }
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      // A modal opened from the window takes Escape for itself.
+      if (event.key === 'Escape' && !document.querySelector('.overlay')) onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

@@ -42,6 +42,7 @@
     "design:registry": "node design-system/generate-registry.mjs",
     "design:registry:check": "node design-system/generate-registry.mjs --check",
     "test:scripts": "node --test scripts/*.test.js",
+    "test:full": "scripts/test-full.sh",
     "lint": "eslint packages/shared/src packages/backend/src packages/backend/test packages/backend/scripts packages/frontend/src packages/cli/src",
     "format": "prettier --write 'packages/*/src/**/*.{ts,tsx,css}'",
     "prepare": "husky"

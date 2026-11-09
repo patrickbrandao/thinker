@@ -52,6 +52,7 @@ function copy(text: string): void {
 }
 
 function Scalar({ value }: { value: unknown }) {
+  // i18n-ignore: JSON literal
   if (value === null) return <span className="text-faint">null</span>;
   if (typeof value === 'string') {
     return <span className="whitespace-pre-wrap break-all text-ok">{JSON.stringify(value)}</span>;

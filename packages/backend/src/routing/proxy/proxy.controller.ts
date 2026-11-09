@@ -1,16 +1,30 @@
 import {
   Controller,
   Get,
+  HttpCode,
+  Param,
   Post,
   Query,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
   UseFilters,
+  UseInterceptors,
   Logger,
   HttpException,
   Optional,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { outboundFetch, runWithOutboundScope } from '../../common/outbound/outbound-proxy';
+import { estimateRequestTokens } from './context-window-fit';
+import { applyParamPolicy } from './param-policy';
+import {
+  countTokensBody,
+  passthroughUrl,
+  resolvePassthroughTarget,
+  type PassthroughKind,
+} from './passthrough';
 import { Request, Response as ExpressResponse } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { randomUUID } from 'node:crypto';
@@ -33,6 +47,8 @@ import { clientIpInfo } from '../../common/utils/client-ip';
 import { requestReceivedAtMs } from '../../common/utils/request-received';
 import { buildRequestTimeline, type TimelineAttempt } from './request-timeline';
 import { recordedRequestHeaders } from './request-headers';
+import { detectHarnessSession, stripHarnessPrivateFields } from './harness-session';
+import { EgressAffinityInterceptor } from '../../proxy-servers/egress-affinity.interceptor';
 import { buildProxySessionScope } from './proxy-session-scope';
 import {
   buildMetaHeaders,
@@ -63,7 +79,8 @@ import { ResponsesSseError } from './chatgpt-adapter';
 import { redactInlineImageDataUrls } from './inline-image-redaction';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
 import { openAiModelCapabilities, type OpenAiModelCapabilities } from './openai-model-capabilities';
-import { StreamFailure } from './stream-writer';
+import { publishedContextWindow } from '../virtual-models/published-context';
+import { StreamFailure, partialUsageOf } from './stream-writer';
 import { AgentRecordingConfigService } from '../../common/services/agent-recording-config.service';
 import { AttemptRecordingService } from './attempt-recording.service';
 import { safeJsonStringify } from '../../common/utils/safe-json';
@@ -87,9 +104,10 @@ interface OpenAiModelObject {
   created: number;
   owned_by: string;
   /**
-   * Smallest context window (tokens) among the routes the entry can be
-   * served by. Published only for `auto` and virtual models, and omitted
-   * when any of those windows is unknown (ADR 0004, section 7).
+   * Context window (tokens). For `auto` and virtual models, the smallest
+   * among the routes the entry can be served by, omitted when any of those
+   * windows is unknown (ADR 0004, section 7). For a real model, its own
+   * window, omitted when only a stand-in default is known.
    */
   context_length?: number;
   provider_model_id?: string;
@@ -143,9 +161,72 @@ function virtualModelRouting(meta: RoutingMeta | undefined): {
     : {};
 }
 
+/** OpenAI-style error body for the passthrough routes. */
+function passthroughError(message: string, status: number) {
+  return {
+    error: {
+      message,
+      type: status >= 500 ? 'server_error' : 'invalid_request_error',
+      code: null,
+    },
+  };
+}
+
+/** The Anthropic SDKs send `anthropic-version` on every call. */
+function isAnthropicCaller(req: Request): boolean {
+  return typeof req.headers['anthropic-version'] === 'string';
+}
+
+/** One `/v1/models` entry in Anthropic's `ModelInfo` shape. */
+function toAnthropicModel(model: OpenAiModelObject) {
+  return {
+    type: 'model',
+    id: model.id,
+    display_name: model.id,
+    created_at: new Date(model.created * 1000).toISOString(),
+  };
+}
+
+/** `/v1/models` in Anthropic's list shape (harness-anthropic-sdk G2). */
+function toAnthropicModelList(data: OpenAiModelObject[]) {
+  const models = data.map(toAnthropicModel);
+  return {
+    data: models,
+    has_more: false,
+    first_id: models[0]?.id ?? null,
+    last_id: models[models.length - 1]?.id ?? null,
+  };
+}
+
+/** Upper bound for a passthrough call (embeddings, transcription, count_tokens). */
+export const PASSTHROUGH_TIMEOUT_MS = 300_000;
+
+/**
+ * Abort signal for a passthrough call: fires when the client disconnects or
+ * after PASSTHROUGH_TIMEOUT_MS, so an abandoned request never pins the
+ * upstream connection.
+ */
+function passthroughAbort(res: ExpressResponse): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const onClose = () => {
+    if (!res.writableFinished) controller.abort();
+  };
+  res.once('close', onClose);
+  const timer = setTimeout(() => controller.abort(), PASSTHROUGH_TIMEOUT_MS);
+  timer.unref?.();
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      clearTimeout(timer);
+      res.off('close', onClose);
+    },
+  };
+}
+
 @Controller('v1')
 @Public()
 @UseGuards(AgentKeyAuthGuard)
+@UseInterceptors(EgressAffinityInterceptor)
 @UseFilters(ProxyExceptionFilter)
 @SkipThrottle()
 export class ProxyController {
@@ -215,6 +296,10 @@ export class ProxyController {
         // them, not the internal `custom:<uuid>` key.
         owned_by: model.providerName ?? model.provider,
       };
+      // Every real model publishes its window (harness-hermes G3), judged from
+      // the same snapshot as `auto`: a stand-in default is never published.
+      const contextLength = publishedContextWindow(model, models);
+      if (contextLength !== null) entry.context_length = contextLength;
       if (includeRouteMetadata) {
         entry.provider_model_id = model.id;
         entry.auth_type = model.authType;
@@ -237,10 +322,211 @@ export class ProxyController {
       data.push(entry);
     }
 
+    if (isAnthropicCaller(req) && req.method === 'GET' && !req.params?.id) {
+      return toAnthropicModelList(data) as unknown as OpenAiModelList;
+    }
     return {
       object: 'list',
       data,
     };
+  }
+
+  /**
+   * `GET /v1/models/{id}` (harness-anthropic-sdk G2): one entry of the list,
+   * in Anthropic shape when the caller sends `anthropic-version`.
+   */
+  @Get('models/:id')
+  async model(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+    @Param('id') id: string,
+  ): Promise<void> {
+    const list = await this.models(req);
+    const entry = list.data.find((model) => model.id === id);
+    if (!entry) {
+      res.status(404).json(passthroughError(`Model "${id}" is not available for this agent.`, 404));
+      return;
+    }
+    res.json(isAnthropicCaller(req) ? toAnthropicModel(entry) : entry);
+  }
+
+  /** `POST /v1/embeddings`: passthrough to the provider the model names. */
+  @Post('embeddings')
+  async embeddings(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+  ): Promise<void> {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    await this.passthrough(req, res, 'embeddings', body.model, (target) =>
+      JSON.stringify({ ...body, model: target.model }),
+    );
+  }
+
+  /** `POST /v1/audio/transcriptions` (multipart): passthrough like embeddings. */
+  @Post('audio/transcriptions')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
+  async transcriptions(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+    @UploadedFile() file?: { buffer: Buffer; originalname?: string; mimetype?: string },
+  ): Promise<void> {
+    const fields = (req.body ?? {}) as Record<string, unknown>;
+    if (!file) {
+      res.status(400).json(passthroughError('A `file` part is required.', 400));
+      return;
+    }
+    await this.passthrough(req, res, 'transcriptions', fields.model, (target) => {
+      const form = new FormData();
+      form.append(
+        'file',
+        new Blob([new Uint8Array(file.buffer)], {
+          type: file.mimetype || 'application/octet-stream',
+        }),
+        file.originalname || 'audio',
+      );
+      for (const [key, value] of Object.entries(fields)) {
+        if (key === 'model' || value === undefined) continue;
+        if (Array.isArray(value)) value.forEach((v) => form.append(key, String(v)));
+        else form.append(key, String(value));
+      }
+      form.append('model', target.model);
+      return form;
+    });
+  }
+
+  /**
+   * `POST /v1/messages/count_tokens` (harness-anthropic-sdk G1): forwarded to
+   * Anthropic when the model is a Claude the agent can reach, estimated for
+   * everything else (`auto`, virtual models, other providers).
+   */
+  @Post('messages/count_tokens')
+  @HttpCode(200)
+  async countTokens(
+    @Req() req: Request & { ingestionContext: IngestionContext },
+    @Res() res: ExpressResponse,
+  ): Promise<void> {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const target = resolvePassthroughTarget(body.model);
+    const url = target ? passthroughUrl(target, 'count_tokens') : null;
+    const { agentId, tenantId } = req.ingestionContext;
+    const credentials =
+      target && url
+        ? await this.proxyService.resolvePassthroughCredentials(agentId, tenantId, target.provider)
+        : null;
+    if (!target || !url || !credentials) {
+      res.json({ input_tokens: estimateRequestTokens(body) });
+      return;
+    }
+    const upstreamBody = countTokensBody(body, target.model);
+    applyParamPolicy(upstreamBody, {
+      endpointKey: target.provider,
+      format: target.endpoint.format,
+      model: target.model,
+    });
+    const abort = passthroughAbort(res);
+    try {
+      const upstream = await runWithOutboundScope(credentials.egressScope, () =>
+        outboundFetch(url, {
+          method: 'POST',
+          headers: target.endpoint.buildHeaders(credentials.apiKey, credentials.authType),
+          body: JSON.stringify(upstreamBody),
+          signal: abort.signal,
+        }),
+      );
+      if (!upstream.ok) {
+        // An estimate beats a failed count: clients use it to plan compaction.
+        res.json({ input_tokens: estimateRequestTokens(body) });
+        return;
+      }
+      res
+        .status(upstream.status)
+        .type('application/json')
+        .send(await upstream.text());
+    } catch {
+      if (!res.headersSent && !res.writableEnded) {
+        res.json({ input_tokens: estimateRequestTokens(body) });
+      }
+    } finally {
+      abort.dispose();
+    }
+  }
+
+  private async passthrough(
+    req: Request & { ingestionContext: IngestionContext },
+    res: ExpressResponse,
+    kind: PassthroughKind,
+    model: unknown,
+    buildBody: (
+      target: NonNullable<ReturnType<typeof resolvePassthroughTarget>>,
+    ) => string | FormData,
+  ): Promise<void> {
+    const target = resolvePassthroughTarget(model);
+    if (!target) {
+      res
+        .status(400)
+        .json(
+          passthroughError(
+            'Name the model with its provider (for example `openai/text-embedding-3-small`).',
+            400,
+          ),
+        );
+      return;
+    }
+    const url = passthroughUrl(target, kind);
+    if (!url) {
+      res
+        .status(400)
+        .json(
+          passthroughError(`Provider ${target.provider} has no ${kind} route in Thinker.`, 400),
+        );
+      return;
+    }
+    const { agentId, tenantId } = req.ingestionContext;
+    // Embeddings and transcriptions cost money like chat: same per-tenant,
+    // per-IP and concurrency limits (M201/M202/M203, rendered by the filter).
+    this.rateLimiter.checkLimit(tenantId);
+    this.rateLimiter.checkIpLimit(req.ip ?? '');
+    const credentials = await this.proxyService.resolvePassthroughCredentials(
+      agentId,
+      tenantId,
+      target.provider,
+    );
+    if (!credentials) {
+      res
+        .status(400)
+        .json(passthroughError(`This agent has no connection for ${target.provider}.`, 400));
+      return;
+    }
+    const body = buildBody(target);
+    const headers: Record<string, string> = {
+      ...target.endpoint.buildHeaders(credentials.apiKey, credentials.authType),
+    };
+    // fetch sets the multipart boundary itself.
+    if (typeof body !== 'string') {
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === 'content-type') delete headers[key];
+      }
+    }
+    this.rateLimiter.acquireSlot(tenantId);
+    const abort = passthroughAbort(res);
+    try {
+      const upstream = await runWithOutboundScope(credentials.egressScope, () =>
+        outboundFetch(url, { method: 'POST', headers, body, signal: abort.signal }),
+      );
+      const contentType = upstream.headers.get('content-type') ?? 'application/json';
+      res
+        .status(upstream.status)
+        .type(contentType)
+        .send(Buffer.from(await upstream.arrayBuffer()));
+    } catch (err) {
+      this.logger.warn(`Passthrough ${kind} to ${target.provider} failed: ${String(err)}`);
+      if (!res.headersSent && !res.writableEnded) {
+        res.status(502).json(passthroughError(`Provider ${target.provider} did not answer.`, 502));
+      }
+    } finally {
+      abort.dispose();
+      this.rateLimiter.releaseSlot(tenantId);
+    }
   }
 
   @Post('chat/completions')
@@ -274,7 +560,12 @@ export class ProxyController {
   ): Promise<void> {
     const { agentId, tenantId } = req.ingestionContext;
     const body = req.body as Record<string, unknown>;
-    const sessionScope = buildProxySessionScope(tenantId, agentId, req.headers['x-session-key']);
+    stripHarnessPrivateFields(body);
+    const sessionScope = buildProxySessionScope(
+      tenantId,
+      agentId,
+      detectHarnessSession(req.headers)?.id,
+    );
     const { sessionKey } = sessionScope;
     const traceId = this.extractTraceId(req);
     const requestId = randomUUID();
@@ -681,6 +972,7 @@ export class ProxyController {
           requestDurationMs: startTime == null ? undefined : Date.now() - startTime,
           traceId,
           apiMode,
+          usage: partialUsageOf(err),
         })
         .catch((e) => this.logger.warn(`Failed to record cancelled Request: ${e}`));
       if (!res.writableEnded) res.end();
@@ -896,7 +1188,7 @@ export class ProxyController {
     return buildProxySessionScope(
       req.ingestionContext.tenantId,
       req.ingestionContext.agentId,
-      req.headers['x-session-key'],
+      detectHarnessSession(req.headers)?.id,
     ).sessionKey;
   }
 

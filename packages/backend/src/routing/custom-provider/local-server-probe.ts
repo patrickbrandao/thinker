@@ -136,11 +136,14 @@ async function mapLimited<T, R>(
 /* ── Ollama ─────────────────────────────────────────────────────────────── */
 
 interface OllamaTags {
-  models?: { name?: string; model?: string }[];
+  /** `/api/ps` also reports the loaded `context_length`. */
+  models?: { name?: string; model?: string; context_length?: number }[];
 }
 interface OllamaShow {
   capabilities?: string[];
   model_info?: Record<string, unknown>;
+  /** Modelfile parameters, one `name value` per line (`num_ctx 8192`). */
+  parameters?: string;
 }
 
 /** Ollama tags `:latest` implicitly; the bare name is what users type and route on. */
@@ -154,6 +157,14 @@ async function probeOllama(ctx: ProbeCtx): Promise<LocalProbeResult> {
   const ps = await getJson<OllamaTags>(ctx, '/api/ps', { optional: true });
   const loaded = new Set(
     (ps?.models ?? []).map((m) => ollamaModelName(m.name ?? m.model ?? '')).filter(Boolean),
+  );
+  // The window Ollama actually runs a loaded model with (local-ollama G2).
+  const loadedContext = new Map(
+    (ps?.models ?? [])
+      .map(
+        (m) => [ollamaModelName(m.name ?? m.model ?? ''), positiveInt(m.context_length)] as const,
+      )
+      .filter(([name, ctx]) => !!name && ctx !== undefined),
   );
   const names = (tags?.models ?? [])
     .map((m) => m.name ?? m.model)
@@ -178,9 +189,15 @@ async function probeOllama(ctx: ProbeCtx): Promise<LocalProbeResult> {
     if (capabilities ? !capabilities.includes('completion') : EMBEDDING_NAME.test(rawName)) return;
     const ctxKey = Object.keys(show?.model_info ?? {}).find((k) => k.endsWith('.context_length'));
     const model_name = ollamaModelName(rawName);
+    // Ollama truncates silently to the window it runs with, not the model's
+    // maximum: the loaded context, then the Modelfile `num_ctx`, then the max.
+    const numCtx = /(?:^|\n)\s*num_ctx\s+(\d+)/.exec(show?.parameters ?? '')?.[1];
     models.push({
       model_name,
-      context_window: ctxKey ? positiveInt(show?.model_info?.[ctxKey]) : undefined,
+      context_window:
+        loadedContext.get(model_name) ??
+        positiveInt(numCtx ? Number(numCtx) : undefined) ??
+        (ctxKey ? positiveInt(show?.model_info?.[ctxKey]) : undefined),
       capabilities: capabilities
         ? caps({
             tools: capabilities.includes('tools'),
@@ -286,6 +303,8 @@ interface LlamaModels {
     id?: string;
     status?: { value?: string };
     meta?: { n_ctx_train?: number };
+    /** Router mode reports each model's window here (local-llamacpp G1). */
+    context_length?: number;
     architecture?: { input_modalities?: string[] };
   }[];
 }
@@ -302,7 +321,12 @@ async function probeLlamaCpp(ctx: ProbeCtx): Promise<LocalProbeResult> {
   const list = await getJson<LlamaModels>(ctx, '/v1/models');
   const entries = (list?.data ?? []).filter(
     (m): m is NonNullable<LlamaModels['data']>[number] & { id: string } =>
-      typeof m.id === 'string' && m.id.length > 0 && !EMBEDDING_NAME.test(m.id),
+      typeof m.id === 'string' &&
+      m.id.length > 0 &&
+      !EMBEDDING_NAME.test(m.id) &&
+      // Router mode lists models still downloading; they cannot serve yet.
+      m.status?.value !== 'downloading' &&
+      m.status?.value !== 'incomplete',
   );
   // Router mode (several models) answers `/props` per model; a single-model
   // server answers it directly with the runtime context size.
@@ -313,7 +337,9 @@ async function probeLlamaCpp(ctx: ProbeCtx): Promise<LocalProbeResult> {
     models: entries.map((m) => ({
       model_name: m.id,
       context_window:
-        positiveInt(props?.default_generation_settings?.n_ctx) ?? positiveInt(m.meta?.n_ctx_train),
+        positiveInt(props?.default_generation_settings?.n_ctx) ??
+        positiveInt(m.context_length) ??
+        positiveInt(m.meta?.n_ctx_train),
       capabilities: caps({
         tools: false,
         vision:

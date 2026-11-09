@@ -19,6 +19,7 @@ import {
   type OutboundProxy,
   type OutboundScope,
 } from './outbound-proxy';
+import { resetBalanceStateForTests, runWithEgressAffinity } from './egress-balance';
 
 interface TestProxy {
   port: number;
@@ -93,6 +94,7 @@ afterAll(async () => {
 });
 
 afterEach(async () => {
+  resetBalanceStateForTests();
   targetStatus = 200;
   setOutboundHopSink(null);
   setGlobalProxyConfigForTests(null);
@@ -277,6 +279,95 @@ describe('outboundFetch through a chain', () => {
     ).rejects.toThrow(/metadata/);
     expect(p.connects).toHaveLength(0);
     await p.close();
+  });
+});
+
+describe('outboundFetch through balanced lines', () => {
+  const group = (members: OutboundProxy[], extra: Record<string, unknown> = {}): EgressItem => ({
+    kind: 'group',
+    key: `t1:pr:${seq}`,
+    mode: 'affinity',
+    members,
+    onFailure: 'next_member',
+    noSession: 'request',
+    ...extra,
+  });
+
+  it('keeps a session on one proxy across requests', async () => {
+    const a = await startProxy();
+    const b = await startProxy();
+    const line = group([proxy(a.port), proxy(b.port)]);
+    const used: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const s = scope([line]);
+      await runWithEgressAffinity({ sessionKey: 'sess-42' }, () =>
+        runWithOutboundScope(s, () => outboundFetch(url()).then((r) => r.text())),
+      );
+      expect(s.hops[0]).toMatchObject({ position: 1, mode: 'affinity', attempt: 1, result: 'ok' });
+      used.push(s.hops[0]!.proxy_id!);
+    }
+    expect(new Set(used).size).toBe(1);
+    await a.close();
+    await b.close();
+  });
+
+  it('per request alternates proxies', async () => {
+    const a = await startProxy();
+    const b = await startProxy();
+    const line = group([proxy(a.port), proxy(b.port)], { mode: 'request' });
+    const used: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const s = scope([line]);
+      await runWithOutboundScope(s, () => outboundFetch(url()).then((r) => r.text()));
+      used.push(s.hops[0]!.proxy_id!);
+    }
+    expect(used[0]).not.toBe(used[1]);
+    expect(used[0]).toBe(used[2]);
+    expect(used[1]).toBe(used[3]);
+    await a.close();
+    await b.close();
+  });
+
+  it('on failure tries another proxy of the line, then quarantines the dead one', async () => {
+    const open = await startProxy();
+    const dead = proxy(await closedPort());
+    const line = group([dead, proxy(open.port)], { mode: 'request', noSession: 'first' });
+    const s = scope([line, { kind: 'direct' }]);
+    await runWithOutboundScope(s, () => outboundFetch(url()));
+    expect(s.hops.map((h) => [h.position, h.attempt, h.result])).toEqual([
+      [1, 1, 'refused'],
+      [1, 2, 'ok'],
+    ]);
+    const next = scope([line, { kind: 'direct' }]);
+    await runWithOutboundScope(next, () => outboundFetch(url()));
+    expect(next.hops.map((h) => h.result)).toEqual(['ok']);
+    expect(next.hops[0]!.proxy_id).not.toBe(dead.id);
+    await open.close();
+  });
+
+  it('"skip to next line" goes to Direct after one failure', async () => {
+    const dead1 = proxy(await closedPort());
+    const dead2 = proxy(await closedPort());
+    const line = group([dead1, dead2], { mode: 'affinity', onFailure: 'next_line' });
+    const s = scope([line, { kind: 'direct' }]);
+    await runWithEgressAffinity({ sessionKey: 's' }, () =>
+      runWithOutboundScope(s, () => outboundFetch(url())),
+    );
+    expect(s.hops.map((h) => [h.kind, h.position, h.result])).toEqual([
+      ['proxy', 1, 'refused'],
+      ['direct', 2, 'ok'],
+    ]);
+  });
+
+  it('a fully quarantined line is skipped while it lasts', async () => {
+    const dead1 = proxy(await closedPort());
+    const dead2 = proxy(await closedPort());
+    const line = group([dead1, dead2], { mode: 'request' });
+    await runWithOutboundScope(scope([line, { kind: 'direct' }]), () => outboundFetch(url()));
+    const s = scope([line, { kind: 'direct' }]);
+    await runWithOutboundScope(s, () => outboundFetch(url()));
+    expect(s.hops.map((h) => h.result)).toEqual(['skipped_quarantine', 'skipped_quarantine', 'ok']);
+    expect(summarizeEgress(s.hops)).toEqual({ kind: 'direct', proxy_id: null, name: null });
   });
 });
 

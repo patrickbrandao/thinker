@@ -13,6 +13,8 @@ import {
 } from '../services/routing-utils.js';
 import { customProviderColor, formatPerRequestCost } from '../services/formatters.js';
 import FallbackList from '../components/FallbackList.js';
+import NotInCatalogBadge from '../components/NotInCatalogBadge.js';
+import { routeNotInCatalog } from '../lib/route-catalog.js';
 import ModelParamsAffordance from '../components/ModelParamsAffordance.jsx';
 import RouteKeyChip from '../components/RouteKeyChip.js';
 import VirtualModelTitle from '../components/VirtualModelTitle.js';
@@ -483,6 +485,9 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
                 : priceLabel(modelName)}
             </span>
             {skippedBadge}
+            {tier && routeNotInCatalog(effectiveRoute(tier), props.models) ? (
+              <NotInCatalogBadge />
+            ) : null}
           </span>
         </div>
       </div>

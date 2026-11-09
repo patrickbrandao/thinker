@@ -79,6 +79,7 @@ interface MountOpts {
   keyInput?: string;
   providers?: RoutingProvider[];
   addKeyOpen?: boolean;
+  newConnection?: boolean;
   onBack?: () => void;
   onUpdate?: () => void;
 }
@@ -109,6 +110,7 @@ function Harness(opts: MountOpts & { onBack: () => void; onUpdate: () => void })
       providers={opts.providers}
       addKeyOpen={addKeyOpen}
       setAddKeyOpen={setAddKeyOpen}
+      newConnection={opts.newConnection}
       onBack={opts.onBack}
       onUpdate={opts.onUpdate}
     />
@@ -127,6 +129,109 @@ function mount(opts: MountOpts) {
 describe('ProviderKeyForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('free key', () => {
+    const opencode = () => makeProviderDef({ id: 'opencode', name: 'OpenCode', freeKey: 'public' });
+    const hint = /The key public gives only the free models/;
+
+    it('offers no one-click keyless connect', () => {
+      mount({ provDef: opencode(), newConnection: true });
+      expect(screen.queryByText(/no key/i)).toBeNull();
+      expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
+        'Cancel',
+        'Connect',
+      ]);
+    });
+
+    it('a new account starts with the free key and is created only on Connect', async () => {
+      const { onBack, onUpdate } = mount({ provDef: opencode(), newConnection: true });
+      expect((screen.getByLabelText('New OpenCode API key') as HTMLInputElement).value).toBe(
+        'public',
+      );
+      expect(screen.getByText(hint)).toBeTruthy();
+      expect(connectProviderMock).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+      await flush();
+      expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
+        provider: 'opencode',
+        apiKey: 'public',
+        authType: 'api_key',
+        label: 'opencode-1',
+      });
+      expect(onUpdate).toHaveBeenCalled();
+      expect(onBack).toHaveBeenCalled();
+    });
+
+    it('a new account takes a real key in place of the free one', async () => {
+      mount({ provDef: opencode(), newConnection: true });
+      fireEvent.change(screen.getByLabelText('New OpenCode API key'), {
+        target: { value: 'sk-real-opencode-key' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+      await flush();
+      expect(connectProviderMock).toHaveBeenCalledWith(
+        'test-agent',
+        expect.objectContaining({ apiKey: 'sk-real-opencode-key' }),
+      );
+    });
+
+    const publicAccount = (id: string, label: string, priority: number): RoutingProvider => ({
+      id,
+      provider: 'opencode',
+      auth_type: 'api_key',
+      is_active: true,
+      has_api_key: true,
+      key_prefix: 'public',
+      label,
+      priority,
+      region: null,
+      connected_at: '2026-11-03',
+    });
+
+    it('adds another free-key account under its own name next to existing ones', async () => {
+      mount({
+        provDef: opencode(),
+        connected: true,
+        newConnection: true,
+        providers: [publicAccount('p1', 'opencode-1', 0), publicAccount('p2', 'opencode-2', 1)],
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+      await flush();
+      expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
+        provider: 'opencode',
+        apiKey: 'public',
+        authType: 'api_key',
+        label: 'opencode-3',
+      });
+    });
+
+    it('refuses a name that belongs to another account instead of replacing its key', async () => {
+      mount({
+        provDef: opencode(),
+        connected: true,
+        newConnection: true,
+        providers: [publicAccount('p1', 'opencode-1', 0)],
+      });
+      fireEvent.change(screen.getByLabelText('Key name'), { target: { value: 'OpenCode-1' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+      await flush();
+      expect(connectProviderMock).not.toHaveBeenCalled();
+      expect(toastError).toHaveBeenCalledWith(expect.stringContaining('OpenCode-1'));
+    });
+
+    it('pre-fills the first key of an unconnected provider', () => {
+      mount({ provDef: opencode() });
+      expect((screen.getByLabelText('OpenCode API key') as HTMLInputElement).value).toBe('public');
+      expect(screen.getByText(hint)).toBeTruthy();
+    });
+
+    it('leaves the key empty and shows no hint without a free key', () => {
+      mount({ provDef: makeProviderDef({ id: 'openai', name: 'OpenAI' }), newConnection: true });
+      expect((screen.getByLabelText('New OpenAI API key') as HTMLInputElement).value).toBe('');
+      expect(screen.queryByText(hint)).toBeNull();
+    });
   });
 
   describe('field label', () => {
@@ -310,7 +415,7 @@ describe('ProviderKeyForm', () => {
         supportsSubscription: true,
         subscriptionAuthMode: 'token',
         subscriptionCredentialKind: 'api-key',
-        subscriptionKeyPlaceholder: 'Paste your Z.ai API key',
+        subscriptionKeyPlaceholder: 'Paste your GLM Coding Plan API key',
         subscriptionEndpointRegions: [
           { value: 'global', label: 'Outside China (api.z.ai)' },
           { value: 'cn', label: 'China Mainland (open.bigmodel.cn)' },
@@ -855,6 +960,46 @@ describe('ProviderKeyForm', () => {
     };
   }
 
+  describe('new connection', () => {
+    it('hides the existing key and adds a named connection, then closes', async () => {
+      const def = makeProviderDef({ id: 'openai', name: 'OpenAI' });
+      const { onBack, onUpdate } = mount({
+        provDef: def,
+        connected: true,
+        providers: [makeProvider()],
+        newConnection: true,
+      });
+
+      // Nothing about the current connection: no masked key, no Change, no Disconnect.
+      expect(screen.queryByDisplayValue('sk-***')).toBeNull();
+      expect(screen.queryByText('Change')).toBeNull();
+      expect(screen.queryByLabelText('Disconnect provider')).toBeNull();
+
+      // The name defaults to <provider>-N with the lowest free N ("Default" is not one).
+      expect((screen.getByLabelText('Key name') as HTMLInputElement).value).toBe('openai-1');
+      fireEvent.change(screen.getByLabelText('New OpenAI API key'), {
+        target: { value: 'sk-new' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+      await flush();
+
+      expect(connectProviderMock).toHaveBeenCalledWith(
+        'test-agent',
+        expect.objectContaining({ provider: 'openai', apiKey: 'sk-new', label: 'openai-1' }),
+      );
+      expect(onUpdate).toHaveBeenCalled();
+      expect(onBack).toHaveBeenCalled();
+    });
+
+    it('closes the host on Cancel', () => {
+      const def = makeProviderDef({ id: 'openai', name: 'OpenAI' });
+      const { onBack } = mount({ provDef: def, newConnection: true });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onBack).toHaveBeenCalled();
+      expect(connectProviderMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('multi-key chain', () => {
     it('shows the legacy single-key view (no list, no Primary badge) when only one key is connected', () => {
       const def = makeProviderDef({ id: 'openai', name: 'OpenAI' });
@@ -1082,14 +1227,14 @@ describe('ProviderKeyForm', () => {
       fireEvent.click(getByText('Add key'));
 
       await flush();
-      // Default suggestion for the 2nd key is "Key 2".
+      // Default suggestion for the 2nd key is "openai-1".
       expect(connectProviderMock).toHaveBeenCalledWith('test-agent', {
         provider: 'openai',
         apiKey: 'sk-second',
         authType: 'api_key',
-        label: 'Key 2',
+        label: 'openai-1',
       });
-      expect(toastSuccess).toHaveBeenCalledWith('OpenAI key "Key 2" added');
+      expect(toastSuccess).toHaveBeenCalledWith('OpenAI key "openai-1" added');
     });
 
     it('list-mode AddAnotherKeyAction submits a 3rd key via connectProvider with the chain auth_type', async () => {
@@ -1115,9 +1260,9 @@ describe('ProviderKeyForm', () => {
         provider: 'openai',
         apiKey: 'sk-third',
         authType: 'api_key',
-        label: 'Key 3',
+        label: 'openai-1',
       });
-      expect(toastSuccess).toHaveBeenCalledWith('OpenAI key "Key 3" added');
+      expect(toastSuccess).toHaveBeenCalledWith('OpenAI key "openai-1" added');
     });
 
     it('list-mode AddAnotherKey routes through validateSubscriptionKey when chain is subscription', async () => {
@@ -1158,7 +1303,7 @@ describe('ProviderKeyForm', () => {
         provider: 'anthropic',
         apiKey: 'sub-third-token',
         authType: 'subscription',
-        label: 'Key 3',
+        label: 'anthropic-1',
       });
     });
 
@@ -1212,7 +1357,7 @@ describe('ProviderKeyForm', () => {
         provider: 'zai',
         apiKey: 'zai-third-key',
         authType: 'subscription',
-        label: 'Key 3',
+        label: 'zai-1',
         region: 'cn',
       });
     });
@@ -1270,7 +1415,7 @@ describe('ProviderKeyForm', () => {
         provider: 'qwen',
         apiKey: 'sk-third',
         authType: 'api_key',
-        label: 'Key 3',
+        label: 'qwen-1',
         region: 'https://workspace-123.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1',
       });
     });
@@ -1424,10 +1569,14 @@ describe('ProviderKeyForm', () => {
 });
 
 describe('suggestNextProviderKeyLabel', () => {
-  it('falls back after the bounded Key N search is exhausted', () => {
-    const existing = Array.from({ length: 98 }, (_, index) => `Key ${index + 2}`);
-    existing.push('Default');
-
-    expect(suggestNextProviderKeyLabel(existing)).toBe('Key 100');
+  it('names connections <provider>-N with the lowest free N', () => {
+    expect(suggestNextProviderKeyLabel([], 'anthropic')).toBe('anthropic-1');
+    expect(suggestNextProviderKeyLabel(['Default', 'anthropic-1'], 'anthropic')).toBe(
+      'anthropic-2',
+    );
+    expect(suggestNextProviderKeyLabel(['Anthropic-2', 'anthropic-3'], 'anthropic')).toBe(
+      'anthropic-1',
+    );
+    expect(suggestNextProviderKeyLabel([], 'custom:abc')).toBe('custom-1');
   });
 });

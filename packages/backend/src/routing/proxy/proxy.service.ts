@@ -1,3 +1,4 @@
+import type { OutboundScope } from '../../common/outbound/outbound-proxy';
 import { Injectable, Logger, HttpStatus, Optional } from '@nestjs/common';
 import { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import { ConfigService } from '@nestjs/config';
@@ -10,6 +11,7 @@ import { AnthropicOauthService } from '../oauth/anthropic/anthropic-oauth.servic
 import { GeminiOauthService } from '../oauth/gemini/gemini-oauth.service';
 import { KiroOauthService } from '../oauth/kiro/kiro-oauth.service';
 import { XaiOauthService } from '../oauth/xai/xai-oauth.service';
+import { OpencodeOauthService } from '../oauth/opencode/opencode-oauth.service';
 import { ForwardResult } from './provider-client';
 import { SessionMomentumService } from './session-momentum.service';
 import { LimitCheckService } from '../../notifications/services/limit-check.service';
@@ -61,7 +63,7 @@ import {
   type ResolvedRouteCredentials,
   type RouteCredentialDeps,
 } from './route-credentials';
-import { peekStream, streamWarmupMsFor } from './stream-warmup';
+import { streamWarmupMsFor } from './stream-warmup';
 import { toChatCompletionsRequest } from './responses-adapter';
 import { messagesToChatCompletionsRequest } from './anthropic-messages-adapter';
 import { effectiveRoutesForResponseMode } from '../routing-core/response-mode-guard';
@@ -104,6 +106,7 @@ const contextSnapshots = new WeakMap<readonly DiscoveredModel[], RouteSnapshot>(
  */
 const SCORING_EXCLUDED_ROLES = new Set(['system', 'developer']);
 const SCORING_RECENT_MESSAGES = 10;
+const LEGACY_OPENCODE_PREFIX = 'opencode-zen/';
 
 export interface RoutingMeta {
   tier: TierSlot | 'direct';
@@ -243,21 +246,6 @@ function withVirtualModel(result: ProxyResult, resolved: ResolvedRouting): Proxy
   return { ...result, meta: { ...result.meta, ...virtualModelFields(resolved) } };
 }
 
-/**
- * Stand-in for a streaming 200 whose body never produced a byte. Keeps the
- * attempt and wire fields so fallback and recording treat it as a failed
- * provider response.
- */
-function warmupFailureForward(forward: ForwardResult, message: string): ForwardResult {
-  return {
-    ...forward,
-    response: new Response(
-      JSON.stringify({ error: { message: `Stream warmup failed: ${message}` } }),
-      { status: 502, headers: { 'content-type': 'application/json' } },
-    ),
-  };
-}
-
 @Injectable()
 export class ProxyService {
   private readonly logger = new Logger(ProxyService.name);
@@ -281,6 +269,7 @@ export class ProxyService {
     private readonly modelParamsService: AgentModelParamsService,
     private readonly providerParamSpecs: ProviderParamSpecService,
     @Optional() private readonly egress?: ProxyEgressService,
+    @Optional() private readonly opencodeOauth?: OpencodeOauthService,
   ) {}
 
   async proxyRequest(opts: ProxyRequestOptions): Promise<ProxyResult> {
@@ -516,6 +505,8 @@ export class ProxyService {
       apiMode,
       resourceUrl: credentials.resourceUrl,
       providerRegion: credentials.providerRegion,
+      providerBaseUrl: credentials.providerBaseUrl,
+      providerBaseUrlAllowsPrivate: credentials.providerBaseUrlAllowsPrivate,
       signatureLookup,
       thinkingLookup,
       clientAnthropicBeta: headers?.['anthropic-beta'],
@@ -523,6 +514,19 @@ export class ProxyService {
       paramsRoute: route,
       tenantProviderId: credentials.tenantProviderId,
       startProviderAttempt,
+      // Stream warm-up and error peek run inside the forward, so a stalled
+      // stream or an error before the first content is a failed hop here.
+      warmupMs: stream
+        ? streamWarmupMsFor(route.provider, {
+            connectionMs: credentials.streamWarmupMs,
+            local: route.authType === 'local',
+          })
+        : undefined,
+      hasNextRoute:
+        !explicitModelOverride &&
+        !!paramMergeContext &&
+        this.effectiveFallbackRoutes(resolved).length > 0,
+      streamIdleTimeoutMs: credentials.streamIdleTimeoutMs,
     });
     // A custom provider's key pool may have rotated to another key; stamp the
     // connection that actually served the call.
@@ -560,101 +564,6 @@ export class ProxyService {
         clientAnthropicBeta: headers?.['anthropic-beta'],
       });
       if (fallbackResult) return fallbackResult;
-    }
-
-    // Stream warm-up: for streaming 200 responses, verify the provider
-    // actually starts delivering data before committing to the client.
-    // If the stream stalls or dies, we can still try fallback providers.
-    if (forward.response.ok && stream && forward.response.body) {
-      const warmup = await peekStream(
-        forward.response.body,
-        streamWarmupMsFor(route.provider, {
-          connectionMs: credentials.streamWarmupMs,
-          local: route.authType === 'local',
-        }),
-        signal,
-      );
-      if (warmup.ok) {
-        const peeked: ForwardResult = {
-          response: new Response(warmup.stream, {
-            status: forward.response.status,
-            statusText: forward.response.statusText,
-            headers: forward.response.headers,
-          }),
-          attempt: forward.attempt,
-          isGoogle: forward.isGoogle,
-          isAnthropic: forward.isAnthropic,
-          isChatGpt: forward.isChatGpt,
-          isResponses: forward.isResponses,
-          isCodeAssist: forward.isCodeAssist,
-          responsesTextFormat: forward.responsesTextFormat,
-          responsesToolNames: forward.responsesToolNames,
-          wireFormat: forward.wireFormat,
-          providerCallStarted: forward.providerCallStarted,
-        };
-        this.recordTierIfScoring(sessionMomentumKey, resolved.tier);
-        this.recordCategoryIfValid(sessionMomentumKey, resolved.specificity_category);
-        return {
-          forward: peeked,
-          meta: this.buildBaseMeta(resolved, primaryModel, {
-            request_params: primaryRequestParams,
-            tenantProviderId: servedTenantProviderId,
-            // Label of the row actually selected — a stale pin resolves to the
-            // default key, and the recorded label must follow the key used.
-            provider_key_label: servedKeyLabel,
-            attempt: forward.attempt,
-            providerCallStarted: forward.providerCallStarted,
-          }),
-        };
-      }
-
-      this.logger.warn(
-        `Stream warmup failed: provider=${route.provider} model=${primaryModel} reason=${warmup.reason} message=${warmup.message}`,
-      );
-
-      const syntheticForward = warmupFailureForward(forward, warmup.message);
-      if (!explicitModelOverride && paramMergeContext) {
-        const fallbackResult = await this.tryFallbackChain({
-          agentId,
-          tenantId,
-          resolved,
-          primaryModel,
-          forward: syntheticForward,
-          body,
-          resolveChatBody,
-          stream,
-          sessionKey,
-          sessionCacheKey,
-          providerCacheKey,
-          sessionMomentumKey,
-          signal,
-          signatureLookup,
-          thinkingLookup,
-          apiMode,
-          paramMergeContext,
-          primaryTenantProviderId: servedTenantProviderId,
-          primaryKeyLabel: servedKeyLabel,
-          startProviderAttempt,
-          credentialDashboardUrl: dashboardUrl,
-          clientAnthropicBeta: headers?.['anthropic-beta'],
-        });
-        if (fallbackResult) return fallbackResult;
-      }
-
-      // Warmup failed and no fallbacks available: return the synthetic 502
-      // instead of the original forward (whose body was consumed by peekStream).
-      this.recordTierIfScoring(sessionMomentumKey, resolved.tier);
-      this.recordCategoryIfValid(sessionMomentumKey, resolved.specificity_category);
-      return {
-        forward: syntheticForward,
-        meta: this.buildBaseMeta(resolved, primaryModel, {
-          request_params: primaryRequestParams,
-          tenantProviderId: servedTenantProviderId,
-          provider_key_label: servedKeyLabel,
-          attempt: forward.attempt,
-          providerCallStarted: forward.providerCallStarted,
-        }),
-      };
     }
 
     this.recordTierIfScoring(sessionMomentumKey, resolved.tier);
@@ -704,6 +613,24 @@ export class ProxyService {
               typeof item === 'string' ||
               (!!item && typeof item === 'object' && !Array.isArray(item)),
           ));
+      // Stateless gateway: Responses state kept upstream cannot be resolved
+      // (harness-openai-sdk G3, harness-vercel-ai-sdk G2).
+      for (const field of ['previous_response_id', 'conversation'] as const) {
+        if (body[field] !== undefined && body[field] !== null) {
+          throw new ThinkerError('M303', HttpStatus.BAD_REQUEST, { field });
+        }
+      }
+      if (
+        Array.isArray(body.input) &&
+        body.input.some(
+          (item) =>
+            !!item &&
+            typeof item === 'object' &&
+            (item as { type?: unknown }).type === 'item_reference',
+        )
+      ) {
+        throw new ThinkerError('M303', HttpStatus.BAD_REQUEST, { field: 'item_reference' });
+      }
       if (hasInstructions || hasInput) return;
       throw new ThinkerError('M300', HttpStatus.BAD_REQUEST);
     }
@@ -879,6 +806,11 @@ export class ProxyService {
     tenantId: string,
     requestedModel: string,
   ): Promise<ResolvedRouting | null> {
+    // Harness configs written before OpenCode Zen became OpenCode still send
+    // `opencode-zen/<model>`; the catalog now publishes `opencode/<model>`.
+    if (requestedModel.startsWith(LEGACY_OPENCODE_PREFIX)) {
+      requestedModel = `opencode/${requestedModel.slice(LEGACY_OPENCODE_PREFIX.length)}`;
+    }
     const models = await this.modelDiscovery.getModelsForAgent(tenantId, agentId);
     const catalogRoute = routeForOpenAiModelId(requestedModel, models);
     if (catalogRoute) return this.explicitRouting(agentId, tenantId, catalogRoute);
@@ -991,9 +923,38 @@ export class ProxyService {
         geminiOauth: this.geminiOauth,
         kiroOauth: this.kiroOauth,
         xaiOauth: this.xaiOauth,
+        opencodeOauth: this.opencodeOauth,
       },
       egress: this.egress,
     };
+  }
+
+  /**
+   * The agent's credential for a passthrough route (embeddings, transcription,
+   * count_tokens): an API key first, then a subscription. Null when the agent
+   * has neither for the provider.
+   */
+  async resolvePassthroughCredentials(
+    agentId: string,
+    tenantId: string,
+    provider: string,
+  ): Promise<{ apiKey: string; authType: AuthType; egressScope?: OutboundScope } | null> {
+    for (const authType of ['api_key', 'subscription'] as AuthType[]) {
+      const credentials = await this.resolveCredentials(agentId, tenantId, {
+        provider,
+        auth_type: authType,
+      });
+      // The egress scope travels with the key: the passthrough call must leave
+      // through the connection's outbound profile, like the chat routes do.
+      if (credentials.ok) {
+        return {
+          apiKey: credentials.apiKey,
+          authType,
+          ...(credentials.egressScope ? { egressScope: credentials.egressScope } : {}),
+        };
+      }
+    }
+    return null;
   }
 
   private resolveCredentials(

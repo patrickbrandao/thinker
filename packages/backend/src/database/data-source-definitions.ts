@@ -33,6 +33,7 @@ import {
   ProxyBinding,
   ProxyLog,
   ProxyProfile,
+  ProxyProfileLine,
   ProxyServer,
   ProxyUsageDaily,
 } from '../entities/proxy-server.entity';
@@ -85,6 +86,16 @@ import { DropTriggerKeyHint1804600000000 } from './migrations/1804600000000-Drop
 import { AddProxyServers1804700000000 } from './migrations/1804700000000-AddProxyServers';
 import { AddProxyProfiles1804800000000 } from './migrations/1804800000000-AddProxyProfiles';
 import { AddTopologyPositions1804900000000 } from './migrations/1804900000000-AddTopologyPositions';
+import { RenameOpencodeZenToOpencode1805000000000 } from './migrations/1805000000000-RenameOpencodeZenToOpencode';
+import { AddRequestHarnessSessions1805200000000 } from './migrations/1805200000000-AddRequestHarnessSessions';
+import { RenameDefaultConnectionLabels1805300000000 } from './migrations/1805300000000-RenameDefaultConnectionLabels';
+import { AddTenantProviderBaseUrl1805400000000 } from './migrations/1805400000000-AddTenantProviderBaseUrl';
+import { AddServedProviderAndStreamIdle1805500000000 } from './migrations/1805500000000-AddServedProviderAndStreamIdle';
+import { AddSystemEvents1805600000000 } from './migrations/1805600000000-AddSystemEvents';
+import { AddProxyProfileLines1805700000000 } from './migrations/1805700000000-AddProxyProfileLines';
+import { NotificationLogAlertType1805800000000 } from './migrations/1805800000000-NotificationLogAlertType';
+import { DropOrphanLimitRules1805800000001 } from './migrations/1805800000001-DropOrphanLimitRules';
+import { AllowPrivateDestination1805900000000 } from './migrations/1805900000000-AllowPrivateDestination';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -244,6 +255,7 @@ export const entities = [
   ProxyServer,
   ProxyBinding,
   ProxyProfile,
+  ProxyProfileLine,
   ProxyAssignment,
   ProxyLog,
   ProxyUsageDaily,
@@ -417,4 +429,14 @@ export const migrations = [
   AddProxyServers1804700000000,
   AddProxyProfiles1804800000000,
   AddTopologyPositions1804900000000,
+  RenameOpencodeZenToOpencode1805000000000,
+  AddRequestHarnessSessions1805200000000,
+  RenameDefaultConnectionLabels1805300000000,
+  AddTenantProviderBaseUrl1805400000000,
+  AddServedProviderAndStreamIdle1805500000000,
+  AddSystemEvents1805600000000,
+  AddProxyProfileLines1805700000000,
+  NotificationLogAlertType1805800000000,
+  DropOrphanLimitRules1805800000001,
+  AllowPrivateDestination1805900000000,
 ];

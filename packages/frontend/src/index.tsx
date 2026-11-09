@@ -36,6 +36,9 @@ const AgentModels = lazyReload(() => import('./pages/AgentModels.jsx'));
 const AgentLimitsRedirect = lazyReload(() => import('./pages/AgentLimitsRedirect.jsx'));
 const AgentMessagesRedirect = lazyReload(() => import('./pages/AgentMessagesRedirect.jsx'));
 const MessageLog = lazyReload(() => import('./pages/MessageLog.jsx'));
+const Sessions = lazyReload(() => import('./pages/Sessions.jsx'));
+const Alerts = lazyReload(() => import('./pages/Alerts.jsx'));
+const SessionDetail = lazyReload(() => import('./pages/SessionDetail.jsx'));
 const Settings = lazyReload(() => import('./pages/Settings.jsx'));
 const Routing = lazyReload(() => import('./pages/Routing.jsx'));
 const Playground = lazyReload(() => import('./pages/Playground.jsx'));
@@ -55,6 +58,7 @@ const ConnectProvider = lazyReload(() => import('./pages/ConnectProvider.jsx'));
 const Subscriptions = lazyReload(() => import('./pages/providers/Subscriptions.jsx'));
 const Byok = lazyReload(() => import('./pages/providers/Byok.jsx'));
 const ByokAdd = lazyReload(() => import('./pages/providers/ByokAdd.jsx'));
+const ProviderModels = lazyReload(() => import('./pages/providers/ProviderModels.jsx'));
 const SubscriptionsAdd = lazyReload(() => import('./pages/providers/SubscriptionsAdd.jsx'));
 const LocalAdd = lazyReload(() => import('./pages/providers/LocalAdd.jsx'));
 const LocalProviders = lazyReload(() => import('./pages/providers/Local.jsx'));
@@ -143,6 +147,30 @@ function AppRoutes() {
           }
         />
         <Route
+          path="alerts"
+          element={
+            <Lazy>
+              <Alerts />
+            </Lazy>
+          }
+        />
+        <Route
+          path="sessions"
+          element={
+            <Lazy>
+              <Sessions />
+            </Lazy>
+          }
+        />
+        <Route
+          path="sessions/:sessionId"
+          element={
+            <Lazy>
+              <SessionDetail />
+            </Lazy>
+          }
+        />
+        <Route
           path="messages"
           element={
             <Lazy>
@@ -219,6 +247,14 @@ function AppRoutes() {
           element={
             <Lazy>
               <LocalProviders />
+            </Lazy>
+          }
+        />
+        <Route
+          path="providers/models"
+          element={
+            <Lazy>
+              <ProviderModels />
             </Lazy>
           }
         />

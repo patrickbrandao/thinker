@@ -282,6 +282,55 @@ export default {
       'Register Thinker in your OpenClaw config to route each request to the best provider using the model {{ model }}',
     openClawCliTab: 'CLI configuration',
     openClawCli: 'Set the provider config and default model directly via CLI commands.',
+    contextHint:
+      '{{ name }} does not read the model list from Thinker, so {{ field }} is set to {{ value }}, a safe default. Raise it to the smallest context window behind the model, shown in the harness Models tab.',
+    craftLimits:
+      'Craft registers custom-endpoint models with a 131072-token context, 8192 output tokens (which also caps the compaction summary) and no images. Set the max output and image support of the connection, and for a larger context edit the connection in {{ file }}:',
+    n8nResponses:
+      'Node version 1.3 turns {{ option }} on by default and calls {{ path }}. Turn it off when your providers have no Responses API: the node then sends Chat Completions, which Thinker forwards without translation. The built-in web search, file search and code interpreter tools only work on providers that serve Responses natively.',
+    claudeApp:
+      'In Claude Desktop, open Help > Troubleshooting > Enable Developer Mode, then Developer > Configure Third-Party Inference and choose the {{ provider }} inference provider. Fill in these values:',
+    claudeAppModels:
+      'Model discovery only shows Claude model ids, so {{ auto }} and your virtual models must be listed in {{ key }}. {{ behaves }} gives them the Effort controls and context window of that Claude model. The same keys work in the configuration JSON or an MDM profile:',
+    claudeAppRestart:
+      'Apply Changes, then quit and reopen Claude Desktop. The base URL has no {{ v1 }}: the app appends {{ path }} itself.',
+    copilotCli:
+      'Save this as {{ file }} (the key is stored as plain text), then start Copilot CLI with {{ cmd }}.',
+    pi: 'Save this as {{ file }}, then pick the model with {{ cmd }}. {{ compat }} makes Pi send its session id, which groups each conversation in Thinker.',
+    piReasoning:
+      'Set {{ reasoning }} to {{ yes }} only when every route behind the model reasons (Pi then sends {{ effort }}), and drop {{ image }} when a route has no vision.',
+    deepSeekIntro:
+      'DeepSeek Harness reaches Thinker in two ways: the native route speaks Anthropic Messages and sends its session id; the Custom model API route speaks Chat Completions.',
+    deepSeekNativeTab: 'Native route',
+    deepSeekPiTab: 'Custom model API',
+    deepSeekNative:
+      'Add this plugin entry to {{ file }} (the Web UI profile is {{ profile }}). dsh appends {{ path }} to the base URL and lists no models from a custom base URL, so {{ auto }} and your virtual models are declared here.',
+    deepSeekPi:
+      'Settings > Models > Custom model API in dsh writes this provider; you can also add it to {{ file }}. The base URL keeps {{ v1 }}.',
+    deepSeekKey: 'Then export your Thinker key in the environment that starts dsh:',
+    openWebUI:
+      'In Open WebUI, open Admin Settings > Connections > OpenAI API and add a connection with these values. Leave Model IDs empty: Open WebUI lists {{ auto }} and your virtual models from {{ models }}.',
+    openWebUIDocker:
+      'When Open WebUI runs in Docker and Thinker on the host, replace {{ localhost }} with {{ docker }} in the URL.',
+    openWebUISession:
+      'The {{ header }} header gives each chat its own Thinker session (prompt cache and routing momentum). Thinker also reads {{ chatId }} when Open WebUI runs with {{ env }}.',
+    openWebUITask:
+      'Tip: set a cheaper {{ task }} so titles, tags and follow-up suggestions do not use the chat model.',
+    chatwoot:
+      'In Chatwoot, open Super Admin > Settings > Captain and fill in these values. The endpoint has no {{ v1 }}: Chatwoot appends it, so an endpoint ending in {{ v1 }} calls {{ double }} and fails.',
+    chatwootExtras:
+      'Captain embeddings and audio transcription use the same endpoint and pass through Thinker; set the Embedding Model to one your providers serve.',
+    langflow:
+      'Langflow blocks private and plain-HTTP hosts until they are allowed. Add this to the environment of the Langflow server and restart it (hostname, IP or CIDR; no scheme, no port):',
+    langflowProvider:
+      'Then open Settings > Model Providers > OpenAI Compatible, fill in these values and enable the discovered models ({{ auto }} and your virtual models). Langflow in a container reaches a Thinker on the host through {{ docker }}.',
+    zapier:
+      'Zapier AI apps take no custom base URL, so call Thinker from a Webhooks by Zapier action with the Custom Request event. Zaps run in the Zapier cloud: the URL must be public (HTTPS), not {{ localhost }}.',
+    zapierBody:
+      'Use this as the request data. Leave {{ stream }} off: Zapier does not read streamed replies and stops an action after 30 seconds, so pick a fast model. The reply is in {{ path }}.',
+    zapierSession:
+      'Optional: add an {{ header }} header with a name for the Zap to group its calls in one session.',
+    values: 'Values to fill in',
   },
   snippets: {
     toolkitTabs: 'SDK / toolkit',

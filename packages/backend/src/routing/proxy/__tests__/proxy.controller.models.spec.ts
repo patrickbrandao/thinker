@@ -95,10 +95,28 @@ describe('ProxyController.models with virtual models', () => {
         context_length: 64000,
       },
       { id: 'fast', object: 'model', created: 0, owned_by: 'thinker', context_length: 128000 },
-      { id: 'openai/gpt-4o', object: 'model', created: 0, owned_by: 'openai' },
-      { id: 'deepseek/deepseek-chat', object: 'model', created: 0, owned_by: 'deepseek' },
-      { id: 'custom:cp-1/model-a', object: 'model', created: 0, owned_by: 'custom:cp-1' },
-      { id: 'gw/qwen', object: 'model', created: 0, owned_by: 'Gateway' },
+      {
+        id: 'openai/gpt-4o',
+        object: 'model',
+        created: 0,
+        owned_by: 'openai',
+        context_length: 128000,
+      },
+      {
+        id: 'deepseek/deepseek-chat',
+        object: 'model',
+        created: 0,
+        owned_by: 'deepseek',
+        context_length: 64000,
+      },
+      {
+        id: 'custom:cp-1/model-a',
+        object: 'model',
+        created: 0,
+        owned_by: 'custom:cp-1',
+        context_length: 128000,
+      },
+      { id: 'gw/qwen', object: 'model', created: 0, owned_by: 'Gateway', context_length: 128000 },
     ]);
   });
 
@@ -153,12 +171,48 @@ describe('ProxyController.models with virtual models', () => {
     expect(virtual).toEqual({ id: 'mystery', object: 'model', created: 0, owned_by: 'thinker' });
   });
 
-  it('keeps real models without context_length', async () => {
+  it('publishes each real model window, never a stand-in default or an implausible one', async () => {
     routing({ autoContextLength: 64000, virtuals: [] });
+    modelDiscovery.getModelsForAgent.mockResolvedValue([
+      makeModel({ id: 'known', provider: 'openai', contextWindow: 200000 }),
+      makeModel({
+        id: 'defaulted',
+        provider: 'openai',
+        contextWindow: 1_000_000,
+        contextWindowSource: 'default',
+      }),
+      makeModel({ id: 'tiny', provider: 'openai', contextWindow: 512 }),
+      makeModel({ id: 'huge', provider: 'openai', contextWindow: 20_000_000 }),
+    ]);
 
     const reals = (await controller.models(request())).data.slice(1);
 
-    for (const entry of reals) expect(entry).not.toHaveProperty('context_length');
+    expect(reals.find((e) => e.id === 'openai/known')?.context_length).toBe(200000);
+    for (const id of ['openai/defaulted', 'openai/tiny', 'openai/huge']) {
+      expect(reals.find((e) => e.id === id)).not.toHaveProperty('context_length');
+    }
+  });
+
+  it('publishes the smallest :free window for openrouter/free, or nothing without one', async () => {
+    routing({ autoContextLength: null, virtuals: [] });
+    const router = makeModel({
+      id: 'openrouter/free',
+      provider: 'openrouter',
+      contextWindow: 2_000_000,
+    });
+    modelDiscovery.getModelsForAgent.mockResolvedValue([
+      router,
+      makeModel({ id: 'a/model:free', provider: 'openrouter', contextWindow: 131072 }),
+      makeModel({ id: 'b/model:free', provider: 'openrouter', contextWindow: 32768 }),
+      makeModel({ id: 'c/model', provider: 'openrouter', contextWindow: 8192 }),
+    ]);
+    let entry = (await controller.models(request())).data.find((e) => e.id === 'openrouter/free');
+    expect(entry?.context_length).toBe(32768);
+
+    modelDiscovery.getModelsForAgent.mockResolvedValue([router]);
+    entry = (await controller.models(request())).data.find((e) => e.id === 'openrouter/free');
+    expect(entry).toBeDefined();
+    expect(entry).not.toHaveProperty('context_length');
   });
 
   it('never adds capabilities, cost or route metadata to auto and virtual models', async () => {
