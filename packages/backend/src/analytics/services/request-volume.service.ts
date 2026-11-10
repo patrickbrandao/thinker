@@ -224,6 +224,8 @@ export class RequestVolumeService {
     splitAt: string;
     to?: string;
     agentName?: string;
+    /** Only requests concluded on this connection (terminal attribution). */
+    connection?: ConnectionScope;
   }): Promise<{ current: DispositionTotals; previous: DispositionTotals }> {
     const empty = (): DispositionTotals => ({
       total: 0,
@@ -242,11 +244,16 @@ export class RequestVolumeService {
     if (params.agentName) sqlParams.push(params.agentName);
     sqlParams.push(params.splitAt);
     const splitIdx = sqlParams.length;
+    const connectionWhere = this.connectionPredicate(params.connection, sqlParams).replace(
+      /^AND /,
+      'WHERE ',
+    );
     const sql = `${this.terminalCte(params.agentName, true)}
       SELECT ${DISPOSITION_EXPR} AS dim,
         COUNT(*) FILTER (WHERE t.ts >= $${splitIdx})::int AS current_count,
         COUNT(*) FILTER (WHERE t.ts < $${splitIdx})::int AS previous_count
       FROM terminal t
+      ${connectionWhere}
       GROUP BY 1`;
     const rows = (await this.messageRepo.query(sql, sqlParams)) as Array<{
       dim: string;

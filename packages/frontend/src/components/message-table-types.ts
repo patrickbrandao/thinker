@@ -66,8 +66,6 @@ export const COMPACT_COLUMNS: MessageColumnKey[] = [
   'status',
   'date',
   'model',
-  'attempts',
-  'message',
   'cost',
   'totalTokens',
   'cache',

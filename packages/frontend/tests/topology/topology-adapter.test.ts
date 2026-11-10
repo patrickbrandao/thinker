@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTopologyGraph,
   expandIpv6,
+  filterTopology,
   ipLines,
   linkWidths,
 } from '../../src/pages/topology-adapter';
@@ -254,5 +255,25 @@ describe('ip lines', () => {
     expect(ipLines('::ffff:203.0.113.7')).toEqual(['203.0.113.7']);
     expect(ipLines('fe80::1%en0')).toHaveLength(2);
     expect(ipLines('10.0.0.5')).toEqual(['10.0.0.5']);
+  });
+});
+
+describe('filterTopology', () => {
+  it('returns the data untouched with no filter', () => {
+    expect(filterTopology(data, {})).toBe(data);
+  });
+
+  it('keeps one harness, its clients and what it reaches', () => {
+    const f = filterTopology(data, { harness: 'harness:b' });
+    expect(f.harnesses.map((h) => h.id)).toEqual(['harness:b']);
+    expect(f.clients).toEqual([]);
+    expect(f.links.every((l) => l.source !== 'harness:a')).toBe(true);
+  });
+
+  it('keeps only harnesses linked to the provider type and its connections', () => {
+    const f = filterTopology(data, { provider: 'anthropic' });
+    expect(f.harnesses.map((h) => h.id)).toEqual(['harness:a']);
+    expect(f.providers.map((p) => p.id)).toEqual(['connection:c2']);
+    expect(f.clients.map((c) => c.id)).toEqual(['client:10.0.0.5']);
   });
 });

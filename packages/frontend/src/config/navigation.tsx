@@ -46,6 +46,7 @@ export interface NavGroup {
 export const NAVIGATION: NavGroup[] = [
   {
     key: 'main',
+    label: 'nav.sectionObservability',
     items: [
       { key: 'overview', to: '/overview', label: 'nav.overview', icon: LayoutDashboard },
       { key: 'sessions', to: '/sessions', label: 'nav.sessions', icon: MessagesSquare },

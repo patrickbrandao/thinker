@@ -15,7 +15,11 @@ import {
   sqlIsFailedStatus,
   sqlIsSuccessStatus,
 } from './query-helpers';
-import { RequestVolumeService, type DispositionTotals } from './request-volume.service';
+import {
+  RequestVolumeService,
+  type ConnectionScope,
+  type DispositionTotals,
+} from './request-volume.service';
 
 export interface ReliabilityStatsResponse {
   success_rate: { value: number; previous: number };
@@ -41,6 +45,9 @@ export interface ReliabilityTimeseriesResponse {
   buckets: Array<{ bucket: string; counts: number[] }>;
 }
 
+const connectionScope = (id?: string): ConnectionScope | undefined =>
+  id ? { tenantProviderId: id } : undefined;
+
 interface WindowCounts {
   total: number;
   successes: number;
@@ -65,6 +72,8 @@ export class ReliabilityStatsService {
     tenantId: string | null;
     range?: string;
     agentName?: string;
+    /** Only requests concluded on this connection (`tenant_providers.id`). */
+    connectionId?: string;
   }): Promise<ReliabilityStatsResponse> {
     const range = params.range ?? '7d';
     const cutoff = computeCutoff(rangeToInterval(range));
@@ -76,6 +85,7 @@ export class ReliabilityStatsService {
       splitAt: cutoff,
       to: computeCutoff('0 hours'),
       agentName: params.agentName,
+      connection: connectionScope(params.connectionId),
     });
     const current = this.windowCounts(windows.current);
     const previous = this.windowCounts(windows.previous);
@@ -220,6 +230,8 @@ export class ReliabilityStatsService {
     by?: string;
     agentName?: string;
     failedOnly?: boolean;
+    /** Scopes the disposition view to one connection (`tenant_providers.id`). */
+    connectionId?: string;
   }): Promise<ReliabilityTimeseriesResponse> {
     const range = params.range ?? '7d';
     const by = (RELIABILITY_TS_DIMENSIONS as readonly string[]).includes(params.by ?? '')
@@ -239,6 +251,7 @@ export class ReliabilityStatsService {
         hourly,
         agentName: params.agentName,
         failedOnly: params.failedOnly,
+        connection: connectionScope(params.connectionId),
       });
       return this.pivotTimeseries(range, by, rows);
     }

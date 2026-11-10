@@ -177,7 +177,7 @@ is-ok (base.css): is-ok
 is-outline (base.css): is-outline
 is-pulse (base.css): is-pulse
 is-round (canvas.css): is-round
-is-selected (base.css, canvas.css): is-selected
+is-selected (base.css, canvas.css, shell.css): is-selected
 is-selecting (canvas.css): is-selecting
 is-sink (canvas.css): is-sink
 is-success (shell.css): is-success
@@ -324,18 +324,18 @@ Tabs: src/components/ui.tsx
 (empty until primitives exist)
 
 ## Canonical rules — same selector+property declared twice with different values; the winner renders (5)
-.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1073  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1073  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1082  [@media (max-width: 900px)]
-.liquid-metal::after { inset: -5px }  ← shell.css:1248
-.liquid-metal::after { padding: 5px }  ← shell.css:1249
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1080  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1080  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1089  [@media (max-width: 900px)]
+.liquid-metal::after { inset: -5px }  ← shell.css:1255
+.liquid-metal::after { padding: 5px }  ← shell.css:1256
 
 ## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (5)
-.app.is-collapsed .nav-action { display: revert }  at shell.css:1066 loses to shell.css:1073
-.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1066 loses to shell.css:1073
-.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1078 loses to shell.css:1082
-.liquid-metal::after { inset: -2px }  at shell.css:1204 loses to shell.css:1248
-.liquid-metal::after { padding: 2px }  at shell.css:1206 loses to shell.css:1249
+.app.is-collapsed .nav-action { display: revert }  at shell.css:1073 loses to shell.css:1080
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1073 loses to shell.css:1080
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1085 loses to shell.css:1089
+.liquid-metal::after { inset: -2px }  at shell.css:1211 loses to shell.css:1255
+.liquid-metal::after { padding: 2px }  at shell.css:1213 loses to shell.css:1256
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

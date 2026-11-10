@@ -137,6 +137,8 @@ export default {
   },
   drawer: {
     title: 'Request {{ id }}',
+    pin: 'Pin window (the next click opens another)',
+    unpin: 'Unpin window',
     close: 'Close',
     float: 'Pop out to a floating window',
     dock: 'Dock to the side',

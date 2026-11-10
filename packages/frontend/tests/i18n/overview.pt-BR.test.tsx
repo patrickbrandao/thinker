@@ -162,8 +162,9 @@ describe('Overview in pt-BR', () => {
     expect(screen.getByText('Nome da conexão')).toBeDefined();
     expect(screen.getByText('Inativa')).toBeDefined();
     expect(screen.getByText('Padrão')).toBeDefined();
-    expect(screen.getByText('Taxa de sucesso', { selector: '.stat-label' })).toBeDefined();
-    expect(screen.getByText('Recuperadas por fallback')).toBeDefined();
+    expect(screen.getByText('Requisições funcionais', { selector: '.stat-label' })).toBeDefined();
+    expect(screen.getByText('Requisições recuperadas', { selector: '.stat-label' })).toBeDefined();
+    expect(screen.queryByText('Recuperadas por fallback')).toBeNull();
     expect(screen.getByText('Últimos 7 dias')).toBeDefined();
     // Intl percent in pt-BR: decimal comma.
     expect(screen.getByText('95,5%')).toBeDefined();

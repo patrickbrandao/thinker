@@ -323,10 +323,16 @@ export function getAttemptTimeseries(range = '7d', agentName?: string): Promise<
   }) as Promise<AttemptTimeseries>;
 }
 
-export function getReliabilityStats(range = '7d', agentName?: string): Promise<ReliabilityStats> {
+export function getReliabilityStats(
+  range = '7d',
+  agentName?: string,
+  /** Only requests concluded on this connection (`tenant_providers.id`). */
+  connectionId?: string,
+): Promise<ReliabilityStats> {
   return fetchJson(RELIABILITY_PATHS.stats, {
     range,
     ...(agentName ? { agent_name: agentName } : {}),
+    ...(connectionId ? { connection_id: connectionId } : {}),
   }) as Promise<ReliabilityStats>;
 }
 
@@ -337,11 +343,14 @@ export function getReliabilityStats(range = '7d', agentName?: string): Promise<R
 export function getRequestStatusTimeseries(
   range = '7d',
   agentName?: string,
+  /** Only requests concluded on this connection (`tenant_providers.id`). */
+  connectionId?: string,
 ): Promise<StatusTimeseries> {
   return fetchJson(RELIABILITY_PATHS.requestStatusTimeseries, {
     range,
     by: 'disposition',
     ...(agentName ? { agent_name: agentName } : {}),
+    ...(connectionId ? { connection_id: connectionId } : {}),
   }) as Promise<StatusTimeseries>;
 }
 
