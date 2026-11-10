@@ -17,6 +17,9 @@
     min-height: 0;
   }
   .app-content {
+    /* Containing block for absolute descendants (e.g. sr-only live regions),
+       so they can't stretch the document past the viewport. */
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow: auto;
@@ -443,7 +446,7 @@
   /* Stat tiles and grids */
   .stat-tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 12px;
   }
   .stat-tile {
@@ -451,6 +454,10 @@
     background: var(--bg-elev);
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
+  }
+  .stat-tile.is-selected {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
   }
   .stat-tile .stat-label {
     color: var(--text-muted);

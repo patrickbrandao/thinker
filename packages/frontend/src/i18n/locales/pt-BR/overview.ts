@@ -99,7 +99,9 @@ const ptBR: Catalog<typeof en> = {
     requestSuccessRate:
       'Requisições bem-sucedidas sobre todas as requisições. As recuperadas contam como bem-sucedidas.',
   },
+  periodFilter: 'Filtro por período',
   kpi: {
+    successfulRequests: 'Requisições funcionais',
     successRate: 'Taxa de sucesso',
     recoveredRequests: 'Requisições recuperadas',
     recoveredByFallback: 'Recuperadas por fallback',
@@ -109,6 +111,7 @@ const ptBR: Catalog<typeof en> = {
     subjectRecovered: 'requisições recuperadas',
     subjectRecoveredByFallback: 'requisições recuperadas por fallback',
     subjectFailed: 'requisições com falha',
+    scopeConnection: 'Ver as {{ subject }} desta conta',
     scopeHarness: 'Ver as {{ subject }} deste harness',
     scopeAll: 'Ver as {{ subject }} de todos os harnesses',
   },
@@ -117,6 +120,8 @@ const ptBR: Catalog<typeof en> = {
     recoveredRequests: 'Requisições recuperadas',
     cost: 'Custo',
     tokenUsage: 'Uso de tokens',
+    costUsd: 'Custo (US $)',
+    viewDetails: 'Ver detalhes',
     loading: 'Carregando gráfico…',
     noRequestData: 'Nenhuma requisição neste período',
     noRecovered: 'Nenhuma requisição recuperada neste período',

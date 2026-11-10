@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import ErrorState from '../components/ErrorState.js';
 import MessageTable from '../components/MessageTable.js';
-import RequestDrawer from '../components/RequestDrawer.js';
+import RequestDrawerStack from '../components/RequestDrawerStack.js';
 import { DETAILED_COLUMNS, type MessageRow } from '../components/message-table-types.js';
 import { Badge, Button, Panel, Skel } from '../components/ui.js';
 import { t } from '../i18n/index.js';
@@ -283,7 +283,7 @@ export default function SessionDetail() {
           </section>
         </div>
       )}
-      <RequestDrawer messageId={selected} onClose={() => setSelected(null)} />
+      <RequestDrawerStack messageId={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

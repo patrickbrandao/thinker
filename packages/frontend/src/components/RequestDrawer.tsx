@@ -14,6 +14,8 @@ import {
   Minus,
   PanelRight,
   PictureInPicture2,
+  Pin,
+  PinOff,
   X,
 } from 'lucide-react';
 import { getMessageDetails, type AttemptRecording } from '../services/api/messages.js';
@@ -37,6 +39,16 @@ export interface RequestDrawerProps {
   onClose: () => void;
   /** `page` fills a dedicated browser tab: no side panel, float or close controls. */
   variant?: 'panel' | 'page';
+  /** Shows the pin control; a pinned window keeps its request (see RequestDrawerStack). */
+  pinned?: boolean;
+  onTogglePin?: () => void;
+  /** Open as a floating window from the start. */
+  startFloating?: boolean;
+  /** Cascade step for windows opened next to others. */
+  cascade?: number;
+  /** Stacking order among open windows; raised by `onActivate`. */
+  zIndex?: number;
+  onActivate?: () => void;
 }
 
 type AttemptTab = 'details' | 'request' | 'response' | 'timeline' | 'tools' | 'raw';
@@ -51,12 +63,13 @@ interface FloatRect {
 
 const PENDING_POLL_MS = 1500;
 
-function initialFloatRect(): FloatRect {
+function initialFloatRect(cascade = 0): FloatRect {
   const width = Math.min(960, window.innerWidth - 48);
   const height = Math.min(720, window.innerHeight - 48);
+  const step = (cascade % 6) * 28;
   return {
-    left: Math.max(16, window.innerWidth - width - 32),
-    top: Math.max(16, Math.round((window.innerHeight - height) / 2)),
+    left: Math.max(16, window.innerWidth - width - 32 - step),
+    top: Math.max(16, Math.round((window.innerHeight - height) / 2) + step - 70),
     width,
     height,
   };
@@ -488,12 +501,20 @@ export default function RequestDrawer({
   messageId,
   onClose,
   variant = 'panel',
+  pinned,
+  onTogglePin,
+  startFloating,
+  cascade = 0,
+  zIndex,
+  onActivate,
 }: RequestDrawerProps) {
   const [selectedAttempt, setSelectedAttempt] = useState(0);
   const [tab, setTab] = useState<AttemptTab>('details');
-  const [layout, setLayout] = useState<Layout>('docked');
+  const [layout, setLayout] = useState<Layout>(startFloating ? 'floating' : 'docked');
   const [minimized, setMinimized] = useState(false);
-  const [rect, setRect] = useState<FloatRect | null>(null);
+  const [rect, setRect] = useState<FloatRect | null>(() =>
+    startFloating ? initialFloatRect(cascade) : null,
+  );
   const boxRef = useRef<HTMLElement>(null);
   const open = messageId !== null;
   const isPage = variant === 'page';
@@ -564,7 +585,7 @@ export default function RequestDrawer({
   if (!open) return null;
 
   const popOut = () => {
-    setRect((prev) => prev ?? initialFloatRect());
+    setRect((prev) => prev ?? initialFloatRect(cascade));
     setMinimized(false);
     setLayout('floating');
   };
@@ -624,8 +645,24 @@ export default function RequestDrawer({
         : { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
       : undefined;
 
+  // Pinned windows float: docked panels would cover each other.
+  const togglePin = () => {
+    if (!pinned && !floating) popOut();
+    onTogglePin?.();
+  };
+
   const controls = isPage ? null : (
     <div className="drawer__controls flex shrink-0 items-center gap-0.5">
+      {onTogglePin ? (
+        <IconButton
+          label={pinned ? t('messages.drawer.unpin') : t('messages.drawer.pin')}
+          onClick={togglePin}
+          className={cx(pinned && 'text-accent')}
+          aria-pressed={pinned}
+        >
+          {pinned ? <PinOff /> : <Pin />}
+        </IconButton>
+      ) : null}
       {floating ? (
         <>
           <IconButton
@@ -634,9 +671,11 @@ export default function RequestDrawer({
           >
             {minimized ? <Maximize2 /> : <Minus />}
           </IconButton>
-          <IconButton label={t('messages.drawer.dock')} onClick={dock}>
-            <PanelRight />
-          </IconButton>
+          {pinned ? null : (
+            <IconButton label={t('messages.drawer.dock')} onClick={dock}>
+              <PanelRight />
+            </IconButton>
+          )}
         </>
       ) : (
         <IconButton label={t('messages.drawer.float')} onClick={popOut}>
@@ -660,7 +699,8 @@ export default function RequestDrawer({
         isPage ? 'drawer--page' : floating ? 'drawer--floating' : 'w-[min(880px,100vw)]',
         floating && minimized && 'drawer--minimized',
       )}
-      style={floatStyle}
+      style={floatStyle && zIndex !== undefined ? { ...floatStyle, zIndex } : floatStyle}
+      onMouseDownCapture={onActivate}
       aria-label={m ? t('messages.drawer.title', { id: m.id?.slice(0, 12) ?? '' }) : undefined}
     >
       {m ? (

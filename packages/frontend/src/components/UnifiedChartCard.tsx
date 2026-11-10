@@ -1,7 +1,7 @@
 import { Suspense, lazy, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
 import InfoTooltip from './InfoTooltip.js';
 import { cx } from './ui.js';
-import { formatNumber, formatCost } from '../services/formatters.js';
 import { type StatusTimeseries } from '../services/api/analytics.js';
 import { t } from '../i18n/index.js';
 
@@ -24,8 +24,8 @@ export interface UnifiedChartCardProps {
   requestsLabel?: string;
   /** Optional ⓘ next to the requests/attempts tab label. */
   requestsInfoTooltip?: string;
-  requestsValue: number;
-  requestsTrendPct: number;
+  requestsValue?: number;
+  requestsTrendPct?: number;
   agentRequestTimeseries?: AgentTimeseries;
   /** When set, the Requests tab shows this (disposition) instead of agentRequestTimeseries */
   requestStatusTimeseries?: StatusTimeseries;
@@ -46,6 +46,10 @@ export interface UnifiedChartCardProps {
   tokensTrendPct: number;
   agentTimeseries?: AgentTimeseries;
   // Shared
+  /** Chart title override (the selected KPI card's label). */
+  title?: string;
+  /** "View details" target beside the title: the report behind the chart. */
+  detailsHref?: string;
   range: string;
   colorMap?: Record<string, string>;
   /** Filter controls rendered in the subtitle bar */
@@ -113,15 +117,17 @@ export const chartEmpty = (msg: string) => (
  * one chart body. Each tab picks its series; filters sit in the subtitle bar.
  */
 export default function UnifiedChartCard(props: UnifiedChartCardProps) {
-  const showCost = props.costValue != null;
+  const navigate = useNavigate();
   const requestsLabel = props.requestsLabel ?? t('overview.chart.requests');
 
-  const tabTitle = {
-    requests: requestsLabel,
-    recovered: t('overview.chart.recoveredRequests'),
-    cost: t('overview.chart.cost'),
-    tokens: t('overview.chart.tokenUsage'),
-  }[props.activeTab];
+  const tabTitle =
+    props.title ??
+    {
+      requests: requestsLabel,
+      recovered: t('overview.chart.recoveredRequests'),
+      cost: t('overview.chart.cost'),
+      tokens: t('overview.chart.tokenUsage'),
+    }[props.activeTab];
 
   const requestsBody = () => {
     const status = props.requestStatusTimeseries;
@@ -194,52 +200,22 @@ export default function UnifiedChartCard(props: UnifiedChartCardProps) {
 
   return (
     <section className="chart-card panel overflow-hidden">
-      <div
-        className="grid grid-cols-2 border-b border-line sm:flex sm:flex-wrap"
-        role="tablist"
-        aria-label={tabTitle}
-      >
-        <ChartStatTab
-          active={props.activeTab === 'requests'}
-          label={requestsLabel}
-          info={props.requestsInfoTooltip}
-          value={formatNumber(props.requestsValue)}
-          trend={<TrendBadge pct={props.requestsTrendPct} />}
-          onClick={() => props.onTabChange('requests')}
-        />
-        {props.recoveredTimeseries ? (
-          <ChartStatTab
-            active={props.activeTab === 'recovered'}
-            label={t('overview.chart.recoveredRequests')}
-            info={t('overview.tips.recoveredRequests')}
-            value={formatNumber(props.recoveredValue ?? 0)}
-            trend={<TrendBadge pct={props.recoveredTrendPct ?? 0} />}
-            onClick={() => props.onTabChange('recovered')}
-          />
-        ) : null}
-        {showCost ? (
-          <ChartStatTab
-            active={props.activeTab === 'cost'}
-            label={t('overview.chart.cost')}
-            info={props.costInfoTooltip}
-            value={formatCost(props.costValue!) ?? formatCost(0)}
-            trend={<TrendBadge pct={props.costTrendPct ?? 0} />}
-            onClick={() => props.onTabChange('cost')}
-          />
-        ) : null}
-        <ChartStatTab
-          active={props.activeTab === 'tokens'}
-          label={t('overview.chart.tokenUsage')}
-          value={formatNumber(props.tokensValue)}
-          trend={<TrendBadge pct={props.tokensTrendPct} />}
-          onClick={() => props.onTabChange('tokens')}
-        />
-      </div>
-
+      {/* No stat tabs: the KPI cards above the chart pick its view. */}
       {/* Subtitle bar: title + contextual filters. The grouping filters do not
           apply to the recovered tab, which is already a fixed fallback subset. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
-        <span className="text-sm font-semibold text-ink">{tabTitle}</span>
+        <span className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-ink">{tabTitle}</span>
+          {props.detailsHref ? (
+            <button
+              type="button"
+              className="chart-card__details link-action text-xs"
+              onClick={() => navigate(props.detailsHref!)}
+            >
+              {t('overview.chart.viewDetails')}
+            </button>
+          ) : null}
+        </span>
         {props.seriesFilters && props.activeTab !== 'recovered' ? (
           <div className="flex flex-wrap items-center gap-2">{props.seriesFilters}</div>
         ) : null}

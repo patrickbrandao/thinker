@@ -26,7 +26,7 @@ import { useSignal } from '../../lib/signal.js';
 import { brandingSignal } from '../../services/branding.js';
 import { themedIcon } from '../setup-ui.js';
 import { t } from '../../i18n/index.js';
-import { IconButton, Menu, MenuItem } from '../ui.jsx';
+import { Badge, IconButton, Menu, MenuItem } from '../ui.jsx';
 import { providerIcon } from '../ProviderIcon.jsx';
 import DuplicateAgentModal from '../DuplicateAgentModal.jsx';
 import AlertsMenu from './AlertsMenu.jsx';
@@ -117,6 +117,12 @@ export default function Topbar({
             {connection.providerId ? providerIcon(connection.providerId, 14) : null}
             <span className="crumb-current">{connection.name}</span>
             {connection.label ? <span className="badge">{connection.label}</span> : null}
+            {connection.custom ? <Badge tone="outline">{t('providers.custom')}</Badge> : null}
+            {connection.active === null ? null : connection.active ? (
+              <Badge tone="ok">{t('providers.active')}</Badge>
+            ) : (
+              <Badge>{t('providers.inactive')}</Badge>
+            )}
           </>
         ) : section && pageCrumb.name && pageCrumb.path === pathname ? (
           <>

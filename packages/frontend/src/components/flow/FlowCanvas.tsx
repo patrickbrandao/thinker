@@ -10,6 +10,7 @@ import {
   ReactFlowProvider,
   SelectionMode,
   useEdgesState,
+  useNodesInitialized,
   useNodesState,
   useReactFlow,
 } from '@xyflow/react';
@@ -66,6 +67,9 @@ function Canvas({
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
   const flow = useReactFlow();
   const shape = useRef('');
+  // Set when the node set changed; the fit waits until React Flow measured them.
+  const pendingFit = useRef(false);
+  const measured = useNodesInitialized();
   // Dragging empty space pans the stage (hand) or draws a selection box (select).
   const [selecting, setSelecting] = useState(false);
 
@@ -96,9 +100,16 @@ function Canvas({
     const next = graph.nodes.map((n) => n.id).join('|');
     if (next !== shape.current) {
       shape.current = next;
-      requestAnimationFrame(() => void flow.fitView({ padding: 0.15, duration: 200 }));
+      pendingFit.current = true;
     }
   }, [graph, setNodes, setEdges, flow]);
+
+  useEffect(() => {
+    if (!pendingFit.current || !measured || nodes.length === 0) return;
+    pendingFit.current = false;
+    // Next frame: the store holds the committed nodes and their sizes.
+    requestAnimationFrame(() => void flow.fitView({ padding: 0.15, duration: 200 }));
+  }, [measured, nodes, flow]);
 
   // `f` frames the whole graph, unless typing in a field.
   useEffect(() => {

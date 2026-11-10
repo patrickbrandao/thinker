@@ -112,17 +112,18 @@ describe('MessageTable', () => {
         <MessageTable items={[]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
       );
       const headers = container.querySelectorAll('th');
-      expect(headers.length).toBe(9);
-      // Identity first (status, when, what), then mechanics.
+      // The overviews' compact set: no Attempts or Request columns.
+      expect(headers.length).toBe(7);
       expect(headers[0]!.textContent).toContain('Status');
       expect(headers[1]!.textContent).toContain('Date');
       expect(headers[2]!.textContent).toContain('Model');
-      expect(headers[3]!.textContent).toBe('Attempts');
-      expect(headers[4]!.textContent).toContain('Request');
-      expect(headers[5]!.textContent).toContain('Cost');
-      expect(headers[6]!.textContent).toContain('Tokens');
-      expect(headers[7]!.textContent).toContain('Cache');
-      expect(headers[8]!.textContent).toContain('Latency');
+      expect(headers[3]!.textContent).toContain('Cost');
+      expect(headers[4]!.textContent).toContain('Tokens');
+      expect(headers[5]!.textContent).toContain('Cache');
+      expect(headers[6]!.textContent).toContain('Latency');
+      const text = [...headers].map((h) => h.textContent);
+      expect(text).not.toContain('Attempts');
+      expect(text).not.toContain('Request');
     });
 
     it('renders detailed column headers with tooltips', () => {
@@ -154,7 +155,7 @@ describe('MessageTable', () => {
       const { container } = render(
         <MessageTable items={[]} columns={COMPACT_COLUMNS} agentName="agent-1" />,
       );
-      const tokensHeader = container.querySelectorAll('th')[6]!; // 'totalTokens' is at index 6 in COMPACT_COLUMNS
+      const tokensHeader = container.querySelectorAll('th')[4]!; // 'totalTokens' is at index 4 in COMPACT_COLUMNS
       expect(tokensHeader.textContent).toBe('Tokens');
       expect(tokensHeader.querySelector('[data-testid="info-tooltip"]')).toBeNull();
     });

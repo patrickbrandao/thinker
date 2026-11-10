@@ -1,5 +1,5 @@
 import AccountBaseUrlField from '../../components/AccountBaseUrlField.js';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import {
   getConnectionDetail,
@@ -7,12 +7,17 @@ import {
   getPerAgentTimeseries,
   getPerAgentMessageTimeseries,
   getPerAgentCostTimeseries,
-  getConnectionAttemptStatusTimeseries,
-  getConnectionAttemptsByAgentTimeseries,
-  getConnectionAttemptHttpStatusTimeseries,
-  getConnectionAttemptBreakdown,
+  getReliabilityStats,
+  getRequestStatusTimeseries,
   attemptSuccessRate,
 } from '../../services/api/analytics.js';
+import ReliabilityKpiCards, {
+  applyKpiFilter,
+  kpiChartTab,
+  kpiChartTitle,
+  kpiDetailsHref,
+  type KpiView,
+} from '../../components/ReliabilityKpiCards.js';
 import { platformIcon } from 'thinker-shared';
 import { PROVIDERS } from '../../services/providers.js';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
@@ -57,7 +62,8 @@ import CustomProviderForm from '../../components/CustomProviderForm.jsx';
 import LocalServerForm from '../../components/LocalServerForm.jsx';
 import ConnectionKeyField from '../../components/ConnectionKeyField.jsx';
 import { useResource } from '../../lib/use-resource.js';
-import { Badge, Button, ButtonLink, EmptyState, Panel, Skel, Tabs } from '../../components/ui.js';
+import { formatRate as formatPercent } from '../../services/overview-format.js';
+import { Button, ButtonLink, EmptyState, Panel, Skel, Tabs } from '../../components/ui.js';
 import { ThemedIcon } from '../../components/setup-ui.js';
 import OutboundProxyPanel from '../../components/proxy/OutboundProxyPanel.js';
 import ConnectionModels from './ConnectionModels.js';
@@ -133,7 +139,6 @@ interface AnalyticsResponse {
   attempts: { total: number; successful: number; success_rate: number };
 }
 
-type GroupBy = 'status' | 'http' | 'harness';
 type Series = { agents: string[]; timeseries: Array<Record<string, number | string>> };
 
 const CD_RANGES = ['24h', '7d', '30d', '90d', '365d'] as const;
@@ -162,7 +167,7 @@ const backLabelFor = (authType: string | undefined) => {
   return (kind && tMaybe(`providers.kind.${kind}`)) ?? t('providers.kind.providers');
 };
 
-const formatRate = (rate: number | null) => (rate == null ? '—' : `${(rate * 100).toFixed(1)}%`);
+const formatRate = (rate: number | null) => (rate == null ? '—' : formatPercent(rate));
 
 /** Thin share bar + percentage used by the models and harnesses tables. */
 function ShareBar({ pct }: { pct: number }) {
@@ -173,42 +178,6 @@ function ShareBar({ pct }: { pct: number }) {
       </div>
       <span className="text-xs text-muted">{pct}%</span>
     </div>
-  );
-}
-
-function StatTile({
-  label,
-  value,
-  extra,
-  title,
-  onClick,
-}: {
-  label: ReactNode;
-  value: ReactNode;
-  extra?: ReactNode;
-  title?: string;
-  onClick?: () => void;
-}) {
-  const body = (
-    <>
-      <span className="stat-label flex items-center gap-1">{label}</span>
-      <div className="flex flex-wrap items-baseline gap-2">
-        <span className="stat-value">{value}</span>
-        {extra}
-      </div>
-    </>
-  );
-  return onClick ? (
-    <button
-      type="button"
-      className="stat-tile cursor-pointer text-left hover:border-line-strong"
-      title={title}
-      onClick={onClick}
-    >
-      {body}
-    </button>
-  ) : (
-    <div className="stat-tile">{body}</div>
   );
 }
 
@@ -273,9 +242,18 @@ const ConnectionDetail = () => {
         // A local server added as a custom provider shows its runtime's icon.
         localType ?? conn.provider,
         conn.label,
+        { active: conn.is_active, custom: isCustomProvider },
       );
     }
-  }, [conn?.provider, conn?.label, conn?.auth_type, providerDisplayName, localType]);
+  }, [
+    conn?.provider,
+    conn?.label,
+    conn?.auth_type,
+    conn?.is_active,
+    isCustomProvider,
+    providerDisplayName,
+    localType,
+  ]);
   useEffect(() => () => setConnectionBreadcrumb(null), []);
 
   // Chart state (persisted in sessionStorage)
@@ -289,25 +267,16 @@ const ConnectionDetail = () => {
     setChartRangeRaw(v);
     writeStorage(`chart-range:${connectionId}`, v);
   };
-  const [chartView, setChartViewRaw] = useState<ChartTab>(() => {
+  // The selected KPI card drives the chart (tab + status filter).
+  const [kpiView, setKpiViewRaw] = useState<KpiView>(() => {
     const v = readStorage(`chart-view:${connectionId}`);
-    return v === 'tokens' || v === 'cost' || v === 'requests' ? v : 'tokens';
+    return v === 'tokens' || v === 'cost' || v === 'recovered' || v === 'failed' ? v : 'requests';
   });
-  const setChartView = (v: ChartTab) => {
-    setChartViewRaw(v);
+  const setKpiView = (v: KpiView) => {
+    setKpiViewRaw(v);
     writeStorage(`chart-view:${connectionId}`, v);
   };
-
-  // Attempts tab view: By HTTP status (default), attempt status or harness.
-  // Persisted per connection like the range and the active tab.
-  const [groupBy, setGroupByRaw] = useState<GroupBy>(() => {
-    const v = readStorage(`chart-group:${connectionId}`);
-    return v === 'harness' || v === 'status' ? v : 'http';
-  });
-  const setGroupBy = (v: GroupBy) => {
-    setGroupByRaw(v);
-    writeStorage(`chart-group:${connectionId}`, v);
-  };
+  const chartView: ChartTab = kpiChartTab(kpiView);
 
   // Every chart/summary query is scoped to this exact connection
   // (provider+auth_type+label, plus the tenant_providers id), so two
@@ -340,28 +309,21 @@ const ConnectionDetail = () => {
     scope,
     enabled,
   );
-  // Attempt world: every provider call on this connection, by its own
-  // outcome. The harness view shares the same universe so both stack to the
-  // same totals.
-  const attemptStatusTs = useResource(
-    () => getConnectionAttemptStatusTimeseries(a, p, chartRange, label, connectionId),
+  // Request world, as on the Overview: a request belongs to the connection of
+  // its concluding attempt (a rescue by another connection counts there).
+  const reliability = useResource(
+    () => getReliabilityStats(chartRange, undefined, connectionId),
     scope,
     enabled,
   );
-  const attemptsByAgentTs = useResource(
-    () => getConnectionAttemptsByAgentTimeseries(a, p, chartRange, label, connectionId),
+  const statusTs = useResource(
+    () => getRequestStatusTimeseries(chartRange, undefined, connectionId),
     scope,
     enabled,
   );
-  const httpStatusTs = useResource(
-    () => getConnectionAttemptHttpStatusTimeseries(a, p, chartRange, label, connectionId),
-    scope,
-    enabled,
-  );
-  const breakdown = useResource(
-    () => getConnectionAttemptBreakdown(a, p, chartRange, label, connectionId),
-    scope,
-    enabled,
+  const filteredStatusTs = useMemo(
+    () => applyKpiFilter(statusTs.data, kpiView),
+    [statusTs.data, kpiView],
   );
 
   const isByok = authType === 'api_key';
@@ -370,21 +332,6 @@ const ConnectionDetail = () => {
     scope,
     { enabled: !!conn && isByok },
   );
-
-  const attemptTotals = (() => {
-    const ts = attemptStatusTs.data;
-    if (!ts) return { attempts: 0, succeeded: 0 };
-    const successIdx = ts.keys.indexOf('success');
-    let attempts = 0;
-    let succeeded = 0;
-    for (const b of ts.buckets) {
-      for (let i = 0; i < b.counts.length; i++) {
-        attempts += b.counts[i] ?? 0;
-        if (i === successIdx) succeeded += b.counts[i] ?? 0;
-      }
-    }
-    return { attempts, succeeded };
-  })();
 
   // Harness tag selection for chart filtering (persisted in sessionStorage).
   // `null` means "no persisted preference" (→ default to all selected); a Set
@@ -411,7 +358,6 @@ const ConnectionDetail = () => {
       ...(agentTimeseries.data?.agents ?? []),
       ...(agentMessageTimeseries.data?.agents ?? []),
       ...(agentCostTimeseries.data?.agents ?? []),
-      ...(attemptsByAgentTs.data?.agents ?? []),
     ]),
   ].sort();
 
@@ -656,12 +602,6 @@ const ConnectionDetail = () => {
     }
   };
 
-  // Deep links into the Requests log, scoped to THIS connection and the
-  // card's current window, so the list matches what the card counted.
-  const requestsLink = (extra: string) =>
-    `/messages?connections=${encodeURIComponent(connectionId)}&range=${chartRange}${extra}`;
-  const viewMore = <span className="link-action text-xs">{t('providers.detail.viewMore')}</span>;
-
   // A rejected fetch surfaces a retryable error state; a resolved-but-null
   // connection (unknown id / deleted) renders not-found. Neither may leave the
   // loading skeleton spinning forever.
@@ -710,7 +650,6 @@ const ConnectionDetail = () => {
 
   const c = conn;
   const data = detail.data;
-  const b = breakdown.data;
   const totalCost = (() => {
     const ts = agentCostTimeseries.data;
     if (!ts) return undefined;
@@ -724,12 +663,6 @@ const ConnectionDetail = () => {
   const emptyRow = (text: string) => (
     <p className="px-4 py-6 text-center text-sm text-muted">{text}</p>
   );
-  const metaItem = (k: string, v: ReactNode) => (
-    <span>
-      <span className="font-semibold text-ink">{k}</span> <span className="text-muted">{v}</span>
-    </span>
-  );
-
   // ── Manage window ─────────────────────────────────────────────
   const windowIcon = provDef ? (
     <span className="flex size-5 items-center">{providerIcon(provDef.id, 20)}</span>
@@ -1065,36 +998,8 @@ const ConnectionDetail = () => {
         {t('providers.detail.pageTitle', { provider: providerDisplayName, label: c.label })}
       </title>
 
-      <div className="page-head">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              {isCustomProvider ? <Badge tone="outline">{t('providers.custom')}</Badge> : null}
-              {c.is_active ? (
-                <Badge tone="ok">{t('providers.active')}</Badge>
-              ) : (
-                <Badge>{t('providers.inactive')}</Badge>
-              )}
-            </div>
-          </div>
-          <div className="sub flex flex-wrap gap-x-4 gap-y-1">
-            {metaItem(t('providers.detail.connectionName'), c.label)}
-            {metaItem(t('providers.detail.models'), c.cached_model_count)}
-            {metaItem(
-              t('providers.detail.firstConnection'),
-              c.connected_at ? formatTimeAgo(c.connected_at) : '—',
-            )}
-            {metaItem(
-              t('providers.detail.lastUsed'),
-              c.last_used_at ? formatTimeAgo(c.last_used_at) : '—',
-            )}
-          </div>
-        </div>
+      <div className="page-head justify-end">
         <div className="page-actions">
-          {tab === 'activity' && allAgents.length > 1 ? harnessFilter : null}
-          {tab === 'activity' ? (
-            <Select value={chartRange} onChange={setChartRange} options={cdRangeOptions()} />
-          ) : null}
           {roleCan.manageProviders() ? (
             <Button variant="ghost" size="sm" onClick={openManageModal}>
               {t('providers.detail.manage')}
@@ -1126,108 +1031,52 @@ const ConnectionDetail = () => {
         />
       ) : (
         <>
-          {/* Attempt world cards: the connection's own numbers on the filtered period. */}
-          <div className="stat-tiles mb-4">
-            <StatTile
-              label={
-                <>
-                  {t('providers.successRate')}
-                  <InfoTooltip text={t('ui.analytics.connectionSuccessRate')} />
-                </>
-              }
-              value={formatRate(
-                b ? attemptSuccessRate({ attempts: b.attempts, succeeded: b.succeeded }) : null,
-              )}
-            />
-            <StatTile
-              label={t('providers.detail.succeededAttempts')}
-              title={t('providers.detail.succeededTitle')}
-              onClick={() => navigate(requestsLink('&attempts=has_succeeded'))}
-              value={formatNumber(b?.succeeded ?? 0)}
-              extra={viewMore}
-            />
-            <StatTile
-              label={t('providers.detail.failedAttempts')}
-              title={t('providers.detail.failedTitle')}
-              onClick={() => navigate(requestsLink('&attempts=has_failed'))}
-              value={formatNumber(b?.failed ?? 0)}
-              extra={viewMore}
-            />
-            <StatTile
-              label={t('providers.detail.fallbackRetries')}
-              title={t('providers.detail.fallbackTitle')}
-              onClick={() => navigate(requestsLink('&trigger=fallback'))}
-              value={formatNumber(b?.fallback_retries ?? 0)}
-              extra={
-                <>
-                  {(b?.fallback_retries ?? 0) > 0 ? (
-                    <span className="text-xs text-muted">
-                      {t('providers.detail.succeeded', {
-                        count: formatNumber(b?.fallback_retries_succeeded ?? 0),
-                      })}
-                    </span>
-                  ) : null}
-                  {viewMore}
-                </>
-              }
-            />
+          <div className="overview-filter-bar mb-4 flex min-h-9 flex-wrap items-center justify-start gap-2 rounded-control border border-line bg-elev px-3 py-1.5">
+            <span className="text-xs text-muted">{t('overview.periodFilter')}</span>
+            <div className="w-44">
+              <Select
+                label={t('overview.periodFilter')}
+                value={chartRange}
+                onChange={setChartRange}
+                options={cdRangeOptions()}
+              />
+            </div>
+            {allAgents.length > 1 ? harnessFilter : null}
           </div>
+
+          {/* The Overview's reliability cards, on this connection's requests. */}
+          <ReliabilityKpiCards
+            stats={reliability.data}
+            cost={isByok && analytics.data ? { value: totalCost ?? 0, trendPct: 0 } : undefined}
+            tokens={
+              analytics.data
+                ? {
+                    value: analytics.data.summary.tokens.value,
+                    trendPct: analytics.data.summary.tokens.trend_pct,
+                  }
+                : undefined
+            }
+            selected={kpiView}
+            onSelect={setKpiView}
+          />
 
           {analytics.data ? (
             <div className="mb-4">
               <UnifiedChartCard
                 activeTab={chartView}
-                onTabChange={setChartView}
-                requestsLabel={t('providers.detail.attempts')}
-                requestsInfoTooltip={t('ui.analytics.totalAttempts')}
-                requestsValue={attemptTotals.attempts}
-                requestsTrendPct={0}
+                onTabChange={setKpiView}
+                title={kpiChartTitle(kpiView)}
+                detailsHref={kpiDetailsHref(kpiView, { connectionId, range: chartRange })}
+                requestStatusTimeseries={filteredStatusTs}
                 tokensValue={analytics.data.summary.tokens.value}
                 tokensTrendPct={analytics.data.summary.tokens.trend_pct}
                 costValue={isByok ? (totalCost ?? 0) : undefined}
                 range={chartRange}
                 agentTimeseries={filterSeries(agentTimeseries.data)}
-                agentRequestTimeseries={
-                  groupBy === 'harness' ? filterSeries(attemptsByAgentTs.data) : undefined
-                }
-                requestStatusTimeseries={
-                  groupBy === 'status'
-                    ? (attemptStatusTs.data ?? undefined)
-                    : groupBy === 'http'
-                      ? (httpStatusTs.data ?? undefined)
-                      : undefined
-                }
-                requestStatusSeriesMode={groupBy === 'http' ? 'http_status' : 'disposition'}
                 agentCostTimeseries={isByok ? filterSeries(agentCostTimeseries.data) : undefined}
                 colorMap={agentColorMap}
                 seriesFilters={
-                  <>
-                    {/* Status/harness grouping only applies to the Attempts tab;
-                        Tokens and Cost stay per-harness. */}
-                    {chartView === 'requests' ? (
-                      <div className="segmented">
-                        {(
-                          [
-                            ['http', t('providers.detail.byHttpStatus')],
-                            ['status', t('providers.detail.byAttemptStatus')],
-                            ['harness', t('providers.detail.byHarness')],
-                          ] as const
-                        ).map(([key, text]) => (
-                          <button
-                            key={key}
-                            type="button"
-                            aria-pressed={groupBy === key}
-                            onClick={() => setGroupBy(key)}
-                          >
-                            {text}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    {(chartView !== 'requests' || groupBy === 'harness') && allAgents.length > 1
-                      ? harnessFilter
-                      : null}
-                  </>
+                  chartView !== 'requests' && allAgents.length > 1 ? harnessFilter : undefined
                 }
               />
             </div>

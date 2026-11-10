@@ -48,6 +48,10 @@ export default {
     },
   },
   flow: {
+    harness: 'Harness',
+    allHarnesses: 'All harnesses',
+    providerType: 'Provider type',
+    allProviders: 'All providers',
     subtitle: 'How requests flow from clients through harnesses and providers to the internet.',
     empty: 'No harness yet. Create one and its providers will appear here.',
     emptyActive: 'No traffic in this period.',

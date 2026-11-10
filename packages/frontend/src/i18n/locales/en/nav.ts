@@ -10,6 +10,7 @@ export default {
   requests: 'Requests',
   harnesses: 'Harnesses',
   createHarness: 'Create new harness',
+  sectionObservability: 'OBSERVABILITY',
   sectionClients: 'CLIENTS',
   sectionProviders: 'PROVIDERS',
   local: 'Local',
