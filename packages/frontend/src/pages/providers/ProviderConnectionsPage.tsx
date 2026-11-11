@@ -837,6 +837,7 @@ export default function ProviderConnectionsPage({
             key={deepLink.providerId}
             providerId={deepLink.providerId}
             authType={deepLink.authType ?? copy.authType}
+            onCancel={handleNewConnectionClose}
             render={(providerId) => (
               <ProviderSelectContent
                 key={providerId}

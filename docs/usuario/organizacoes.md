@@ -24,7 +24,9 @@ O primeiro usuário, criado no assistente `/setup`, é o **admin da instância**
 
 ## Criar contas
 
-Não há cadastro aberto nem convite por e-mail. O admin da instância (em **Users**) ou um owner/admin da organização (em **Members & settings**) cria a conta com e-mail, nome e papel. O Thinker gera uma **senha temporária**, mostrada uma única vez. Passe-a para a pessoa por um canal seguro. No primeiro login ela precisa definir uma senha nova antes de usar o painel. Se a pessoa esquecer a senha, o admin da instância gera outra senha temporária em **Users**.
+Não há cadastro aberto nem convite por e-mail. Só o super usuário (o admin da instância) cria contas, em **Usuários**, com e-mail, nome e, opcionalmente, uma organização e um papel. O Thinker gera uma **senha temporária**, mostrada uma única vez. Passe-a para a pessoa por um canal seguro. No primeiro login ela precisa definir uma senha nova antes de usar o painel. Se a pessoa esquecer a senha, o super usuário abre a conta em **Usuários** e gera outra senha temporária.
+
+Na guia **Membros** da tela **Organização**, owners e admins só adicionam uma conta que já existe (pelo e-mail, com o papel) ou removem um membro. Um e-mail sem conta é recusado.
 
 Sair da conta ou ter a senha redefinida apaga a sessão no servidor, mas o cookie de sessão é validado por assinatura e continua aceito por até 5 minutos. Uma cópia do cookie feita antes disso vale nesse intervalo; depois de uma redefinição pelo admin, ela só consegue ler o próprio perfil até a senha ser trocada.
 

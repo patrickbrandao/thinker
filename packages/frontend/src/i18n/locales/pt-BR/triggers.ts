@@ -302,11 +302,6 @@ const ptBR: Catalog<typeof en> = {
     readOnly:
       'Só membros, administradores e proprietários podem alterar os triggers de um harness.',
   },
-  org: {
-    title: 'Triggers',
-    body: 'Destinos de e-mail, webhook, Telegram, syslog, GELF e RELP para eventos de harness e do workspace.',
-    open: 'Abrir triggers',
-  },
 };
 
 export default ptBR;

@@ -15,7 +15,7 @@ const shell: Catalog<typeof en> = {
   user: {
     organization: 'Organização',
     role: 'Seu papel: {{ role }}',
-    instanceAdmin: 'admin da instância',
+    instanceAdmin: 'super usuário',
     manageOrganization: 'Organização e membros',
     viewOrganization: 'Dados da organização',
     switchOrganization: 'Trocar de organização',

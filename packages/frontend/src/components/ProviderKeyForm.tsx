@@ -22,7 +22,7 @@ import {
 import { suggestNextProviderKeyLabel } from '../services/provider-key-labels.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
-import { Button, cx } from './ui.js';
+import { Button, WindowFooter, cx } from './ui.js';
 
 export const MAX_KEYS_PER_PROVIDER = SHARED_MAX_KEYS_PER_PROVIDER;
 const MAX_LABEL_LENGTH = 50;
@@ -773,6 +773,23 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
   }
 
   const baseUrlPlaceholder = selectedEndpointRegionOption?.baseUrlPlaceholder;
+  // Bare (a new-connection window): the buttons go to the window's fixed footer.
+  const actions = (
+    <div className={cx('flex w-full justify-between gap-2', !props.bare && 'mt-3')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => (props.onCancel ? props.onCancel() : setIsOpen(false))}
+        disabled={props.busy}
+      >
+        {props.cancelLabel ?? t('common.cancel')}
+      </Button>
+      <Button size="sm" busy={props.busy} disabled={!apiKey.trim()} onClick={() => void submit()}>
+        {props.submitLabel ?? t('providerSetup.keyForm.addKey')}
+      </Button>
+    </div>
+  );
+
   return (
     <div className={cx('flex flex-col', !props.bare && 'well mt-3')}>
       <label className="label" htmlFor="add-key-label">
@@ -880,19 +897,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
           disabled={props.busy}
         />
       ) : null}
-      <div className="mt-3 flex justify-between gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => (props.onCancel ? props.onCancel() : setIsOpen(false))}
-          disabled={props.busy}
-        >
-          {props.cancelLabel ?? t('common.cancel')}
-        </Button>
-        <Button size="sm" busy={props.busy} disabled={!apiKey.trim()} onClick={() => void submit()}>
-          {props.submitLabel ?? t('providerSetup.keyForm.addKey')}
-        </Button>
-      </div>
+      {props.bare ? <WindowFooter>{actions}</WindowFooter> : actions}
     </div>
   );
 }

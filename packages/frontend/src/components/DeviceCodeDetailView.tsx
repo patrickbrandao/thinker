@@ -15,7 +15,7 @@ import { t } from '../i18n/index.js';
 import AuthUrlFallback from './AuthUrlFallback.js';
 import { usePageWake } from '../lib/use-page-wake.js';
 import Select from './Select.js';
-import { Button, cx } from './ui.js';
+import { Button, WindowFooter, cx } from './ui.js';
 import { SubscriptionAccountList, renameSubscriptionKey } from './OAuthDetailView.js';
 
 interface Props {
@@ -491,9 +491,11 @@ export default function DeviceCodeDetailView(props: Props) {
                     ) : null}
                   </>
                 ) : null}
-                <Button block busy={props.busy} onClick={() => void handleStart()}>
-                  {t('providerSetup.device.connectWith', { name: props.provDef.name })}
-                </Button>
+                {props.newConnection ? null : (
+                  <Button block busy={props.busy} onClick={() => void handleStart()}>
+                    {t('providerSetup.device.connectWith', { name: props.provDef.name })}
+                  </Button>
+                )}
               </div>
             ) : null}
             {alt && method === 'token' ? (
@@ -521,18 +523,44 @@ export default function DeviceCodeDetailView(props: Props) {
                   }}
                 />
                 {altError ? <div className="form-error">{altError}</div> : null}
+                {props.newConnection ? null : (
+                  <Button
+                    block
+                    busy={props.busy}
+                    disabled={!altToken.trim()}
+                    onClick={() => void handleAltConnect()}
+                  >
+                    {t('providerSetup.device.connectWithToken')}
+                  </Button>
+                )}
+              </div>
+            ) : null}
+          </>
+        )}
+        {props.newConnection ? (
+          // A new-connection window: Cancel and the next step sit in its fixed footer.
+          <WindowFooter>
+            <div className="flex w-full justify-between gap-2">
+              <Button variant="ghost" size="sm" disabled={props.busy} onClick={props.onClose}>
+                {t('common.cancel')}
+              </Button>
+              {flow ? null : alt && method === 'token' ? (
                 <Button
-                  block
+                  size="sm"
                   busy={props.busy}
                   disabled={!altToken.trim()}
                   onClick={() => void handleAltConnect()}
                 >
                   {t('providerSetup.device.connectWithToken')}
                 </Button>
-              </div>
-            ) : null}
-          </>
-        )}
+              ) : showLogin ? (
+                <Button size="sm" busy={props.busy} onClick={() => void handleStart()}>
+                  {t('providerSetup.device.connectWith', { name: props.provDef.name })}
+                </Button>
+              ) : null}
+            </div>
+          </WindowFooter>
+        ) : null}
         {addingAccount ? (
           <Button variant="ghost" block disabled={props.busy} onClick={cancelAddAccount}>
             {t('common.cancel')}

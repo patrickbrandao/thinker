@@ -5,7 +5,8 @@ import ErrorState from '../components/ErrorState.js';
 import { endpointOf, ProxyStatusBadge } from '../components/proxy/ProxyParts.js';
 import ProviderDefaultsTab from '../components/proxy/ProviderDefaultsTab.js';
 import ProxyProfilesTab from '../components/proxy/ProxyProfilesTab.js';
-import { Badge, ButtonLink, EmptyState, Switch, Tabs } from '../components/ui.js';
+import { Badge, Button, EmptyState, Switch, Tabs } from '../components/ui.js';
+import { NewProxyWindow } from './ProxyServer.js';
 import { listProxies, proxyPath, updateProxy, type ProxyView } from '../services/api/proxies.js';
 import { formatNumber } from '../services/formatters.js';
 import { roleCan } from '../services/session-store.js';
@@ -71,6 +72,7 @@ export default function ProxyServers() {
 function ServersTab() {
   const res = useResource(listProxies, []);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const list = res.data?.proxies ?? [];
   const global = res.data?.global ?? null;
 
@@ -99,11 +101,20 @@ function ServersTab() {
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <p className="m-0 max-w-3xl text-sm text-muted">{t('proxies.subtitle')}</p>
-          <ButtonLink to="/proxy-servers/new" size="sm" className="shrink-0">
+          <Button size="sm" className="shrink-0" onClick={() => setCreating(true)}>
             <Plus aria-hidden="true" />
             {t('proxies.create')}
-          </ButtonLink>
+          </Button>
         </div>
+        {creating ? (
+          <NewProxyWindow
+            onClose={() => setCreating(false)}
+            onCreated={() => {
+              setCreating(false);
+              void res.reload();
+            }}
+          />
+        ) : null}
 
         <>
           {global ? (

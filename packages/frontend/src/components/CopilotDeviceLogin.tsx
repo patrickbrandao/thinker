@@ -12,7 +12,7 @@ import {
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { usePageWake } from '../lib/use-page-wake.js';
-import { Button, IconButton } from './ui.js';
+import { Button, IconButton, WindowFooter } from './ui.js';
 
 type Phase = 'idle' | 'loading' | 'awaiting' | 'success' | 'error';
 
@@ -246,9 +246,23 @@ export default function CopilotDeviceLogin(props: Props) {
         <>
           <p className="text-sm text-dim">{t('providerSetup.copilot.requires')}</p>
           {errorBox}
-          <Button block onClick={() => void startLogin()}>
-            {t('providerSetup.copilot.signIn')}
-          </Button>
+          {props.newConnection ? (
+            // A new-connection window: Cancel and Sign in sit in its fixed footer.
+            <WindowFooter>
+              <div className="flex w-full justify-between gap-2">
+                <Button variant="ghost" size="sm" onClick={props.onBack}>
+                  {t('common.cancel')}
+                </Button>
+                <Button size="sm" onClick={() => void startLogin()}>
+                  {t('providerSetup.copilot.signIn')}
+                </Button>
+              </div>
+            </WindowFooter>
+          ) : (
+            <Button block onClick={() => void startLogin()}>
+              {t('providerSetup.copilot.signIn')}
+            </Button>
+          )}
         </>
       ) : null}
 

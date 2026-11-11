@@ -625,11 +625,20 @@
     overflow-y: auto;
   }
   .floating-window-foot {
+    flex: none;
     display: flex;
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 18px;
     border-top: 1px solid var(--border);
+  }
+  .floating-window-foot:empty {
+    display: none;
+  }
+  /* A form's own action row, moved into the footer by WindowFooter. */
+  .floating-window-foot > .actions {
+    flex: 1;
+    padding-top: 0;
   }
   /* Variable-height sections inside a floating window scroll on their own. */
   .floating-window .scroll-section {

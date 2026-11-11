@@ -3,7 +3,9 @@
  * classes in styles/base.css and shell.css; colors only from tokens.
  */
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -465,8 +467,20 @@ export function Modal({
  * A non-modal window: no backdrop, the page behind stays usable and a click
  * outside never closes it. Dragged by its title bar; resized from its corner;
  * closed by its X or Escape. The title bar and `footer` stay put while the
- * body scrolls. `icon` sits left of the title.
+ * body scrolls. `icon` sits left of the title. A form inside the body can put
+ * its buttons in that fixed footer with `WindowFooter`.
  */
+const WindowFooterSlot = createContext<HTMLElement | null>(null);
+
+/**
+ * The action buttons of a form: in a FloatingWindow they render in its fixed
+ * footer (outside the scrolling body); anywhere else, in place.
+ */
+export function WindowFooter({ children }: { children: ReactNode }) {
+  const slot = useContext(WindowFooterSlot);
+  return slot ? createPortal(children, slot) : <>{children}</>;
+}
+
 export function FloatingWindow({
   open,
   title,
@@ -486,6 +500,7 @@ export function FloatingWindow({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [footEl, setFootEl] = useState<HTMLDivElement | null>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   useEffect(() => {
     if (!open) {
@@ -544,8 +559,13 @@ export function FloatingWindow({
           <X />
         </IconButton>
       </div>
-      <div className="modal-body floating-window-body">{children}</div>
-      {footer ? <div className="floating-window-foot">{footer}</div> : null}
+      <div className="modal-body floating-window-body">
+        <WindowFooterSlot.Provider value={footEl}>{children}</WindowFooterSlot.Provider>
+      </div>
+      {/* Empty (no footer, no WindowFooter) collapses through :empty. */}
+      <div className="floating-window-foot" ref={setFootEl}>
+        {footer}
+      </div>
     </div>,
     document.body,
   );

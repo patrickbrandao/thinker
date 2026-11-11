@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronLeft, ListPlus, X } from 'lucide-react';
 import { deriveCustomProviderAlias, normalizeCustomProviderAlias } from 'thinker-shared';
 import {
@@ -32,7 +32,7 @@ import type { CustomProviderPrefill } from '../services/routing-params.js';
 import { useResource } from '../lib/use-resource.js';
 import InfoTooltip from './InfoTooltip.js';
 import ProviderKeyForm, { MAX_KEYS_PER_PROVIDER } from './ProviderKeyForm.js';
-import { Button, Modal, cx } from './ui.js';
+import { Button, Modal, cx, WindowFooter } from './ui.js';
 import { maskedKeyLabel } from '../services/key-mask.js';
 import type { FormLayout, WindowSection } from './TabbedWindow.js';
 
@@ -100,6 +100,7 @@ const parseContextWindow = (v: string): number | null => {
 };
 
 export default function CustomProviderForm(props: Props) {
+  const formId = useId();
   const { initialData, agentName } = props;
   const isEdit = !!initialData;
 
@@ -845,6 +846,7 @@ export default function CustomProviderForm(props: Props) {
       )}
 
       <form
+        id={formId}
         className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
@@ -1147,29 +1149,40 @@ export default function CustomProviderForm(props: Props) {
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2">
-          {isEdit ? (
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={busy}
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              {t('providers.customForm.deleteProvider')}
-            </Button>
-          ) : (
-            <div />
-          )}
-          <Button
-            type="submit"
-            size="sm"
-            className="provider-detail__action"
-            busy={busy}
-            disabled={!canSubmit}
-          >
-            {isEdit ? t('providers.customForm.saveChanges') : t('providers.customForm.connect')}
-          </Button>
-        </div>
+        <WindowFooter>
+          <div className="flex w-full items-center justify-between gap-2">
+            {isEdit ? (
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={busy}
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                {t('providers.customForm.deleteProvider')}
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex items-center gap-2">
+              {props.embedded ? (
+                <Button variant="ghost" size="sm" onClick={props.onBack}>
+                  {t('common.cancel')}
+                </Button>
+              ) : null}
+              <Button
+                type="submit"
+                // In a window this row renders in the footer, outside the form.
+                form={formId}
+                size="sm"
+                className="provider-detail__action"
+                busy={busy}
+                disabled={!canSubmit}
+              >
+                {isEdit ? t('providers.customForm.saveChanges') : t('providers.customForm.connect')}
+              </Button>
+            </div>
+          </div>
+        </WindowFooter>
       </form>
 
       {showConnections ? (

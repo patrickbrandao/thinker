@@ -11,7 +11,7 @@ import {
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import AuthUrlFallback from './AuthUrlFallback.js';
-import { Button } from './ui.js';
+import { Button, WindowFooter } from './ui.js';
 import { SubscriptionAccountList, renameSubscriptionKey } from './OAuthDetailView.js';
 
 interface Props {
@@ -200,15 +200,35 @@ export default function AnthropicOAuthDetailView(props: Props) {
             }}
           />
           {error ? <div className="form-error">{error}</div> : null}
-          <Button
-            block
-            busy={props.busy}
-            disabled={!input.trim()}
-            onClick={() => void handleSubmit()}
-          >
-            {t('providerSetup.shared.connect')}
-          </Button>
+          {props.newConnection ? null : (
+            <Button
+              block
+              busy={props.busy}
+              disabled={!input.trim()}
+              onClick={() => void handleSubmit()}
+            >
+              {t('providerSetup.shared.connect')}
+            </Button>
+          )}
         </div>
+        {props.newConnection ? (
+          // A new-connection window: Cancel and Connect sit in its fixed footer.
+          <WindowFooter>
+            <div className="flex w-full justify-between gap-2">
+              <Button variant="ghost" size="sm" disabled={props.busy} onClick={props.onClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                busy={props.busy}
+                disabled={!input.trim()}
+                onClick={() => void handleSubmit()}
+              >
+                {t('providerSetup.shared.connect')}
+              </Button>
+            </div>
+          </WindowFooter>
+        ) : null}
         {addingAccount ? (
           <Button variant="ghost" block disabled={props.busy} onClick={cancelAddAccount}>
             {t('common.cancel')}
