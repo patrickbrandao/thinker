@@ -2,9 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockNavigate = vi.fn();
-vi.mock('react-router', () => ({
-  useNavigate: () => mockNavigate,
-}));
+// The page keeps its tab in ?tab=; tests start on `routeTab.current`.
+const routeTab = vi.hoisted(() => ({ current: '' }));
+vi.mock('react-router', async () => {
+  const { useState } = await import('react');
+  return {
+    useNavigate: () => mockNavigate,
+    useSearchParams: () => {
+      const [params, setParams] = useState(
+        () => new URLSearchParams(routeTab.current ? `tab=${routeTab.current}` : ''),
+      );
+      const update = (next: URLSearchParams | ((prev: URLSearchParams) => URLSearchParams)) =>
+        setParams((prev) => (typeof next === 'function' ? next(prev) : next));
+      return [params, update] as const;
+    },
+  };
+});
 
 const mockListAccounts = vi.fn();
 const mockChangePassword = vi.fn();
@@ -59,6 +72,7 @@ describe('Account', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    routeTab.current = '';
     setThemePreference('system');
     mockListAccounts.mockResolvedValue({ data: [{ providerId: 'credential' }], error: null });
     mockChangePassword.mockResolvedValue({ data: {}, error: null });
@@ -66,7 +80,7 @@ describe('Account', () => {
 
   it('renders the profile panel', () => {
     render(<Account />);
-    expect(screen.getByText('Profile information')).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'Profile information' })).toBeDefined();
   });
 
   it('shows display name input with user name', () => {
@@ -82,6 +96,7 @@ describe('Account', () => {
   });
 
   it('shows theme options', () => {
+    routeTab.current = 'appearance';
     render(<Account />);
     expect(screen.getByText('Light')).toBeDefined();
     expect(screen.getByText('Dark')).toBeDefined();
@@ -89,8 +104,9 @@ describe('Account', () => {
   });
 
   it('shows workspace section', () => {
+    routeTab.current = 'workspace';
     render(<Account />);
-    expect(screen.getByText('Workspace')).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'Workspace' })).toBeDefined();
   });
 
   it('shows Back button', () => {
@@ -101,13 +117,14 @@ describe('Account', () => {
 
   it('shows profile information section', () => {
     render(<Account />);
-    expect(screen.getByText('Profile information')).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'Profile information' })).toBeDefined();
   });
 
   it('shows Security section for a credential account', async () => {
     mockListAccounts.mockResolvedValue({ data: [{ providerId: 'credential' }], error: null });
+    routeTab.current = 'security';
     render(<Account />);
-    expect(await screen.findByText('Security')).toBeDefined();
+    expect(await screen.findByRole('tab', { name: 'Security' })).toBeDefined();
     expect(screen.getByLabelText('Current password')).toBeDefined();
     expect(screen.getByLabelText('New password')).toBeDefined();
     expect(screen.getByLabelText('Confirm new password')).toBeDefined();
@@ -116,7 +133,7 @@ describe('Account', () => {
   it('hides Security section for an OAuth-only account', async () => {
     mockListAccounts.mockResolvedValue({ data: [{ providerId: 'google' }], error: null });
     render(<Account />);
-    await screen.findByText('Profile information');
+    await screen.findByRole('tab', { name: 'Profile information' });
     await waitFor(() => expect(mockListAccounts).toHaveBeenCalled());
     expect(screen.queryByText('Security')).toBeNull();
   });
@@ -124,7 +141,7 @@ describe('Account', () => {
   it('hides Security section when listAccounts returns no data', async () => {
     mockListAccounts.mockResolvedValue({ data: null, error: { message: 'boom' } });
     render(<Account />);
-    await screen.findByText('Profile information');
+    await screen.findByRole('tab', { name: 'Profile information' });
     await waitFor(() => expect(mockListAccounts).toHaveBeenCalled());
     expect(screen.queryByText('Security')).toBeNull();
   });
@@ -138,8 +155,9 @@ describe('Account', () => {
   };
 
   it('rejects when new and confirm do not match', async () => {
+    routeTab.current = 'security';
     render(<Account />);
-    await screen.findByText('Security');
+    await screen.findByRole('tab', { name: 'Security' });
     fillPw('oldpass1', 'newpass12', 'different12');
     fireEvent.click(screen.getByText('Change password'));
     expect(await screen.findByText('New passwords do not match')).toBeDefined();
@@ -147,8 +165,9 @@ describe('Account', () => {
   });
 
   it('rejects a new password shorter than 8 characters', async () => {
+    routeTab.current = 'security';
     render(<Account />);
-    await screen.findByText('Security');
+    await screen.findByRole('tab', { name: 'Security' });
     fillPw('oldpass1', 'short', 'short');
     fireEvent.click(screen.getByText('Change password'));
     expect(await screen.findByText('New password must be at least 8 characters')).toBeDefined();
@@ -156,8 +175,9 @@ describe('Account', () => {
   });
 
   it('rejects when the new password equals the current password', async () => {
+    routeTab.current = 'security';
     render(<Account />);
-    await screen.findByText('Security');
+    await screen.findByRole('tab', { name: 'Security' });
     fillPw('samepass1', 'samepass1', 'samepass1');
     fireEvent.click(screen.getByText('Change password'));
     expect(
@@ -167,8 +187,9 @@ describe('Account', () => {
   });
 
   it('changes the password and revokes other sessions on success', async () => {
+    routeTab.current = 'security';
     render(<Account />);
-    await screen.findByText('Security');
+    await screen.findByRole('tab', { name: 'Security' });
     fillPw('oldpass1', 'newpass12', 'newpass12');
     fireEvent.click(screen.getByText('Change password'));
     await waitFor(() =>
@@ -190,8 +211,9 @@ describe('Account', () => {
 
   it('shows an inline error when changePassword fails', async () => {
     mockChangePassword.mockResolvedValue({ data: null, error: { message: 'Invalid password' } });
+    routeTab.current = 'security';
     render(<Account />);
-    await screen.findByText('Security');
+    await screen.findByRole('tab', { name: 'Security' });
     fillPw('wrongpass1', 'newpass12', 'newpass12');
     fireEvent.click(screen.getByText('Change password'));
     expect(await screen.findByText('Invalid password')).toBeDefined();
@@ -202,8 +224,9 @@ describe('Account', () => {
 
   it('falls back to a generic error message when changePassword error has no message', async () => {
     mockChangePassword.mockResolvedValue({ data: null, error: {} });
+    routeTab.current = 'security';
     render(<Account />);
-    await screen.findByText('Security');
+    await screen.findByRole('tab', { name: 'Security' });
     fillPw('wrongpass1', 'newpass12', 'newpass12');
     fireEvent.click(screen.getByText('Change password'));
     expect(await screen.findByText('Failed to change password')).toBeDefined();
@@ -211,8 +234,9 @@ describe('Account', () => {
 
   it('recovers and re-enables the button when changePassword rejects', async () => {
     mockChangePassword.mockRejectedValue(new Error('network down'));
+    routeTab.current = 'security';
     render(<Account />);
-    await screen.findByText('Security');
+    await screen.findByRole('tab', { name: 'Security' });
     fillPw('oldpass1', 'newpass12', 'newpass12');
     const button = screen.getByText('Change password').closest('button') as HTMLButtonElement;
     fireEvent.click(button);
@@ -221,16 +245,19 @@ describe('Account', () => {
   });
 
   it('shows appearance section', () => {
+    routeTab.current = 'appearance';
     render(<Account />);
-    expect(screen.getByText('Appearance')).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'Appearance' })).toBeDefined();
   });
 
   it('shows workspace ID', () => {
+    routeTab.current = 'workspace';
     const { container } = render(<Account />);
     expect(container.textContent).toContain('u1');
   });
 
   it('applies light theme when Light clicked', () => {
+    routeTab.current = 'appearance';
     render(<Account />);
     fireEvent.click(screen.getByText('Light'));
     expect(localStorage.getItem('theme')).toBe('light');
@@ -238,6 +265,7 @@ describe('Account', () => {
   });
 
   it('applies dark theme when Dark clicked', () => {
+    routeTab.current = 'appearance';
     render(<Account />);
     fireEvent.click(screen.getByText('Dark'));
     expect(localStorage.getItem('theme')).toBe('dark');
@@ -246,6 +274,7 @@ describe('Account', () => {
 
   it('removes theme from storage when System clicked', () => {
     setThemePreference('dark');
+    routeTab.current = 'appearance';
     render(<Account />);
     fireEvent.click(screen.getByText('System'));
     expect(localStorage.getItem('theme')).toBeNull();
@@ -253,6 +282,7 @@ describe('Account', () => {
   });
 
   it('copies user ID to clipboard when copy button clicked', async () => {
+    routeTab.current = 'workspace';
     const { container } = render(<Account />);
     const copyBtn = container.querySelector('.copy-btn') as HTMLElement;
     await act(async () => {
@@ -263,17 +293,29 @@ describe('Account', () => {
 
   it('reads stored theme on mount', () => {
     setThemePreference('dark');
+    routeTab.current = 'appearance';
     render(<Account />);
     expect(pressed('Dark')).toBe('true');
     expect(pressed('System')).toBe('false');
   });
 
   it('follows a theme change made elsewhere, like the topbar toggle', () => {
+    routeTab.current = 'appearance';
     render(<Account />);
     expect(pressed('System')).toBe('true');
     act(() => setThemePreference('light'));
     expect(pressed('Light')).toBe('true');
     expect(pressed('System')).toBe('false');
+  });
+
+  it('shows one section per tab, starting on Profile', async () => {
+    render(<Account />);
+    expect(screen.getByLabelText('Display name')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Dark' })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Appearance' }));
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeDefined();
+    expect(screen.queryByLabelText('Display name')).toBeNull();
+    expect(await screen.findByRole('tab', { name: 'Security' })).toBeDefined();
   });
 
   it('shows no billing, plan or usage-email sections', async () => {
