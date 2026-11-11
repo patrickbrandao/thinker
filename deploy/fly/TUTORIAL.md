@@ -34,7 +34,7 @@ Environment variables:
 - `FLY_ORG`: Fly organization. Defaults to `personal`.
 - `FLY_RECORDING_BUCKET_NAME`: private Tigris bucket name. Defaults to `<app-name>-recordings`. Keep the same value on reruns; changing an attached bucket requires a manual recording migration.
 
-The script uses [`fly.toml`](fly.toml) as a template and deploys `docker.io/tmsoftbrasil/thinker:0.33`. It creates a private Tigris bucket and lets Fly stage the bucket's `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets on the app; Thinker uses those credentials with the bucket name, Tigris endpoint, and `auto` region from `fly.toml`. Re-running the script keeps that bucket and the existing `BETTER_AUTH_SECRET` and `THINKER_ENCRYPTION_KEY` values; rotate those secrets manually only if you intend to invalidate sessions and encrypted provider credentials.
+The script uses [`fly.toml`](fly.toml) as a template and deploys `docker.io/tmsoftbrasil/thinker:0.34`. It creates a private Tigris bucket and lets Fly stage the bucket's `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets on the app; Thinker uses those credentials with the bucket name, Tigris endpoint, and `auto` region from `fly.toml`. Re-running the script keeps that bucket and the existing `BETTER_AUTH_SECRET` and `THINKER_ENCRYPTION_KEY` values; rotate those secrets manually only if you intend to invalidate sessions and encrypted provider credentials.
 
 ## Manual Deploy
 
@@ -112,7 +112,7 @@ fly logs --app <your-fly-app>
 
 ## What Gets Provisioned
 
-- Fly app running `docker.io/tmsoftbrasil/thinker:0.33`.
+- Fly app running `docker.io/tmsoftbrasil/thinker:0.34`.
 - Fly Postgres app.
 - Private Tigris S3-compatible bucket for compressed request recordings.
 - `DATABASE_URL` secret from `fly postgres attach`.
