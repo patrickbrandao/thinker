@@ -297,9 +297,4 @@ export default {
     missing: 'Deleted trigger',
     readOnly: 'Only members, admins and owners can change the triggers of a harness.',
   },
-  org: {
-    title: 'Triggers',
-    body: 'E-mail, webhook, Telegram, syslog, GELF and RELP targets for harness and workspace events.',
-    open: 'Open triggers',
-  },
 };

@@ -1,6 +1,6 @@
 # ADR 0006 — Organizações, papéis e contas
 
-- **Status:** aceito
+- **Status:** aceito; item 6 alterado pelo [ADR 0010](0010-contas-so-pelo-super-usuario.md), que deixa só o super usuário (admin da instância) criar contas
 - **Data:** 2026-10-27
 - **Issues:** milestone v0.3 (#78, #102, #131); decisões em `docs/decisoes-iniciais.md` §2
 

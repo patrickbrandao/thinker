@@ -195,19 +195,20 @@ export class OrganizationsService {
     this.assertCanGrant(callerRole, role);
     if (!input.email?.includes('@')) throw new BadRequestException('A valid email is required.');
 
-    let account = await this.accounts.findByEmail(input.email);
-    let temporaryPassword: string | null = null;
+    // Only existing accounts join here; creating accounts is a superuser task
+    // on the Users page.
+    const account = await this.accounts.findByEmail(input.email);
     if (!account) {
-      const created = await this.accounts.createAccount(input.email, input.name ?? '');
-      account = created.account;
-      temporaryPassword = created.temporaryPassword;
-    } else if (
-      await this.memberRepo.exists({ where: { tenant_id: tenantId, user_id: account.id } })
-    ) {
+      throw new NotFoundException({
+        message: 'No account uses this email. A superuser must create it first.',
+        code: 'account_not_found',
+      });
+    }
+    if (await this.memberRepo.exists({ where: { tenant_id: tenantId, user_id: account.id } })) {
       throw new ConflictException('This account is already a member.');
     }
     await this.tenantCache.addMember(tenantId, account.id, role);
-    return { member: await this.member(tenantId, account.id), temporaryPassword };
+    return { member: await this.member(tenantId, account.id), temporaryPassword: null };
   }
 
   /** Adds an existing account (instance admin flow: create user into an org). */

@@ -114,23 +114,40 @@ describe('shell, auth and organization screens in pt-BR', () => {
 
   it('renders the Organization page in Portuguese', async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/organization?tab=members']}>
         <Organization />
       </MemoryRouter>,
     );
     await screen.findByText('v@x.io');
-    expect(screen.getByText('Membros')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /Membros/ })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Zona de perigo' })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Triggers' })).toBeNull();
     expect(screen.getByText('Troca de senha pendente')).toBeTruthy();
-    expect(screen.getByLabelText('Papel de v@x.io')).toBeTruthy();
-    expect(screen.getByText('Zona de perigo')).toBeTruthy();
+    expect(screen.getByLabelText(/Conta existente/)).toBeTruthy();
   });
 
   it('renders the Users admin page in Portuguese', async () => {
     render(<AdminUsers />);
     await screen.findByText('Acme · Proprietário');
-    expect(screen.getByText('Todos os usuários')).toBeTruthy();
-    expect(screen.getAllByText('Criar usuário').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Criar usuário' })).toBeTruthy();
+    // The instance-admin flag and password reset live in the edit window, not the list.
+    expect(screen.queryByText('Super usuário')).toBeNull();
+    expect(screen.queryByText('Redefinir senha')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar me@x.io' }));
+    expect(screen.getByRole('dialog', { name: 'Me' })).toBeTruthy();
+    expect(screen.getByText('Super usuário')).toBeTruthy();
     expect(screen.getByText('Redefinir senha')).toBeTruthy();
+  });
+
+  it('hides the role for a superuser and labels the organization as initial', async () => {
+    render(<AdminUsers />);
+    await screen.findByText('Acme · Proprietário');
+    fireEvent.click(screen.getByRole('button', { name: 'Criar usuário' }));
+    expect(screen.getByLabelText('Papel')).toBeTruthy();
+    expect(screen.getByLabelText('Organização (opcional)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Super usuário/ }));
+    expect(screen.queryByLabelText('Papel')).toBeNull();
+    expect(screen.getByLabelText('Organização inicial (opcional)')).toBeTruthy();
   });
 
   it('renders the sidebar in Portuguese', () => {
@@ -153,7 +170,7 @@ describe('shell, auth and organization screens in pt-BR', () => {
     const menu = screen.getByRole('menu', { name: 'Menu do usuário' });
     expect(menu.textContent).toContain('Organização');
     expect(menu.textContent).toContain('Seu papel: Proprietário');
-    expect(menu.textContent).toContain('admin da instância');
+    expect(menu.textContent).toContain('super usuário');
     expect(screen.getByRole('menuitem', { name: /Organização e membros/ })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /Sair/ })).toBeTruthy();
     expect(await screen.findByText('Trocar de organização')).toBeTruthy();

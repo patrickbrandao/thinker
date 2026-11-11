@@ -15,7 +15,7 @@ import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { providerIcon } from './ProviderIcon.js';
-import { Badge, Button, Field, cx } from './ui.js';
+import { Badge, Button, Field, cx, WindowFooter } from './ui.js';
 import type { FormLayout } from './TabbedWindow.js';
 
 export const LOCAL_SERVER_TYPE_NAMES: Record<LocalServerType, string> = {
@@ -566,7 +566,7 @@ export default function LocalServerForm(props: Props) {
       {header}
       {serverSection}
       {modelsSection}
-      {actions}
+      <WindowFooter>{actions}</WindowFooter>
     </div>
   );
 }

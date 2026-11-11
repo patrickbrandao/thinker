@@ -104,9 +104,10 @@ export function listMembers(orgId: string): Promise<{ members: OrganizationMembe
 
 export function addMember(
   orgId: string,
-  body: { email: string; name?: string; role: OrgRole },
+  body: { email: string; role: OrgRole },
+  options?: FetchMutateOptions,
 ): Promise<{ member: OrganizationMember; temporaryPassword: string | null }> {
-  return fetchMutate(orgPath(orgId, '/members'), json(body));
+  return fetchMutate(orgPath(orgId, '/members'), json(body), options);
 }
 
 export function updateMemberRole(

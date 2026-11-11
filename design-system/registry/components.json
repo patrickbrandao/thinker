@@ -2155,6 +2155,10 @@
     {
       "name": "Tabs",
       "file": "src/components/ui.tsx"
+    },
+    {
+      "name": "WindowFooter",
+      "file": "src/components/ui.tsx"
     }
   ],
   "migrationMap": {},
@@ -2166,7 +2170,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1080
+      "line": 1089
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2175,7 +2179,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1080
+      "line": 1089
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2184,21 +2188,21 @@
       "prop": "padding",
       "value": "6px 8px",
       "file": "shell.css",
-      "line": 1089
+      "line": 1098
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-5px",
       "file": "shell.css",
-      "line": 1255
+      "line": 1264
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "5px",
       "file": "shell.css",
-      "line": 1256
+      "line": 1265
     }
   ],
   "ghostRules": [
@@ -2209,8 +2213,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1073,
-      "losesTo": "shell.css:1080"
+      "line": 1082,
+      "losesTo": "shell.css:1089"
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2219,8 +2223,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1073,
-      "losesTo": "shell.css:1080"
+      "line": 1082,
+      "losesTo": "shell.css:1089"
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2229,24 +2233,24 @@
       "prop": "padding",
       "value": "0 10px",
       "file": "shell.css",
-      "line": 1085,
-      "losesTo": "shell.css:1089"
+      "line": 1094,
+      "losesTo": "shell.css:1098"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-2px",
       "file": "shell.css",
-      "line": 1211,
-      "losesTo": "shell.css:1255"
+      "line": 1220,
+      "losesTo": "shell.css:1264"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "2px",
       "file": "shell.css",
-      "line": 1213,
-      "losesTo": "shell.css:1256"
+      "line": 1222,
+      "losesTo": "shell.css:1265"
     }
   ],
   "componentSheets": {

@@ -299,7 +299,7 @@ user-trigger (shell.css): user-trigger
 well (base.css): well
 wide (shell.css): wide
 
-## Primitives (19)
+## Primitives (20)
 Avatar: src/components/ui.tsx
 Badge: src/components/ui.tsx
 Button: src/components/ui.tsx
@@ -319,23 +319,24 @@ Skel: src/components/ui.tsx
 Status: src/components/ui.tsx
 Switch: src/components/ui.tsx
 Tabs: src/components/ui.tsx
+WindowFooter: src/components/ui.tsx
 
 ## Migration map — legacy component → primitive to use instead (0)
 (empty until primitives exist)
 
 ## Canonical rules — same selector+property declared twice with different values; the winner renders (5)
-.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1080  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1080  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1089  [@media (max-width: 900px)]
-.liquid-metal::after { inset: -5px }  ← shell.css:1255
-.liquid-metal::after { padding: 5px }  ← shell.css:1256
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1089  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1089  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1098  [@media (max-width: 900px)]
+.liquid-metal::after { inset: -5px }  ← shell.css:1264
+.liquid-metal::after { padding: 5px }  ← shell.css:1265
 
 ## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (5)
-.app.is-collapsed .nav-action { display: revert }  at shell.css:1073 loses to shell.css:1080
-.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1073 loses to shell.css:1080
-.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1085 loses to shell.css:1089
-.liquid-metal::after { inset: -2px }  at shell.css:1211 loses to shell.css:1255
-.liquid-metal::after { padding: 2px }  at shell.css:1213 loses to shell.css:1256
+.app.is-collapsed .nav-action { display: revert }  at shell.css:1082 loses to shell.css:1089
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1082 loses to shell.css:1089
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1094 loses to shell.css:1098
+.liquid-metal::after { inset: -2px }  at shell.css:1220 loses to shell.css:1264
+.liquid-metal::after { padding: 2px }  at shell.css:1222 loses to shell.css:1265
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

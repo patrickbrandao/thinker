@@ -12,7 +12,7 @@ export default {
   user: {
     organization: 'Organization',
     role: 'Your role: {{ role }}',
-    instanceAdmin: 'instance admin',
+    instanceAdmin: 'superuser',
     manageOrganization: 'Organization and members',
     viewOrganization: 'Organization details',
     switchOrganization: 'Switch organization',
