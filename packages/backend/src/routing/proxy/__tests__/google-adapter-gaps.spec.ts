@@ -65,3 +65,46 @@ describe('Gemini thoughtSignature on text parts', () => {
     expect(req.contents[0]!.parts[0]).not.toHaveProperty('thoughtSignature');
   });
 });
+
+describe('Gemini optional functionCall args and blocked prompts', () => {
+  it('serializes a functionCall without args as "{}"', () => {
+    const res = fromGoogleResponse(
+      { candidates: [{ content: { parts: [{ functionCall: { id: 'c1', name: 'now' } }] } }] },
+      'gemini-3.5-flash',
+    ) as {
+      choices: Array<{ message: { tool_calls: Array<{ function: { arguments: string } }> } }>;
+    };
+    expect(res.choices[0]!.message.tool_calls[0]!.function.arguments).toBe('{}');
+  });
+
+  it.each(['null', '[]', '1'])('replays non-object arguments %s as {}', (args) => {
+    const req = toGoogleRequest(
+      {
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              { id: 'c1', type: 'function', function: { name: 'now', arguments: args } },
+            ],
+          },
+        ],
+      },
+      'gemini-3.5-flash',
+    ) as { contents: Array<{ parts: Array<{ functionCall?: { args: unknown } }> }> };
+    expect(req.contents[0]!.parts[0]!.functionCall!.args).toEqual({});
+  });
+
+  it('closes a stream whose prompt was blocked with content_filter and usage', () => {
+    const out = transformGoogleStreamChunk(
+      JSON.stringify({
+        promptFeedback: { blockReason: 'PROHIBITED_CONTENT' },
+        usageMetadata: { promptTokenCount: 7, totalTokenCount: 7 },
+      }),
+      'gemini-3.5-flash',
+      createGoogleStreamState(),
+    ).chunk!;
+    expect(out).toContain('"finish_reason":"content_filter"');
+    expect(out).toContain('"prompt_tokens":7');
+  });
+});

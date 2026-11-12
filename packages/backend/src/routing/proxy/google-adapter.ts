@@ -131,7 +131,9 @@ function sanitizeSchema(schema: unknown, isPropertiesMap = false): unknown {
 
 function safeParseArgs(args: string | undefined): Record<string, unknown> {
   try {
-    return JSON.parse(args || '{}') as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(args || '{}');
+    // Gemini requires a Struct: `null`, arrays and scalars are rejected.
+    return isRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -549,7 +551,7 @@ export function fromGoogleResponse(
       const toolCall: Record<string, unknown> = {
         id: toolCallId,
         type: 'function',
-        function: { name: fc.name, arguments: JSON.stringify(fc.args) },
+        function: { name: fc.name, arguments: JSON.stringify(fc.args ?? {}) },
       };
       const sig = part.thoughtSignature;
       if (typeof sig === 'string' && sig) {
@@ -747,7 +749,13 @@ export function transformGoogleStreamChunk(
   // candidate) closes the stream; its usage is the total.
   const usage = data.usageMetadata as Record<string, number> | undefined;
   if (usage) state.usage = usage;
-  const isTerminal = Boolean(candidate?.finishReason) || (Boolean(usage) && !candidate);
+  // A rejected prompt comes back with promptFeedback.blockReason and no
+  // candidate: close the stream as content_filter, not as a normal stop.
+  const promptBlocked =
+    !candidate &&
+    typeof (data.promptFeedback as { blockReason?: unknown } | undefined)?.blockReason === 'string';
+  const isTerminal =
+    Boolean(candidate?.finishReason) || promptBlocked || (Boolean(usage) && !candidate);
   if (isTerminal) {
     if (!state.finished) {
       state.finished = true;
@@ -757,7 +765,9 @@ export function transformGoogleStreamChunk(
           signature: state.textSignature,
         });
       }
-      const finishReason = mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
+      const finishReason = promptBlocked
+        ? 'content_filter'
+        : mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
       result += `data: ${JSON.stringify({
         id: state.id,
         object: 'chat.completion.chunk',

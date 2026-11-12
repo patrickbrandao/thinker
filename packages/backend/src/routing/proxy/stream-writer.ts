@@ -167,7 +167,10 @@ export function parseUsageObject(usage: unknown): StreamUsage | null {
             ? promptDetails.cache_write_tokens
             : typeof promptDetails?.cache_creation_input_tokens === 'number'
               ? promptDetails.cache_creation_input_tokens
-              : undefined;
+              : // Requesty names cache writes `caching_tokens` (api-requesty).
+                typeof promptDetails?.caching_tokens === 'number'
+                ? promptDetails.caching_tokens
+                : undefined;
     return {
       prompt_tokens: u.prompt_tokens,
       completion_tokens: typeof u.completion_tokens === 'number' ? u.completion_tokens : 0,

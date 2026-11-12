@@ -60,7 +60,7 @@ Módulos do backend (`packages/backend/src/`):
 | `mcp/` | Servidor MCP remoto (OAuth 2.1, uma instância por POST, ferramentas em `tools/`) |
 | `otlp/` | Autenticação por chave de agente (`thk_`); o ingest OTLP responde 410 |
 
-Fonte única dos provedores: `SHARED_PROVIDERS` em `packages/shared/src/` (reexportado como `PROVIDER_REGISTRY` em `common/constants/providers.ts`). Não repita nomes de provedores em outro lugar. Para adicionar um provedor: entrada em `SHARED_PROVIDERS`; `FetcherConfig` em `model-discovery/provider-model-fetcher.service.ts`; `ProviderEndpoint` em `routing/proxy/provider-endpoints.ts`; `ProviderDef` em `packages/frontend/src/services/providers.ts`.
+Fonte única dos provedores: `SHARED_PROVIDERS` em `packages/shared/src/` (reexportado como `PROVIDER_REGISTRY` em `common/constants/providers.ts`). Não repita nomes de provedores em outro lugar. Para adicionar um provedor: entrada em `SHARED_PROVIDERS`; `FetcherConfig` em `model-discovery/provider-model-fetcher.service.ts`; `ProviderEndpoint` em `routing/proxy/provider-endpoints.ts` (e, se os ids do provedor têm barra, o id em `routing/proxy/model-prefix.ts`); `ProviderDef` em `packages/frontend/src/services/providers.ts`.
 
 ## Comandos
 

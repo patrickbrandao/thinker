@@ -103,6 +103,8 @@ export interface ProviderEndpoint {
   acceptsMaxOutputTokens?: boolean;
   /** Send Thinker's stable `prompt_cache_key` when the caller did not set one. */
   acceptsPromptCacheKey?: boolean;
+  /** Map Chat Completions `reasoning_effort` to `reasoning: { effort, summary: 'auto' }`. */
+  acceptsReasoningSummary?: boolean;
 }
 
 const openaiStreamUsage = { streamUsageReporting: 'openai_stream_options' as const };
@@ -221,6 +223,10 @@ const OPENCODE_INFERENCE_BASE = 'https://opencode.ai/inference';
 const OPENCODE_GO_INFERENCE_BASE = 'https://opencode.ai/inference/go';
 const KILO_GATEWAY_BASE = 'https://api.kilo.ai/api/gateway';
 const NOUS_PORTAL_BASE = 'https://inference-api.nousresearch.com';
+// OpenAI-compatible aggregators (api-atlascloud, api-edenai, api-requesty).
+export const ATLAS_CLOUD_BASE = 'https://api.atlascloud.ai/v1';
+export const EDEN_AI_BASE = 'https://api.edenai.run/v3';
+export const REQUESTY_BASE = 'https://router.requesty.ai/v1';
 const NVIDIA_NIM_BASE = 'https://integrate.api.nvidia.com';
 const FIREWORKS_INFERENCE_BASE = 'https://api.fireworks.ai/inference';
 const HUGGING_FACE_INFERENCE_BASE = 'https://router.huggingface.co';
@@ -323,6 +329,7 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     forwardResponsesStream: true,
     acceptsMaxOutputTokens: true,
     acceptsPromptCacheKey: true,
+    acceptsReasoningSummary: true,
   },
   'bedrock-anthropic': {
     baseUrl: getBedrockMantleBaseUrl(),
@@ -432,6 +439,27 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
       ...(authType === 'subscription' ? { 'User-Agent': MISTRAL_VIBE_USER_AGENT } : {}),
     }),
     buildPath: openaiPath,
+    format: 'openai',
+    ...openaiStreamUsage,
+  },
+  atlascloud: {
+    baseUrl: ATLAS_CLOUD_BASE,
+    buildHeaders: openaiHeaders,
+    buildPath: () => '/chat/completions',
+    format: 'openai',
+    ...openaiStreamUsage,
+  },
+  edenai: {
+    baseUrl: EDEN_AI_BASE,
+    buildHeaders: openaiHeaders,
+    buildPath: () => '/chat/completions',
+    format: 'openai',
+    ...openaiStreamUsage,
+  },
+  requesty: {
+    baseUrl: REQUESTY_BASE,
+    buildHeaders: openaiHeaders,
+    buildPath: () => '/chat/completions',
     format: 'openai',
     ...openaiStreamUsage,
   },

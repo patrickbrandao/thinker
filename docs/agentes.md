@@ -15,7 +15,7 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 | Arquiteto | `architect.md` | herda | Desenho de features e ADRs | Só `docs/` e issues (também planeja milestones e abre as issues) |
 | DevOps | `devops.md` | herda | CI, imagem multi-arch, Docker Hub, releases | Sim (infra) |
 | Docs PT-BR | `docs-ptbr.md` | Sonnet | Documentação e notas de release | Só docs |
-| Pesquisadores de sistemas externos (68) | `api-*.md`, `sub-*.md`, `local-*.md`, `harness-*.md` | herda | Um por entidade externa: mantém o dossiê em [`docs/externos/`](externos/README.md) e abre issues `externo` | Não (só o próprio dossiê) |
+| Pesquisadores de sistemas externos (71) | `api-*.md`, `sub-*.md`, `local-*.md`, `harness-*.md` | herda | Um por entidade externa: mantém o dossiê em [`docs/externos/`](externos/README.md) e abre issues `externo` | Não (só o próprio dossiê) |
 
 ## LiteLLM
 

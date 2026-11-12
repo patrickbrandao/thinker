@@ -1,5 +1,10 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DiscoveredModel, FetcherConfig, contextWindowFields } from './model-fetcher';
+import {
+  DiscoveredModel,
+  FetcherConfig,
+  LongContextPricing,
+  contextWindowFields,
+} from './model-fetcher';
 import { rebaseUrl } from '../routing/account-base-url';
 import { validatePublicUrl } from '../common/utils/url-validation';
 import { parseModalities } from './model-capabilities';
@@ -38,7 +43,12 @@ import {
   type OpencodeCatalogEntry,
   type OpencodeCatalogProvider,
 } from './opencode-catalog.service';
-import { PROVIDER_ENDPOINTS } from '../routing/proxy/provider-endpoints';
+import {
+  ATLAS_CLOUD_BASE,
+  EDEN_AI_BASE,
+  PROVIDER_ENDPOINTS,
+  REQUESTY_BASE,
+} from '../routing/proxy/provider-endpoints';
 import {
   buildKiroHeaders,
   KIRO_BASE_URL,
@@ -1001,6 +1011,284 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
   });
 }
 
+/* ── OpenAI-compatible aggregators: Atlas Cloud, Eden AI, Requesty ── */
+
+/** A finite, non-negative price, from a number or a decimal string. */
+function nonNegativePrice(value: unknown): number | null {
+  if (typeof value !== 'number' && (typeof value !== 'string' || value.trim() === '')) return null;
+  const price = Number(value);
+  return Number.isFinite(price) && price >= 0 ? price : null;
+}
+
+/** Capability list of a gateway model: its input modalities, streaming, and tools when flagged. */
+function gatewayCapabilities(
+  inputModalities: readonly ModelModality[] | undefined,
+  tools: boolean,
+): ModelCapability[] {
+  const capabilities: ModelCapability[] = [...(inputModalities ?? ['text'])];
+  capabilities.push('stream');
+  if (tools) capabilities.push('tools');
+  return capabilities;
+}
+
+/** Long-context tier from a threshold and its rates; null when incomplete. */
+function longContextTier(
+  thresholdTokens: unknown,
+  input: unknown,
+  output: unknown,
+  cacheRead?: unknown,
+  cacheWrite?: unknown,
+): LongContextPricing | null {
+  const inputPricePerToken = nonNegativePrice(input);
+  const outputPricePerToken = nonNegativePrice(output);
+  if (
+    typeof thresholdTokens !== 'number' ||
+    !Number.isSafeInteger(thresholdTokens) ||
+    thresholdTokens <= 0 ||
+    inputPricePerToken === null ||
+    outputPricePerToken === null
+  ) {
+    return null;
+  }
+  const cacheReadPricePerToken = nonNegativePrice(cacheRead);
+  const cacheWritePricePerToken = nonNegativePrice(cacheWrite);
+  return {
+    thresholdTokens,
+    inputPricePerToken,
+    outputPricePerToken,
+    ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+    ...(cacheWritePricePerToken !== null ? { cacheWritePricePerToken } : {}),
+  };
+}
+
+interface AtlasCloudModelEntry {
+  id?: unknown;
+  name?: string;
+  context_length?: number;
+  input_modalities?: string[];
+  output_modalities?: string[];
+  supported_features?: string[];
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    input_cache_read?: string;
+    overrides?: {
+      prompt?: string;
+      completion?: string;
+      input_cache_read?: string;
+      min_context?: number;
+    }[];
+  };
+}
+
+/** Image generators Atlas Cloud lists with `output_modalities: ["text"]`. */
+const ATLAS_CLOUD_IMAGE_MODEL_RE = /(?:^|[/-])(?:gpt-)?image(?:-|$)/i;
+
+/**
+ * Atlas Cloud `GET /v1/models` (public): `{code, msg, data: [...]}` with
+ * OpenRouter-like per-token string prices and a long-context `overrides` tier.
+ * Image generators claim text output, so they are dropped by id
+ * (api-atlascloud).
+ */
+function parseAtlasCloud(body: unknown, provider: string): DiscoveredModel[] {
+  const data = (body as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((raw): DiscoveredModel[] => {
+    const entry = raw as AtlasCloudModelEntry;
+    if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
+    if (ATLAS_CLOUD_IMAGE_MODEL_RE.test(entry.id)) return [];
+    const output = entry.output_modalities?.map((o) => o.toLowerCase());
+    if (output && output.length > 0 && !output.every((o) => o === 'text')) return [];
+
+    const features = Array.isArray(entry.supported_features) ? entry.supported_features : [];
+    const inputModalities = parseModalities(entry.input_modalities);
+    const override = entry.pricing?.overrides?.find((o) => typeof o?.min_context === 'number');
+    const longContextPricing = override
+      ? longContextTier(
+          override.min_context,
+          override.prompt,
+          override.completion,
+          override.input_cache_read,
+        )
+      : null;
+    const cacheReadPricePerToken = nonNegativePrice(entry.pricing?.input_cache_read);
+    return [
+      {
+        id: entry.id,
+        displayName: entry.name || entry.id,
+        provider,
+        ...contextWindowFields(entry.context_length),
+        inputPricePerToken: nonNegativePrice(entry.pricing?.prompt),
+        outputPricePerToken: nonNegativePrice(entry.pricing?.completion),
+        ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+        ...(longContextPricing ? { longContextPricing } : {}),
+        capabilityReasoning: features.includes('reasoning'),
+        capabilityCode: features.includes('tools'),
+        ...(inputModalities ? { inputModalities } : {}),
+        outputModalities: ['text'],
+        qualityScore: 3,
+      },
+    ];
+  });
+}
+
+interface EdenAiModelEntry {
+  id?: unknown;
+  context_length?: number | null;
+  capabilities?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+    supports_reasoning?: boolean;
+    supports_function_calling?: boolean;
+  } | null;
+  pricing?: Record<string, unknown> | null;
+}
+
+/** Eden AI's LiteLLM-style long-context price keys, by prompt-token threshold. */
+const EDEN_AI_LONG_CONTEXT_TIERS: readonly (readonly [number, string])[] = [
+  [200_000, 'above_200k_tokens'],
+  [272_000, 'above_272k_tokens'],
+];
+
+/**
+ * Eden AI `GET /v3/models` (public): OpenAI `{object, data}` envelope, LLMs
+ * only, with LiteLLM-style per-token prices (`input_cost_per_token`,
+ * `cache_read_input_token_cost`, `..._above_200k_tokens`) and a
+ * `capabilities` object (api-edenai).
+ */
+function parseEdenAi(body: unknown, provider: string): DiscoveredModel[] {
+  const data = (body as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((raw): DiscoveredModel[] => {
+    const entry = raw as EdenAiModelEntry;
+    if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
+    const caps = entry.capabilities ?? undefined;
+    const output = caps?.output_modalities?.map((o) => o.toLowerCase());
+    if (output && output.length > 0 && !output.every((o) => o === 'text')) return [];
+
+    const pricing = entry.pricing ?? {};
+    const cacheReadPricePerToken = nonNegativePrice(pricing.cache_read_input_token_cost);
+    const cacheWritePricePerToken = nonNegativePrice(pricing.cache_creation_input_token_cost);
+    let longContextPricing: LongContextPricing | null = null;
+    for (const [threshold, suffix] of EDEN_AI_LONG_CONTEXT_TIERS) {
+      longContextPricing ??= longContextTier(
+        threshold,
+        pricing[`input_cost_per_token_${suffix}`],
+        pricing[`output_cost_per_token_${suffix}`],
+        pricing[`cache_read_input_token_cost_${suffix}`],
+        pricing[`cache_creation_input_token_cost_${suffix}`],
+      );
+    }
+    const inputModalities = parseModalities(caps?.input_modalities);
+    const tools = caps?.supports_function_calling === true;
+    return [
+      {
+        id: entry.id,
+        displayName: entry.id,
+        provider,
+        ...contextWindowFields(entry.context_length),
+        inputPricePerToken: nonNegativePrice(pricing.input_cost_per_token),
+        outputPricePerToken: nonNegativePrice(pricing.output_cost_per_token),
+        ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+        ...(cacheWritePricePerToken !== null ? { cacheWritePricePerToken } : {}),
+        ...(longContextPricing ? { longContextPricing } : {}),
+        capabilityReasoning: caps?.supports_reasoning === true,
+        capabilityCode: tools,
+        capabilities: gatewayCapabilities(inputModalities, tools),
+        ...(inputModalities ? { inputModalities } : {}),
+        outputModalities: ['text'],
+        qualityScore: 3,
+      },
+    ];
+  });
+}
+
+interface RequestyPriceTier {
+  prompt_tokens_threshold?: number;
+  input_price?: number;
+  output_price?: number;
+  cached_price?: number;
+  caching_price?: number;
+}
+
+interface RequestyModelEntry {
+  id?: unknown;
+  api?: string;
+  context_window?: number;
+  retires?: number | null;
+  input_price?: number;
+  output_price?: number;
+  cached_price?: number;
+  caching_price?: number;
+  pricing?: RequestyPriceTier[];
+  supports_vision?: boolean;
+  supports_reasoning?: boolean;
+  supports_tool_calling?: boolean;
+  supports_image_generation?: boolean;
+}
+
+/**
+ * Requesty `GET /v1/models` (public without a key; with one, only the models
+ * the key may use): OpenAI `{object, data}` envelope with per-token numeric
+ * prices, `cached_price` (read) and `caching_price` (write), tiers keyed by
+ * `prompt_tokens_threshold`, `supports_*` flags and `retires` in unix seconds
+ * (api-requesty).
+ */
+function parseRequesty(body: unknown, provider: string): DiscoveredModel[] {
+  const data = (body as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  const nowSeconds = Date.now() / 1000;
+  return data.flatMap((raw): DiscoveredModel[] => {
+    const entry = raw as RequestyModelEntry;
+    if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
+    if (entry.api !== undefined && entry.api !== 'chat') return [];
+    if (entry.supports_image_generation === true) return [];
+    if (typeof entry.retires === 'number' && entry.retires > 0 && entry.retires <= nowSeconds) {
+      return [];
+    }
+
+    const tier = (Array.isArray(entry.pricing) ? entry.pricing : [])
+      .filter(
+        (t): t is RequestyPriceTier & { prompt_tokens_threshold: number } =>
+          typeof t?.prompt_tokens_threshold === 'number' && t.prompt_tokens_threshold > 0,
+      )
+      .sort((a, b) => a.prompt_tokens_threshold - b.prompt_tokens_threshold)[0];
+    const longContextPricing = tier
+      ? longContextTier(
+          tier.prompt_tokens_threshold,
+          tier.input_price,
+          tier.output_price,
+          tier.cached_price,
+          tier.caching_price,
+        )
+      : null;
+    const cacheReadPricePerToken = nonNegativePrice(entry.cached_price);
+    const cacheWritePricePerToken = nonNegativePrice(entry.caching_price);
+    const inputModalities: ModelModality[] =
+      entry.supports_vision === true ? ['text', 'image'] : ['text'];
+    const tools = entry.supports_tool_calling === true;
+    return [
+      {
+        id: entry.id,
+        displayName: entry.id,
+        provider,
+        ...contextWindowFields(entry.context_window),
+        inputPricePerToken: nonNegativePrice(entry.input_price),
+        outputPricePerToken: nonNegativePrice(entry.output_price),
+        ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+        ...(cacheWritePricePerToken !== null ? { cacheWritePricePerToken } : {}),
+        ...(longContextPricing ? { longContextPricing } : {}),
+        capabilityReasoning: entry.supports_reasoning === true,
+        capabilityCode: tools,
+        capabilities: gatewayCapabilities(inputModalities, tools),
+        inputModalities,
+        outputModalities: ['text'],
+        qualityScore: 3,
+      },
+    ];
+  });
+}
+
 /* ── Provider configs ── */
 
 export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
@@ -1053,6 +1341,21 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     endpoint: FIREWORKS_MODELS_URL,
     buildHeaders: bearerHeaders,
     parse: parseFireworks,
+  },
+  atlascloud: {
+    endpoint: `${ATLAS_CLOUD_BASE}/models`,
+    buildHeaders: bearerHeaders,
+    parse: parseAtlasCloud,
+  },
+  edenai: {
+    endpoint: `${EDEN_AI_BASE}/models`,
+    buildHeaders: bearerHeaders,
+    parse: parseEdenAi,
+  },
+  requesty: {
+    endpoint: `${REQUESTY_BASE}/models`,
+    buildHeaders: bearerHeaders,
+    parse: parseRequesty,
   },
   kilo: {
     endpoint: `${KILO_GATEWAY_BASE}/models`,

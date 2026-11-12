@@ -307,11 +307,14 @@ const ptBR: Catalog<typeof en> = {
   },
   catalog: {
     subtitles: {
+      atlascloud: 'DeepSeek, Qwen, GLM, Kimi, Claude e mais com uma chave',
       cerebras: 'GPT-OSS, GLM, Gemma na inferência da Cerebras',
+      edenai: 'Gateway europeu para OpenAI, Anthropic, Mistral, Google e mais',
       pioneer: 'Inferência compatível com OpenAI e modelos Fastino ajustados (antiga Pioneer)',
       groq: 'Llama 4, Qwen, GPT-OSS. Inferência rápida',
       huggingface: 'Modelos abertos pelos Inference Providers do Hugging Face',
       kilo: 'Acesso unificado a modelos pelo Kilo Gateway',
+      requesty: 'Roteador compatível com OpenAI, com fallback e roteamento na UE',
       llamacpp: 'Servidor compatível com OpenAI para modelos GGUF em CPU / Metal / CUDA',
       lmstudio: 'Rode modelos GGUF com um servidor local',
       meta: 'Muse Spark 1.2, Contributor e 1.1',

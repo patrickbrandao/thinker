@@ -9,6 +9,7 @@ import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
 import {
   PROVIDER_ENDPOINTS,
   ProviderEndpoint,
+  buildEndpointOverride,
   resolveBedrockEndpointKey,
   resolveEndpointKey,
 } from './provider-endpoints';
@@ -76,7 +77,10 @@ import {
 import { ProviderModelRegistryService } from '../../model-discovery/provider-model-registry.service';
 import { qualifyChatGptResponse } from './chatgpt-response-qualifier';
 import { isBedrockProvider } from '../bedrock-region';
-import { getBedrockRuntimeCapabilities } from '../bedrock-runtime-capabilities';
+import {
+  bedrockRuntimeChatNeedsResponses,
+  getBedrockRuntimeCapabilities,
+} from '../bedrock-runtime-capabilities';
 
 export interface ForwardResult {
   response: Response;
@@ -615,7 +619,26 @@ export class ProviderClient {
     apiMode: ForwardOptions['apiMode'],
     body?: Record<string, unknown>,
   ): Promise<{ endpoint: ProviderEndpoint; endpointKey: string }> {
+    // Runtime Chat Completions rejects function tools next to reasoning on GPT
+    // profiles, so those chat requests go to Runtime Responses instead.
+    // `THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES=false` turns it off.
+    const viaResponses =
+      body !== undefined &&
+      isBedrockProvider(provider) &&
+      (apiMode === undefined || apiMode === 'chat_completions') &&
+      process.env.THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES !== 'false' &&
+      bedrockRuntimeChatNeedsResponses(model, body);
     if (customEndpoint) {
+      // A stored-region or account base URL connection arrives as the Runtime
+      // chat override; swap it for the Responses template on the same host.
+      if (viaResponses && customEndpoint.format === 'openai') {
+        const responsesEndpoint = buildEndpointOverride(
+          customEndpoint.baseUrl,
+          'bedrock-runtime-responses',
+        );
+        responsesEndpoint.allowPrivateDestination = customEndpoint.allowPrivateDestination;
+        return { endpoint: responsesEndpoint, endpointKey: 'custom' };
+      }
       return { endpoint: customEndpoint, endpointKey: 'custom' };
     }
     let resolved = resolveEndpointKey(provider);
@@ -627,7 +650,7 @@ export class ProviderClient {
       if (override) resolved = override;
     }
     if (resolved === 'bedrock') {
-      resolved = resolveBedrockEndpointKey(model, apiMode);
+      resolved = resolveBedrockEndpointKey(model, viaResponses ? 'responses' : apiMode);
     }
     if (resolved === 'qwen-subscription') {
       const bareQwenModel = stripVendorPrefix(model);
@@ -904,10 +927,12 @@ export class ProviderClient {
                 endpointKey === 'openai-subscription' ||
                 endpointKey === 'openai-responses' ||
                 endpointKey === 'xai-responses',
-              // Only OpenAI infrastructure is known to accept
-              // reasoning.summary; other Responses backends may 400 on it.
+              // Only OpenAI infrastructure and Bedrock Runtime are known to
+              // accept reasoning.summary; other Responses backends may 400 on it.
               mapReasoningEffort:
-                endpointKey === 'openai-subscription' || endpointKey === 'openai-responses',
+                endpointKey === 'openai-subscription' ||
+                endpointKey === 'openai-responses' ||
+                endpoint.acceptsReasoningSummary === true,
             });
       if (endpointKey === 'xai-responses' || endpoint.acceptsPromptCacheKey) {
         applyHashedPromptCacheKey(requestBody, ctx.providerCacheKey);
