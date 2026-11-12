@@ -299,11 +299,14 @@ export default {
   },
   catalog: {
     subtitles: {
+      atlascloud: 'DeepSeek, Qwen, GLM, Kimi, Claude and more on one key',
       cerebras: 'GPT-OSS, GLM, Gemma on Cerebras inference',
+      edenai: 'EU-based gateway to OpenAI, Anthropic, Mistral, Google and more',
       pioneer: 'OpenAI-compatible inference and fine-tuned Fastino models (formerly Pioneer)',
       groq: 'Llama 4, Qwen, GPT-OSS. Fast inference',
       huggingface: 'Open models through Hugging Face Inference Providers',
       kilo: 'Kilo Gateway unified model access',
+      requesty: 'OpenAI-compatible router with fallback and EU routing',
       llamacpp: 'OpenAI-compatible server for GGUF models on CPU / Metal / CUDA',
       lmstudio: 'Run GGUF models with a local server',
       meta: 'Muse Spark 1.2, Contributor, and 1.1',

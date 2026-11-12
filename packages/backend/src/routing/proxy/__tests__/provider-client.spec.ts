@@ -820,13 +820,99 @@ describe('ProviderClient', () => {
         expect(sent.reasoning_effort).toBe('none');
       });
 
-      it.each([{ tools }, {}])('forwards the caller reasoning_effort (%o)', async (extra) => {
-        const sent = await sentBodyFor('us.openai.gpt-6-luna', {
-          ...extra,
-          reasoning_effort: 'high',
-        });
+      it('forwards the caller reasoning_effort when no tools are sent', async () => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', { reasoning_effort: 'high' });
 
         expect(sent.reasoning_effort).toBe('high');
+      });
+
+      describe('function tools with reasoning go to Runtime Responses', () => {
+        const RUNTIME = 'https://bedrock-runtime.us-east-1.amazonaws.com';
+        afterEach(() => {
+          delete process.env.THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES;
+        });
+
+        it('sends Luna with tools and effort high to Responses with a reasoning summary', async () => {
+          mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+          const result = await client.forward({
+            provider: 'bedrock',
+            apiKey: 'bedrock-api-key-test',
+            model: 'global.openai.gpt-6-luna',
+            body: { ...body, tools, reasoning_effort: 'high', max_tokens: 512 },
+            providerCacheKey: 'v1:tenant-agent-session-digest',
+            stream: true,
+            apiMode: 'chat_completions',
+          });
+
+          expect(mockFetch.mock.calls[0][0]).toBe(`${RUNTIME}/openai/v1/responses`);
+          const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+          expect(sent.model).toBe('global.openai.gpt-6-luna');
+          expect(sent.reasoning).toEqual({ effort: 'high', summary: 'auto' });
+          expect(sent.reasoning_effort).toBeUndefined();
+          expect(sent.max_output_tokens).toBe(512);
+          expect(sent.stream).toBe(true);
+          expect(sent.tools[0]).toMatchObject({ type: 'function', name: 'get_weather' });
+          expect(sent.prompt_cache_key).toMatch(/^thinker-[a-f0-9]{32}$/);
+          expect(result.isChatGpt).toBe(true);
+          expect(result.isResponses).toBe(false);
+        });
+
+        it('sends Astra with tools and no effort to Responses', async () => {
+          mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+          await client.forward({
+            provider: 'bedrock',
+            apiKey: 'bedrock-api-key-test',
+            model: 'us.openai.gpt-6-astra',
+            body: { ...body, tools },
+            stream: false,
+            apiMode: 'chat_completions',
+          });
+
+          expect(mockFetch.mock.calls[0][0]).toBe(`${RUNTIME}/openai/v1/responses`);
+          const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+          expect(sent.reasoning).toBeUndefined();
+        });
+
+        it('swaps a stored-region Runtime chat override for Responses on the same host', async () => {
+          mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+          await client.forward({
+            provider: 'bedrock',
+            apiKey: 'bedrock-api-key-test',
+            model: 'us.openai.gpt-6-luna',
+            body: { ...body, tools, reasoning_effort: 'max' },
+            stream: false,
+            apiMode: 'chat_completions',
+            customEndpoint: buildEndpointOverride(
+              'https://bedrock-runtime.us-west-2.amazonaws.com',
+              'bedrock-runtime',
+            ),
+          });
+
+          expect(mockFetch.mock.calls[0][0]).toBe(
+            'https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1/responses',
+          );
+          const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+          expect(sent.reasoning).toEqual({ effort: 'max', summary: 'auto' });
+        });
+
+        it('stays on chat when THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES=false', async () => {
+          process.env.THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES = 'false';
+          const sent = await sentBodyFor('us.openai.gpt-6-luna', {
+            tools,
+            reasoning_effort: 'high',
+          });
+
+          expect(mockFetch.mock.calls[0][0]).toBe(`${RUNTIME}/openai/v1/chat/completions`);
+          expect(sent.reasoning_effort).toBe('high');
+        });
+
+        it('keeps Kimi chat requests with tools and effort on chat', async () => {
+          await sentBodyFor('global.moonshotai.kimi-k3', { tools, reasoning_effort: 'high' });
+          expect(mockFetch.mock.calls[0][0]).toBe(`${RUNTIME}/openai/v1/chat/completions`);
+        });
       });
 
       it('leaves reasoning_effort out when neither tools nor an effort are sent', async () => {

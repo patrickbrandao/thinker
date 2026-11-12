@@ -100,6 +100,7 @@ Cada servidor local guarda a própria configuração (host, porta, prefixo, chav
 | `THINKER_SERVED_PROVIDER_CAPTURE` | `true` | Grava em cada tentativa quem de fato serviu (o campo `provider` do OpenRouter), o id da geração e o modelo respondido. Aparece como "Served by" no detalhe da mensagem e pode ser filtrado na lista. |
 | `STREAM_IDLE_TIMEOUT_MS` | `180000` | Silêncio máximo entre eventos de streaming antes de falhar a tentativa (HTTP 504). |
 | `CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS` | `60000` | Espera por texto ou saída de ferramenta úteis do ChatGPT Codex. |
+| `THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES` | `true` | Pedidos Chat Completions com function tools e esforço de raciocínio para perfis CRIS de GPT no Bedrock Runtime (e qualquer pedido com tools para o GPT-6 Astra) vão para a Responses do Runtime, porque o Chat Completions do Runtime os rejeita. Só o valor exato `false` desliga. Nessa rota, `temperature`, `top_p`, `stop`, `seed` e afins não são repassados. |
 | `THINKER_CONCURRENCY_MAX` | `10` | Requisições simultâneas por tenant, por processo (erro M203). |
 | `THINKER_RATE_MAX_REQUESTS` | `200` | Requisições por minuto por tenant, por processo (M201). |
 | `THINKER_IP_RATE_MAX_REQUESTS` | `500` | Requisições por minuto por IP, por processo (M202). |

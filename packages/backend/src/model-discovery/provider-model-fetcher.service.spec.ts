@@ -349,7 +349,8 @@ describe('ProviderModelFetcherService', () => {
               inferenceProfileId: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
               status: 'ACTIVE',
             },
-            { inferenceProfileId: 'us.anthropic.claude-fable-5', status: 'ACTIVE' },
+            { inferenceProfileId: 'us.anthropic.claude-fable-5-1', status: 'ACTIVE' },
+            { inferenceProfileId: 'us.anthropic.claude-mythos-5', status: 'ACTIVE' },
             { inferenceProfileId: 'global.moonshotai.kimi-k3', status: 'ACTIVE' },
             { inferenceProfileId: 'eu.anthropic.claude-opus-5', status: 'INACTIVE' },
           ],
@@ -362,6 +363,7 @@ describe('ProviderModelFetcherService', () => {
         'openai.gpt-6-sol',
         'us.anthropic.claude-sonnet-5-5',
         'global.anthropic.claude-opus-5-5',
+        'us.anthropic.claude-fable-5-1',
         'global.moonshotai.kimi-k3',
       ]);
       expect(result[1]).toMatchObject({
@@ -369,7 +371,8 @@ describe('ProviderModelFetcherService', () => {
         supportedEndpoints: ['/v1/chat/completions', '/v1/messages'],
       });
       expect(result[2].supportedEndpoints).toEqual(['/v1/chat/completions', '/v1/messages']);
-      expect(result[3].supportedEndpoints).toEqual(['/v1/chat/completions', '/v1/responses']);
+      expect(result[3].supportedEndpoints).toEqual(['/v1/chat/completions', '/v1/messages']);
+      expect(result[4].supportedEndpoints).toEqual(['/v1/chat/completions', '/v1/responses']);
     });
 
     it('keeps previously discovered Claude profiles when the control plane fails, and drops unsupported ones', async () => {
@@ -381,7 +384,7 @@ describe('ProviderModelFetcherService', () => {
         { id: 'us.anthropic.claude-sonnet-5-5' },
         { id: 'global.anthropic.claude-opus-5' },
         { id: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' },
-        { id: 'us.anthropic.claude-fable-5' },
+        { id: 'us.anthropic.claude-mythos-5' },
       ].map((m) => ({ ...m, provider: 'bedrock' })) as never[];
 
       const result = await service.fetch('bedrock', 'ABSK-test', 'api_key', undefined, {

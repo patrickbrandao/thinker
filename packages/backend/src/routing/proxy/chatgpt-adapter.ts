@@ -258,6 +258,25 @@ interface ReasoningStreamState {
   sawToolCall: boolean;
   /** Output indexes that received at least one function_call_arguments delta. */
   argDeltaIndexes?: Set<number>;
+  /** Responses `output_index` -> Chat Completions tool call index, in first-seen order. */
+  toolCallIndex?: Map<number, number>;
+}
+
+/**
+ * Chat Completions numbers tool calls from 0, and the OpenAI SDKs accumulate
+ * them by that index. A Responses `output_index` counts every output item, so
+ * a reasoning item first pushes the first function call to 1. With stream
+ * state, renumber densely in first-seen order; without it, keep the raw index.
+ */
+function denseToolCallIndex(state: ReasoningStreamState | undefined, outputIndex: number): number {
+  if (!state) return outputIndex;
+  state.toolCallIndex ??= new Map();
+  let index = state.toolCallIndex.get(outputIndex);
+  if (index === undefined) {
+    index = state.toolCallIndex.size;
+    state.toolCallIndex.set(outputIndex, index);
+  }
+  return index;
 }
 
 /**
@@ -391,6 +410,11 @@ export function transformResponsesStreamChunk(
   }
 
   if (!eventType && !dataStr) return null;
+  // Bedrock Runtime sends frames with no `event:` line; the name is only in `data.type`.
+  if (!eventType) {
+    const type = safeParse(dataStr)?.type;
+    if (typeof type === 'string') eventType = type;
+  }
 
   if (eventType === 'response.output_text.delta') {
     const data = safeParse(dataStr);
@@ -413,7 +437,7 @@ export function transformResponsesStreamChunk(
     const delta = typeof data.delta === 'string' ? data.delta : '';
     const index = typeof data.output_index === 'number' ? data.output_index : 0;
     if (state) (state.argDeltaIndexes ??= new Set()).add(index);
-    return toolArgumentsFrame(index, delta, model);
+    return toolArgumentsFrame(denseToolCallIndex(state, index), delta, model);
   }
 
   // Parallel tool calls can arrive with only the `.done` event and no deltas;
@@ -427,7 +451,7 @@ export function transformResponsesStreamChunk(
     const args = typeof data.arguments === 'string' ? data.arguments : '';
     if (!args) return null;
     (state.argDeltaIndexes ??= new Set()).add(index);
-    return toolArgumentsFrame(index, args, model);
+    return toolArgumentsFrame(denseToolCallIndex(state, index), args, model);
   }
 
   if (eventType === 'response.output_item.added') {
@@ -441,7 +465,10 @@ export function transformResponsesStreamChunk(
         delta: {
           tool_calls: [
             {
-              index: typeof data.output_index === 'number' ? data.output_index : 0,
+              index: denseToolCallIndex(
+                state,
+                typeof data.output_index === 'number' ? data.output_index : 0,
+              ),
               id: (item.call_id as string) ?? '',
               type: 'function',
               function: { name: (item.name as string) ?? '', arguments: '' },

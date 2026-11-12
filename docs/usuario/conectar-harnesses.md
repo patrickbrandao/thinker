@@ -84,6 +84,36 @@ Em `~/.config/opencode/opencode.json`, no formato do OpenCode 2 (`providers`, `p
 }
 ```
 
+### OpenCode com o provedor Claude Agent (opcional)
+
+Desde a v2.2.3 o OpenCode tem o provedor embutido **Claude Agent** (`claude-agent`). Ele não chama a API direto: roda o `claude` (Claude Code) instalado na máquina, pelo Claude Agent SDK. Requisitos: `claude` no `PATH` (ou em `OPENCODE_CLAUDE_PATH`), versão 2.1.248 ou mais nova.
+
+A config `providers.claude-agent.settings` vira as variáveis do Claude Code: `baseURL` em `ANTHROPIC_BASE_URL` e `authToken` em `ANTHROPIC_AUTH_TOKEN` (`apiKey` vira `ANTHROPIC_API_KEY`). No mesmo `opencode.json`:
+
+```json
+{
+  "providers": {
+    "claude-agent": {
+      "settings": {
+        "baseURL": "http://localhost:2099",
+        "authToken": "thk_SUA_CHAVE"
+      }
+    }
+  }
+}
+```
+
+Como no Claude Code, a URL base **não** leva `/v1`, e vale definir **só uma** credencial (`authToken` ou `apiKey`), para não causar `M006`.
+
+O que muda em relação ao provedor `thinker` acima:
+
+- O Thinker vê o harness como **Claude Code**: as requisições chegam em `POST /v1/messages` com a identificação do Claude Code (como `x-claude-code-session-id`), e não com os cabeçalhos `x-opencode-*`.
+- Os modelos são os do Claude Code (`opus`, `sonnet`, `haiku`, que viram ids `claude-*` reais). O Thinker recebe uma rota explícita, **sem fallback**, e não `auto` nem modelos virtuais. Para manter a cascata, crie um modelo virtual com o nome do id (veja [`model` explícito](provedores-e-roteamento.md#model-explícito)). Remapear com `ANTHROPIC_DEFAULT_*_MODEL` no ambiente do OpenCode é possível em teoria, mas não foi confirmado neste caminho.
+- O OpenCode mostra custo **$0** nesse caminho (URL base customizada). O custo real fica no Thinker.
+- O OpenCode não retenta: quem retenta é o Claude Code.
+
+Não confirmado: o uso de `authToken` com uma chave `thk_` segue do proxy aceitar `Authorization: Bearer`, mas este caminho ainda não foi testado ao vivo. Teste antes de depender dele. Para entender a técnica em detalhe, veja o [parecer do provedor Claude Agent](../referencia/opencode/claude-agent-provider-parecer.md).
+
 ## OpenClaw e Hermes
 
 **OpenClaw**, como provedor OpenAI-compatible (Chat Completions):
