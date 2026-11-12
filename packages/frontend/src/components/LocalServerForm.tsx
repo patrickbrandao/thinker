@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { RefreshCw, Server } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import {
   createCustomProvider,
   deleteCustomProvider,
@@ -7,6 +7,7 @@ import {
   probeLocalServer,
   updateCustomProvider,
   type CustomProviderData,
+  type LocalModelCapability,
   type LocalProbeModel,
   type LocalServerConfig,
   type LocalServerType,
@@ -56,6 +57,16 @@ interface ProbeState {
   version?: string;
   base_url: string;
   models: LocalProbeModel[];
+}
+
+const CAPABILITIES: LocalModelCapability[] = ['tools', 'vision', 'reasoning'];
+
+/** The model being added (index null) or edited in the Models tab. */
+interface ModelDraft {
+  index: number | null;
+  name: string;
+  ctx: string;
+  caps: LocalModelCapability[];
 }
 
 function freeName(base: string, taken: readonly string[]): string {
@@ -126,6 +137,18 @@ export default function LocalServerForm(props: Props) {
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(props.editData?.models.map((m) => m.model_name) ?? []),
   );
+  // Edit: the configured model list, changed by hand in the Models tab.
+  const [entries, setEntries] = useState<LocalProbeModel[]>(() =>
+    (props.editData?.models ?? []).map((m) => ({
+      model_name: m.model_name,
+      ...(m.context_window ? { context_window: m.context_window } : {}),
+      ...(m.capabilities?.length ? { capabilities: m.capabilities } : {}),
+    })),
+  );
+  const [draft, setDraft] = useState<ModelDraft | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  // Edit: drop the stored key on save (keyless server).
+  const [clearKey, setClearKey] = useState(false);
 
   const initial = useMemo<FormState | null>(() => {
     if (props.editData?.local_config) {
@@ -157,9 +180,11 @@ export default function LocalServerForm(props: Props) {
         local_type: props.type,
         local_config: toConfig(current),
         ...(current.apiKey ? { apiKey: current.apiKey } : {}),
-        ...(props.editData ? { provider_id: props.editData.id } : {}),
+        // The stored key is reused for the test unless it is being removed.
+        ...(props.editData && !clearKey ? { provider_id: props.editData.id } : {}),
       });
       setProbe(result);
+      if (isEdit) return;
       const names = result.models.map((m) => m.model_name);
       setSelected((prev) => {
         // A new server starts with the models already in memory (or everything,
@@ -192,6 +217,36 @@ export default function LocalServerForm(props: Props) {
     const err = formError(current);
     if (err) {
       setProbeError(err);
+      return;
+    }
+    if (isEdit) {
+      if (entries.length === 0) {
+        setProbeError(t('providerSetup.localServer.errModelsEmpty'));
+        return;
+      }
+      setSaving(true);
+      try {
+        await updateCustomProvider(props.agentName, props.editData!.id, {
+          ...(current.name.trim() !== props.editData!.name ? { name: current.name.trim() } : {}),
+          local_config: toConfig(current),
+          ...(current.apiKey ? { apiKey: current.apiKey } : clearKey ? { apiKey: null } : {}),
+          models: entries.map((m) => ({
+            ...m,
+            input_price_per_million_tokens: 0,
+            output_price_per_million_tokens: 0,
+          })),
+        });
+        toast.success(t('providerSetup.local.updated', current.name.trim(), entries.length));
+        props.onSaved();
+      } catch (e) {
+        setProbeError(
+          e instanceof Error
+            ? e.message
+            : t('providerSetup.local.failedConnect', { name: current.name }),
+        );
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     const known = new Map<string, LocalProbeModel>(
@@ -380,20 +435,41 @@ export default function LocalServerForm(props: Props) {
         <Field
           label={t('providerSetup.localServer.apiKey')}
           hint={
-            props.editData?.has_api_key
-              ? t('providerSetup.localServer.apiKeyStored')
-              : t('providerSetup.localServer.apiKeyHint')
+            clearKey
+              ? t('providerSetup.localServer.keyWillBeRemoved')
+              : props.editData?.has_api_key
+                ? t('providerSetup.localServer.apiKeyStored')
+                : t('providerSetup.localServer.apiKeyHint')
           }
           htmlFor={id('key')}
         >
-          <input
-            id={id('key')}
-            className="field provider-detail__input--masked font-mono"
-            type="password"
-            autoComplete="off"
-            value={current.apiKey}
-            onChange={(e) => set({ apiKey: e.currentTarget.value })}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              id={id('key')}
+              className="field provider-detail__input--masked min-w-0 flex-1 font-mono"
+              type="password"
+              autoComplete="off"
+              placeholder={props.editData?.has_api_key && !clearKey ? '••••••••' : ''}
+              disabled={clearKey}
+              value={current.apiKey}
+              onChange={(e) => set({ apiKey: e.currentTarget.value })}
+            />
+            {props.editData?.has_api_key ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  if (!clearKey) set({ apiKey: '' });
+                  else setProbe(null);
+                  setClearKey(!clearKey);
+                }}
+              >
+                {clearKey
+                  ? t('providerSetup.localServer.keepKey')
+                  : t('providerSetup.localServer.removeKey')}
+              </Button>
+            ) : null}
+          </div>
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field
@@ -511,6 +587,245 @@ export default function LocalServerForm(props: Props) {
       ) : null}
     </>
   );
+  const capBadges = (m: LocalProbeModel) => (
+    <>
+      {m.context_window ? (
+        <Badge mono>
+          {t('providerSetup.localServer.ctx', { n: m.context_window.toLocaleString('en-US') })}
+        </Badge>
+      ) : null}
+      {m.capabilities?.map((c) => (
+        <Badge key={c} tone="outline">
+          {t(`providerSetup.localServer.cap.${c}` as const)}
+        </Badge>
+      ))}
+    </>
+  );
+
+  const startDraft = (index: number | null) => {
+    const m = index === null ? null : entries[index]!;
+    setDraftError(null);
+    setDraft({
+      index,
+      name: m?.model_name ?? '',
+      ctx: m?.context_window ? String(m.context_window) : '',
+      caps: m?.capabilities ?? [],
+    });
+  };
+
+  const commitDraft = () => {
+    if (!draft) return;
+    const name = draft.name.trim();
+    if (!name) return setDraftError(t('providerSetup.localServer.errModelName'));
+    if (entries.some((m, i) => i !== draft.index && m.model_name === name)) {
+      return setDraftError(t('providerSetup.localServer.errModelDup'));
+    }
+    const ctx = draft.ctx.trim() ? Number(draft.ctx) : undefined;
+    if (ctx !== undefined && (!Number.isInteger(ctx) || ctx < 1)) {
+      return setDraftError(t('providerSetup.localServer.errContext'));
+    }
+    const entry: LocalProbeModel = {
+      model_name: name,
+      ...(ctx ? { context_window: ctx } : {}),
+      ...(draft.caps.length ? { capabilities: draft.caps } : {}),
+    };
+    setEntries((prev) =>
+      draft.index === null ? [...prev, entry] : prev.map((m, i) => (i === draft.index ? entry : m)),
+    );
+    setDraft(null);
+  };
+
+  const draftForm = draft ? (
+    <div className="flex flex-col gap-3 rounded-control border border-line bg-elev p-3">
+      <Field
+        label={t('providerSetup.localServer.modelName')}
+        hint={t('providerSetup.localServer.modelNameHint')}
+        htmlFor={id('m-name')}
+      >
+        <input
+          id={id('m-name')}
+          className="field font-mono"
+          type="text"
+          maxLength={100}
+          autoFocus
+          value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.currentTarget.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitDraft();
+            }
+          }}
+        />
+      </Field>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label={t('providerSetup.localServer.contextWindow')} htmlFor={id('m-ctx')}>
+          <input
+            id={id('m-ctx')}
+            className="field"
+            type="number"
+            min={1}
+            value={draft.ctx}
+            onChange={(e) => setDraft({ ...draft, ctx: e.currentTarget.value })}
+          />
+        </Field>
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5 text-xs font-medium text-ink">
+            {t('providerSetup.localServer.capabilities')}
+          </legend>
+          <div className="flex flex-wrap gap-3">
+            {CAPABILITIES.map((c) => (
+              <label key={c} className="flex items-center gap-1.5 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={draft.caps.includes(c)}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      caps: e.currentTarget.checked
+                        ? CAPABILITIES.filter((x) => x === c || draft.caps.includes(x))
+                        : draft.caps.filter((x) => x !== c),
+                    })
+                  }
+                />
+                {t(`providerSetup.localServer.cap.${c}` as const)}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </div>
+      {draftError ? (
+        <div className="text-xs text-danger" role="alert">
+          {draftError}
+        </div>
+      ) : null}
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
+          {t('common.cancel')}
+        </Button>
+        <Button size="sm" onClick={commitDraft}>
+          {draft.index === null ? t('common.add') : t('common.save')}
+        </Button>
+      </div>
+    </div>
+  ) : null;
+
+  const configured = new Set(entries.map((m) => m.model_name));
+  const discovered = (probe?.models ?? []).filter((m) => !configured.has(m.model_name));
+  const editModelsSection = (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button size="sm" variant="ghost" busy={probing} onClick={() => void runProbe()}>
+          <RefreshCw size={14} aria-hidden="true" />
+          {t('providerSetup.localServer.fetchModels')}
+        </Button>
+        <Button size="sm" disabled={!!draft} onClick={() => startDraft(null)}>
+          <Plus size={14} aria-hidden="true" />
+          {t('providerSetup.localServer.addModel')}
+        </Button>
+      </div>
+      {/* Unlaid-out, the server section above already shows the error. */}
+      {probeError && props.layout ? (
+        <div className="notice whitespace-pre-line" role="alert">
+          <Server aria-hidden="true" />
+          <span>{probeError}</span>
+        </div>
+      ) : null}
+      {draft?.index === null ? draftForm : null}
+      {entries.length === 0 ? (
+        <div className="text-sm text-muted">
+          {t('providerSetup.localServer.noConfiguredModels')}
+        </div>
+      ) : (
+        <div className="flex flex-col border-t border-line">
+          {entries.map((m, i) =>
+            draft?.index === i ? (
+              <div key={m.model_name} className="border-b border-line py-2">
+                {draftForm}
+              </div>
+            ) : (
+              <div
+                key={m.model_name}
+                className="flex items-center justify-between gap-3 border-b border-line py-2"
+              >
+                <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="truncate font-mono text-sm text-ink">{m.model_name}</span>
+                  {capBadges(m)}
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('providerSetup.localServer.editModel', { name: m.model_name })}
+                    title={t('common.edit')}
+                    disabled={!!draft}
+                    onClick={() => startDraft(i)}
+                  >
+                    <Pencil size={14} aria-hidden="true" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('providerSetup.localServer.removeModel', { name: m.model_name })}
+                    title={t('common.remove')}
+                    disabled={!!draft}
+                    onClick={() => setEntries((prev) => prev.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </Button>
+                </span>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+      {probe ? (
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-medium text-muted">
+            {t('providerSetup.localServer.available')}
+          </div>
+          {discovered.length === 0 ? (
+            <div className="text-sm text-muted">{t('providerSetup.localServer.allAdded')}</div>
+          ) : (
+            <div className="flex flex-col border-t border-line">
+              {discovered.map((m) => (
+                <div
+                  key={m.model_name}
+                  className="flex items-center justify-between gap-3 border-b border-line py-2"
+                >
+                  <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <span className="truncate font-mono text-sm text-ink">{m.model_name}</span>
+                    {capBadges(m)}
+                    {m.loaded ? (
+                      <Badge tone="ok">{t('providerSetup.localServer.loaded')}</Badge>
+                    ) : null}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setEntries((prev) => [
+                        ...prev,
+                        {
+                          model_name: m.model_name,
+                          ...(m.context_window ? { context_window: m.context_window } : {}),
+                          ...(m.capabilities?.length ? { capabilities: m.capabilities } : {}),
+                        },
+                      ])
+                    }
+                  >
+                    <Plus size={14} aria-hidden="true" />
+                    {t('common.add')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+
   const actions = (
     <div className="flex w-full items-center justify-end gap-3">
       {isEdit ? (
@@ -530,7 +845,11 @@ export default function LocalServerForm(props: Props) {
       <Button
         size="sm"
         busy={saving}
-        disabled={selected.size === 0 || probing || (!isEdit && !probe)}
+        disabled={
+          isEdit
+            ? entries.length === 0 || probing || !!draft
+            : selected.size === 0 || probing || !probe
+        }
         onClick={() => void save()}
       >
         {isEdit ? t('common.saveChanges') : t('providerSetup.local.connectModels', selected.size)}
@@ -554,7 +873,7 @@ export default function LocalServerForm(props: Props) {
         {
           key: 'models',
           label: t('providers.detail.manageTab.models'),
-          content: modelsSection,
+          content: isEdit ? editModelsSection : modelsSection,
         },
       ],
       actions,
@@ -565,7 +884,7 @@ export default function LocalServerForm(props: Props) {
     <div className="flex flex-col gap-4">
       {header}
       {serverSection}
-      {modelsSection}
+      {isEdit ? editModelsSection : modelsSection}
       <WindowFooter>{actions}</WindowFooter>
     </div>
   );

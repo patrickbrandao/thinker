@@ -1097,13 +1097,9 @@ describe('ConnectionDetail (analytics)', () => {
     apiMocks.getReliabilityStats.mockResolvedValue(connectionReliability);
     const { container } = renderPage(<ConnectionDetail />);
     await waitFor(() => expect(screen.getAllByText('Activity').length).toBeGreaterThan(0));
-    // The header only holds the Manage action; badges and the meta row moved
-    // to the topbar breadcrumb.
-    const head = container.querySelector('.page-head');
-    expect(head).not.toBeNull();
-    expect(head?.querySelector('.page-actions')?.textContent).toBe('Manage');
-    expect(head?.querySelector('.badge')).toBeNull();
-    expect(head?.querySelector('.sub')).toBeNull();
+    // No page header: the Manage action sits at the right end of the tab row.
+    expect(container.querySelector('.page-head')).toBeNull();
+    expect(container.querySelector('.tabs')?.textContent).toContain('Manage');
     // The Period filter bar wraps the range Select at phone width.
     const bar = container.querySelector('.overview-filter-bar');
     expect(bar?.className).toContain('flex-wrap');

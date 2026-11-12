@@ -425,8 +425,9 @@ describe('LocalServerForm editing', () => {
     expect(field('Test timeout (s)').value).toBe('4');
     expect(screen.getByText('Edit Ollama server')).toBeTruthy();
     expect(screen.getByText('A key is stored. Leave empty to keep it.')).toBeTruthy();
-    const sw = screen.getByRole('switch');
-    expect(sw.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByText('llama3')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit model llama3' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove model llama3' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy();
   });
 
@@ -438,19 +439,74 @@ describe('LocalServerForm editing', () => {
     expect(mockProbe.mock.calls[0][1].apiKey).toBeUndefined();
   });
 
-  it('keeps its picks after a test and drops the ones the server no longer reports', async () => {
+  it('keeps its models after a test and offers the new ones the server reports', async () => {
     mockProbe.mockResolvedValue({
       base_url: 'http://h:1',
-      models: [{ model_name: 'new-model', loaded: true }],
+      models: [{ model_name: 'new-model', loaded: true, context_window: 4096 }],
     });
-    await renderNew({ editData: edit });
+    const { onSaved } = await renderNew({ editData: edit });
     clickTest();
     await screen.findByText('new-model');
-    const sw = screen.getByRole('switch');
-    expect(sw.getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByText('llama3')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByRole('button', { name: 'Remove model new-model' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][2].models.map((m: any) => m.model_name)).toEqual([
+      'llama3',
+      'new-model',
+    ]);
+    expect(mockUpdate.mock.calls[0][2].models[1].context_window).toBe(4096);
+  });
+
+  it('adds, edits and removes models by hand', async () => {
+    const { onSaved } = await renderNew({ editData: edit });
+    fireEvent.click(screen.getByRole('button', { name: 'Add model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByRole('alert').textContent).toContain('Enter the model name.');
+    fireEvent.change(field('Model name'), { target: { value: 'llama3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByRole('alert').textContent).toContain('already listed');
+    fireEvent.change(field('Model name'), { target: { value: 'qwen3:8b' } });
+    fireEvent.change(field('Context window (tokens)'), { target: { value: '32768' } });
+    fireEvent.click(screen.getByLabelText('Vision'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    // Edit llama3: drop its context window.
+    fireEvent.click(screen.getByRole('button', { name: 'Edit model llama3' }));
+    fireEvent.change(field('Context window (tokens)'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove model llama3' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][2].models).toEqual([
+      {
+        model_name: 'qwen3:8b',
+        context_window: 32768,
+        capabilities: ['vision'],
+        input_price_per_million_tokens: 0,
+        output_price_per_million_tokens: 0,
+      },
+    ]);
+  });
+
+  it('cannot save once every model is removed', async () => {
+    await renderNew({ editData: edit });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove model llama3' }));
     expect(
       (screen.getByRole('button', { name: 'Save changes' }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+
+  it('removes the stored key and tests without it', async () => {
+    const { onSaved } = await renderNew({ editData: edit });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove key' }));
+    expect(screen.getByText(/stored key is removed on save/)).toBeTruthy();
+    clickTest();
+    await waitFor(() => expect(mockProbe).toHaveBeenCalled());
+    expect(mockProbe.mock.calls[0][1].provider_id).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][2].apiKey).toBeNull();
   });
 
   it('saves without re-testing, sending the stored models, and omits an unchanged name and empty key', async () => {

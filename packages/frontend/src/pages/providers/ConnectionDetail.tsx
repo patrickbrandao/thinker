@@ -698,7 +698,7 @@ const ConnectionDetail = () => {
         icon={windowIcon}
         sections={[
           ...parts.sections,
-          ...(c.key_masked
+          ...(c.key_masked && !customProviderData?.local_type
             ? [
                 {
                   key: 'credential',
@@ -998,19 +998,16 @@ const ConnectionDetail = () => {
         {t('providers.detail.pageTitle', { provider: providerDisplayName, label: c.label })}
       </title>
 
-      <div className="page-head justify-end">
-        <div className="page-actions">
-          {roleCan.manageProviders() ? (
-            <Button variant="ghost" size="sm" onClick={openManageModal}>
-              {t('providers.detail.manage')}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
       <Tabs<'activity' | 'models'>
         className="mb-4"
         label={c.label}
+        end={
+          roleCan.manageProviders() ? (
+            <Button variant="ghost" size="sm" onClick={openManageModal}>
+              {t('providers.detail.manage')}
+            </Button>
+          ) : null
+        }
         value={tab}
         onChange={setTab}
         items={[
