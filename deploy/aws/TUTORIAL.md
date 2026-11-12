@@ -39,7 +39,7 @@ The deploy script exposes the common settings as environment variables:
 STACK_NAME=thinker \
 SERVICE_NAME=thinker \
 AWS_REGION=us-east-1 \
-IMAGE_URL=docker.io/tmsoftbrasil/thinker:0.34 \
+IMAGE_URL=docker.io/tmsoftbrasil/thinker:0.35 \
 DATABASE_INSTANCE_CLASS=db.t4g.micro \
 DESIRED_COUNT=1 \
 ./deploy/aws/deploy.sh
