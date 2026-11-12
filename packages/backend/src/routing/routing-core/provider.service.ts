@@ -1397,12 +1397,14 @@ export class ProviderService {
       ),
     );
 
+    // Routes that still name these providers are skipped at resolution time
+    // (every request re-checks availability), but cached resolutions would keep
+    // serving them until they expire: drop them for every owned agent.
+    for (const ownedAgentId of await this.listOwnedAgentIds(tenantId)) {
+      this.routingCache.invalidateAgent(ownedAgentId);
+    }
+
     if (removedProviders.length > 0) {
-      // TODO: tier cleanup for removed subscription providers is per-agent.
-      // With tenant-level providers, we need to clean up tiers across ALL agents
-      // that reference these providers. For now, the provider is deactivated
-      // and tier references will be cleaned up lazily on the next routing
-      // resolution attempt.
       this.logger.debug(
         `Deactivated unsupported subscription providers for tenant=${tenantId}: ${removedProviders.join(', ')}`,
       );

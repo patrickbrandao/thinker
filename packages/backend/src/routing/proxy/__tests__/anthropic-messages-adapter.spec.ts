@@ -956,6 +956,20 @@ describe('Anthropic Messages adapter', () => {
       return out + tail;
     }
 
+    it('reports tool_use when the stream ends without a finish_reason after tool calls', () => {
+      const t = createMessagesStreamTransformer('claude-sonnet-4');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"ls","arguments":"{}"}}]}}]}\n\n',
+      ]);
+      expect(sse).toContain('"stop_reason":"tool_use"');
+    });
+
+    it('keeps end_turn when the stream ends without a finish_reason and no tool calls', () => {
+      const t = createMessagesStreamTransformer('claude-sonnet-4');
+      const sse = flushChunks(t, ['data: {"choices":[{"delta":{"content":"hi"}}]}\n\n']);
+      expect(sse).toContain('"stop_reason":"end_turn"');
+    });
+
     it('emits message_start, content_block events, message_delta, and message_stop for plain text', () => {
       const t = createMessagesStreamTransformer('claude-sonnet-4');
       const chunks = [
@@ -1536,8 +1550,8 @@ describe('Anthropic Messages adapter', () => {
       ]);
       // Stop must reference the tool_use's index (0, the first/only block).
       expect(events[0].data).toEqual({ type: 'content_block_stop', index: 0 });
-      // No finish_reason was ever seen, so stop_reason defaults to end_turn.
-      expect(events[1].data.delta.stop_reason).toBe('end_turn');
+      // No finish_reason was ever seen, but a tool call was emitted: tool_use.
+      expect(events[1].data.delta.stop_reason).toBe('tool_use');
     });
   });
 });

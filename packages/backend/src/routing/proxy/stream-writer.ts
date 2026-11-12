@@ -31,6 +31,12 @@ export interface StreamUsage {
   /** Subset of `cache_creation_tokens` cached with Anthropic's one-hour TTL. */
   cache_creation_1h_tokens?: number;
   reported_cost_usd?: number;
+  /**
+   * The `model` the response says actually served it, when it differs from
+   * the requested one (auto routers such as `kilo-auto/*`). Used only to
+   * price a request whose requested model has no price.
+   */
+  response_model?: string;
 }
 
 const PARTIAL_USAGE = Symbol('thinker.partialUsage');
@@ -240,7 +246,11 @@ function extractUsageFromObject(obj: unknown): StreamUsage | null {
   if (!obj || typeof obj !== 'object') return null;
   const record = obj as Record<string, unknown>;
   const fromUsage = parseUsageObject(record.usage);
-  if (fromUsage) return fromUsage;
+  if (fromUsage) {
+    return typeof record.model === 'string' && record.model
+      ? { ...fromUsage, response_model: record.model }
+      : fromUsage;
+  }
   const response = record.response;
   if (response && typeof response === 'object') {
     return parseUsageObject((response as Record<string, unknown>).usage);

@@ -4,7 +4,7 @@
  * accept the OpenAI format directly.
  */
 
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 import { OpenAIMessage, SignatureLookup } from './proxy-types';
 
@@ -251,6 +251,22 @@ function messageToContent(
     }
   }
 
+  // A text-only assistant reply: put back the signature Gemini attached to
+  // its last part, when the cache still has it.
+  if (
+    msg.role === 'assistant' &&
+    signatureLookup &&
+    !parts.some((p) => p.functionCall) &&
+    parts.length > 0
+  ) {
+    const text = parts.map((p) => p.text ?? '').join('');
+    const last = parts[parts.length - 1]!;
+    if (text && typeof last.text === 'string' && !last.thoughtSignature) {
+      const signature = signatureLookup(textSignatureKey(text));
+      if (typeof signature === 'string' && signature) last.thoughtSignature = signature;
+    }
+  }
+
   // Handle tool response. Chat completions also accepts a tool message's
   // content as an array of text parts; it still has to become a
   // functionResponse, or the preceding functionCall is left unanswered.
@@ -369,6 +385,16 @@ function systemContentText(content: unknown): string {
     )
     .map((part) => part.text)
     .join('\n');
+}
+
+/**
+ * Cache key for a thoughtSignature that Gemini put on a text part (a reply
+ * with no function calls). Clients echo the reply back only as plain
+ * `content`, so the signature is found again by a hash of that text; sending
+ * it back lets Gemini 3.5+ reuse the earlier turn's reasoning (api-gemini G2).
+ */
+export function textSignatureKey(text: string): string {
+  return `text:${createHash('sha256').update(text).digest('hex').slice(0, 32)}`;
 }
 
 /** Extracted thought_signature entries from a Gemini response. */
@@ -505,7 +531,11 @@ export function fromGoogleResponse(
   const toolCalls: Record<string, unknown>[] = [];
   const extractedSignatures: ExtractedSignature[] = [];
 
+  let textSignature: string | undefined;
   for (const part of parts) {
+    if (part.text && !part.thought && typeof part.thoughtSignature === 'string') {
+      textSignature = part.thoughtSignature || textSignature;
+    }
     // Thinking summaries come back as text parts with `thought: true`. Skip
     // them — the OpenAI-compat surface doesn't expose them, and including
     // them in `content` would leak chain-of-thought into the assistant reply.
@@ -532,6 +562,12 @@ export function fromGoogleResponse(
 
   const message: Record<string, unknown> = { role: 'assistant', content: textContent || null };
   if (toolCalls.length > 0) message.tool_calls = toolCalls;
+  if (textSignature && textContent && toolCalls.length === 0) {
+    extractedSignatures.push({
+      toolCallId: textSignatureKey(textContent),
+      signature: textSignature,
+    });
+  }
 
   const usage = googleResp.usageMetadata as Record<string, number> | undefined;
 
@@ -617,6 +653,10 @@ export interface GoogleStreamState {
   finished: boolean;
   /** Set once the usage chunk is sent, so the stream reports usage exactly once. */
   usageSent: boolean;
+  /** Visible text streamed so far, to key a text-part thoughtSignature. */
+  text?: string;
+  /** Latest thoughtSignature seen on a text part. */
+  textSignature?: string;
 }
 
 export function createGoogleStreamState(): GoogleStreamState {
@@ -659,7 +699,16 @@ export function transformGoogleStreamChunk(
 
   const toolCalls: Record<string, unknown>[] = [];
   const signatures: ExtractedSignature[] = [];
+  if (text) state.text = (state.text ?? '') + text;
   for (const part of parts) {
+    if (
+      part.text &&
+      !part.thought &&
+      typeof part.thoughtSignature === 'string' &&
+      part.thoughtSignature
+    ) {
+      state.textSignature = part.thoughtSignature;
+    }
     if (part.functionCall) {
       const fc = part.functionCall as GeminiFunctionCall;
       const toolCallId = typeof fc.id === 'string' && fc.id ? fc.id : `call_${randomUUID()}`;
@@ -702,6 +751,12 @@ export function transformGoogleStreamChunk(
   if (isTerminal) {
     if (!state.finished) {
       state.finished = true;
+      if (state.textSignature && state.text && state.toolCallCount === 0) {
+        signatures.push({
+          toolCallId: textSignatureKey(state.text),
+          signature: state.textSignature,
+        });
+      }
       const finishReason = mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
       result += `data: ${JSON.stringify({
         id: state.id,

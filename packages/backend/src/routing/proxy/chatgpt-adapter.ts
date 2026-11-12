@@ -256,6 +256,8 @@ interface ReasoningStreamState {
   streamed: boolean;
   /** True once the stream has emitted any function_call output item / delta. */
   sawToolCall: boolean;
+  /** Output indexes that received at least one function_call_arguments delta. */
+  argDeltaIndexes?: Set<number>;
 }
 
 /**
@@ -318,7 +320,6 @@ export function fromResponsesResponse(
   }
 
   const usage = (data.usage as Record<string, unknown>) ?? {};
-  const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
 
   const message: Record<string, unknown> = {
     role: 'assistant',
@@ -350,14 +351,7 @@ export function fromResponsesResponse(
               : 'stop',
       },
     ],
-    usage: {
-      prompt_tokens: (usage.input_tokens as number) ?? 0,
-      completion_tokens: (usage.output_tokens as number) ?? 0,
-      total_tokens: (usage.total_tokens as number) ?? 0,
-      cache_read_tokens: inputDetails?.cached_tokens ?? 0,
-      cache_creation_tokens:
-        inputDetails?.cache_write_tokens ?? inputDetails?.cache_creation_input_tokens ?? 0,
-    },
+    usage: toChatUsage(usage),
   };
 }
 
@@ -417,20 +411,23 @@ export function transformResponsesStreamChunk(
     const data = safeParse(dataStr);
     if (!data) return null;
     const delta = typeof data.delta === 'string' ? data.delta : '';
-    return formatSSE(
-      {
-        delta: {
-          tool_calls: [
-            {
-              index: typeof data.output_index === 'number' ? data.output_index : 0,
-              function: { arguments: delta },
-            },
-          ],
-        },
-        finish_reason: null,
-      },
-      model,
-    );
+    const index = typeof data.output_index === 'number' ? data.output_index : 0;
+    if (state) (state.argDeltaIndexes ??= new Set()).add(index);
+    return toolArgumentsFrame(index, delta, model);
+  }
+
+  // Parallel tool calls can arrive with only the `.done` event and no deltas;
+  // emit the full arguments then, or the client sees an empty call.
+  if (eventType === 'response.function_call_arguments.done') {
+    if (!state) return null;
+    const data = safeParse(dataStr);
+    if (!data) return null;
+    const index = typeof data.output_index === 'number' ? data.output_index : 0;
+    if (state.argDeltaIndexes?.has(index)) return null;
+    const args = typeof data.arguments === 'string' ? data.arguments : '';
+    if (!args) return null;
+    (state.argDeltaIndexes ??= new Set()).add(index);
+    return toolArgumentsFrame(index, args, model);
   }
 
   if (eventType === 'response.output_item.added') {
@@ -470,6 +467,16 @@ export function transformResponsesStreamChunk(
   }
 
   return null;
+}
+
+function toolArgumentsFrame(index: number, args: string, model: string): string {
+  return formatSSE(
+    {
+      delta: { tool_calls: [{ index, function: { arguments: args } }] },
+      finish_reason: null,
+    },
+    model,
+  );
 }
 
 function handleCompletedEvent(
@@ -521,18 +528,28 @@ function incompleteFinishReason(response: Record<string, unknown> | undefined): 
 
 function extractResponseUsage(
   response: Record<string, unknown> | undefined,
-): Record<string, number> | undefined {
+): Record<string, unknown> | undefined {
   const responseUsage = response?.usage as Record<string, unknown> | undefined;
   if (!responseUsage) return undefined;
-  const inputDetails = responseUsage.input_tokens_details as Record<string, number> | undefined;
-  return {
-    prompt_tokens: (responseUsage.input_tokens as number) ?? 0,
-    completion_tokens: (responseUsage.output_tokens as number) ?? 0,
-    total_tokens: (responseUsage.total_tokens as number) ?? 0,
+  return toChatUsage(responseUsage);
+}
+
+/** Responses API usage → Chat Completions usage, keeping reasoning tokens. */
+function toChatUsage(usage: Record<string, unknown>): Record<string, unknown> {
+  const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
+  const outputDetails = usage.output_tokens_details as Record<string, unknown> | undefined;
+  const chatUsage: Record<string, unknown> = {
+    prompt_tokens: (usage.input_tokens as number) ?? 0,
+    completion_tokens: (usage.output_tokens as number) ?? 0,
+    total_tokens: (usage.total_tokens as number) ?? 0,
     cache_read_tokens: inputDetails?.cached_tokens ?? 0,
     cache_creation_tokens:
       inputDetails?.cache_write_tokens ?? inputDetails?.cache_creation_input_tokens ?? 0,
   };
+  if (typeof outputDetails?.reasoning_tokens === 'number') {
+    chatUsage.completion_tokens_details = { reasoning_tokens: outputDetails.reasoning_tokens };
+  }
+  return chatUsage;
 }
 
 function handleStreamErrorEvent(dataStr: string): string {
@@ -614,6 +631,12 @@ export function collectChatGptSseResponse(sseText: string, model: string): Recor
       const tc = toolCallMap.get(idx);
       if (tc) {
         tc.function.arguments += typeof data.delta === 'string' ? data.delta : '';
+      }
+    } else if (eventType === 'response.function_call_arguments.done') {
+      const idx = typeof data.output_index === 'number' ? data.output_index : 0;
+      const tc = toolCallMap.get(idx);
+      if (tc && !tc.function.arguments && typeof data.arguments === 'string') {
+        tc.function.arguments = data.arguments;
       }
     } else if (eventType === 'response.completed') {
       const response = isObjectRecord(data.response) ? data.response : undefined;
