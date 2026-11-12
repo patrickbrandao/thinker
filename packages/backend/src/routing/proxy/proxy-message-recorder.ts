@@ -494,7 +494,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       // `custom:<uuid>/<model>`, which is exactly what canonicalization strips.
       pricing:
         catalogPricing ??
-        (!isCopilot && usage ? this.pricingCache.getByModel(model, provider) : undefined),
+        (!isCopilot && usage ? this.listPricing(model, provider, usage) : undefined),
       isSubscription: authType === 'subscription' && !catalogPricing,
       isLocalProvider:
         authType === 'local' || isLocalOnlyProvider(canonicalProvider ?? provider ?? ''),
@@ -507,6 +507,18 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           : usage?.reported_cost_usd,
       at,
     });
+  }
+
+  /**
+   * List price of the requested model or, when it has none (an auto router
+   * such as `kilo-auto/*`, whose catalog price is dynamic), of the model the
+   * response says served it (api-kilo G2).
+   */
+  private listPricing(model: string, provider: string | undefined, usage: StreamUsage) {
+    const own = this.pricingCache.getByModel(model, provider);
+    const priced = own && (own.input_price_per_token != null || own.output_price_per_token != null);
+    if (priced || !usage.response_model || usage.response_model === model) return own;
+    return this.pricingCache.getByModel(usage.response_model, provider) ?? own;
   }
 
   /**
