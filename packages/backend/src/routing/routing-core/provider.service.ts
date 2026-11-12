@@ -723,6 +723,19 @@ export class ProviderService {
     return row;
   }
 
+  /** Remove a connection's stored key (local servers may run without one). */
+  async clearApiKey(tenantId: string, connectionId: string): Promise<void> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    row.api_key_encrypted = null;
+    row.key_prefix = null;
+    row.updated_at = new Date().toISOString();
+    await this.providerRepo.save(row);
+    this.routingCache.invalidateTenant(tenantId);
+  }
+
   /**
    * Set or clear (null) an API-key connection's base URL. The caller has
    * normalized and SSRF-checked it (routing/account-base-url.ts).

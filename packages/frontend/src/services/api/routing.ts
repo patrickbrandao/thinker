@@ -685,7 +685,8 @@ export function updateCustomProvider(
     base_url?: string;
     api_kind?: CustomProviderApiKind;
     local_config?: Partial<LocalServerConfig>;
-    apiKey?: string;
+    /** Empty or null removes the stored key. */
+    apiKey?: string | null;
     models?: CustomProviderModel[];
   },
 ) {

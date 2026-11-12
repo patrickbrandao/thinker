@@ -254,7 +254,7 @@ export class UpdateCustomProviderDto {
 
   @IsOptional()
   @IsString()
-  apiKey?: string;
+  apiKey?: string | null;
 
   @IsOptional()
   @IsArray()

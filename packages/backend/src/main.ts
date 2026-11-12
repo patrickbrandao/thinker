@@ -75,6 +75,11 @@ export async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
     logger: new ConsoleLogger({ prefix: 'Thinker' }),
+    // Outside production, close open connections on shutdown: the dashboard's
+    // long-lived streams otherwise keep server.close() pending, so a
+    // `nest start --watch` restart never brings the new process up.
+    // Production keeps the graceful close that lets in-flight streams finish.
+    forceCloseConnections: process.env['NODE_ENV'] !== 'production',
   });
   // Before anything reads the client address.
   app.use(clientIpMiddleware);

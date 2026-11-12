@@ -223,12 +223,15 @@ export function Tabs<K extends string>({
   onChange,
   className,
   label,
+  end,
 }: {
   items: TabItem<K>[];
   value: K;
   onChange?: (key: K) => void;
   className?: string;
   label?: string;
+  /** Actions on the right end of the tab row (e.g. a Manage button). */
+  end?: ReactNode;
 }) {
   return (
     <div className={cx('tabs', className)} role="tablist" aria-label={label}>
@@ -263,6 +266,7 @@ export function Tabs<K extends string>({
           </button>
         );
       })}
+      {end ? <div className="ml-auto flex shrink-0 items-center gap-2 pb-1">{end}</div> : null}
     </div>
   );
 }

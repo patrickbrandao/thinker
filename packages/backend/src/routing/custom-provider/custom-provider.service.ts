@@ -562,13 +562,17 @@ export class CustomProviderService {
     // the (possibly renamed) display name. Pin the write to the primary
     // connection: the unlabeled path matches a row named 'Default' and would
     // add a second connection once the primary one has been renamed.
-    if ('apiKey' in dto) {
+    // An empty or null key removes the stored one (keyless local servers).
+    if ('apiKey' in dto && !dto.apiKey?.trim()) {
+      const primary = await this.primaryConnection(tenantId, id);
+      if (primary) await this.providerService.clearApiKey(tenantId, primary.id);
+    } else if ('apiKey' in dto) {
       const primary = await this.primaryConnection(tenantId, id);
       await this.providerService.upsertProvider(
         null,
         tenantId,
         CustomProviderService.providerKey(id),
-        dto.apiKey,
+        dto.apiKey ?? undefined,
         nextAuthType,
         undefined,
         primary?.label,
