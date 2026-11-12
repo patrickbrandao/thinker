@@ -468,6 +468,44 @@ export function Modal({
 }
 
 /**
+ * In-app confirmation (never `window.confirm`, which embedded browsers such as
+ * the desktop app's pane dismiss silently, returning false).
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel,
+  danger,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: ReactNode;
+  confirmLabel: string;
+  danger?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal open={open} title={title} onClose={onCancel}>
+      <p className="text-sm text-ink">{message}</p>
+      <div className="actions mt-4 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
+          {t('common.cancel')}
+        </Button>
+        <Button variant={danger ? 'danger' : undefined} busy={busy} onClick={onConfirm}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/**
  * A non-modal window: no backdrop, the page behind stays usable and a click
  * outside never closes it. Dragged by its title bar; resized from its corner;
  * closed by its X or Escape. The title bar and `footer` stay put while the

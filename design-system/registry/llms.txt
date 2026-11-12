@@ -299,11 +299,12 @@ user-trigger (shell.css): user-trigger
 well (base.css): well
 wide (shell.css): wide
 
-## Primitives (20)
+## Primitives (21)
 Avatar: src/components/ui.tsx
 Badge: src/components/ui.tsx
 Button: src/components/ui.tsx
 ButtonLink: src/components/ui.tsx
+ConfirmDialog: src/components/ui.tsx
 EmptyState: src/components/ui.tsx
 Field: src/components/ui.tsx
 FloatingWindow: src/components/ui.tsx

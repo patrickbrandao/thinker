@@ -212,21 +212,23 @@ describe('RoutingVirtualModelsSection', () => {
     await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
   });
 
-  it('deletes after confirmation', async () => {
+  it('deletes after an in-app confirmation (never window.confirm)', async () => {
     mockList.mockResolvedValue([vm('a'), vm('b')]);
     mockDelete.mockResolvedValue(undefined);
-    const confirm = vi
-      .spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    const confirm = vi.spyOn(window, 'confirm');
     renderSection();
     await screen.findByTestId('card-a');
     fireEvent.click(screen.getAllByText('delete')[0]!);
-    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/per-model parameters/));
+    expect(screen.getByRole('dialog').textContent).toMatch(/per-model parameters/);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(mockDelete).not.toHaveBeenCalled();
     fireEvent.click(screen.getAllByText('delete')[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByTestId('card-a')).toBeNull());
     expect(mockDelete).toHaveBeenCalledWith('demo', 'a');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(confirm).not.toHaveBeenCalled();
     confirm.mockRestore();
   });
 
@@ -237,8 +239,9 @@ describe('RoutingVirtualModelsSection', () => {
     fireEvent.click(await screen.findByText('edit'));
     await screen.findByText('editing a');
     fireEvent.click(screen.getByText('modal-delete'));
-    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('demo', 'a'));
     expect(screen.queryByTestId('vm-modal')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('demo', 'a'));
   });
 
   it('opens the example from a card', async () => {

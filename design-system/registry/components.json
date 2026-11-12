@@ -2097,6 +2097,10 @@
       "file": "src/components/ui.tsx"
     },
     {
+      "name": "ConfirmDialog",
+      "file": "src/components/ui.tsx"
+    },
+    {
       "name": "EmptyState",
       "file": "src/components/ui.tsx"
     },
