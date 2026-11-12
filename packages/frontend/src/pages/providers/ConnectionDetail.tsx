@@ -407,6 +407,14 @@ const ConnectionDetail = () => {
 
   // Activity (usage) or the account's model list.
   const [tab, setTab] = useState<'activity' | 'models'>('activity');
+  // Bumped when the Manage window saves, so the Models tab refetches.
+  const [modelsVersion, setModelsVersion] = useState(0);
+  /** After Manage saves: refresh the page, the provider's form data and its models. */
+  const reloadAfterSave = () => {
+    void detail.reload();
+    if (isCustomProvider) void customProvider.reload();
+    setModelsVersion((v) => v + 1);
+  };
 
   // Manage window state
   const [showManageModal, setShowManageModal] = useState(false);
@@ -1023,6 +1031,7 @@ const ConnectionDetail = () => {
       {tab === 'models' ? (
         <ConnectionModels
           connectionId={c.id}
+          reloadKey={modelsVersion}
           canRefresh={c.is_active && !isCustomProvider}
           onRefreshed={() => void detail.reload()}
         />
@@ -1252,7 +1261,7 @@ const ConnectionDetail = () => {
             layout={(parts) => manageWindow(parts)}
             onSaved={() => {
               closeManageModal();
-              void detail.reload();
+              reloadAfterSave();
             }}
             onCancel={closeManageModal}
             onDeleted={() => {
@@ -1268,7 +1277,7 @@ const ConnectionDetail = () => {
             layout={(parts) => manageWindow(parts)}
             onCreated={() => {
               closeManageModal();
-              void detail.reload();
+              reloadAfterSave();
             }}
             onBack={closeManageModal}
             onDeleted={() => {

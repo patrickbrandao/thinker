@@ -23,8 +23,11 @@ export default function ConnectionModels({
   connectionId,
   canRefresh,
   onRefreshed,
+  reloadKey = 0,
 }: {
   connectionId: string;
+  /** Changes when the account's models were edited elsewhere: refetch. */
+  reloadKey?: number;
   /** Custom providers list their models by hand; discovery skips them. */
   canRefresh: boolean;
   onRefreshed?: () => void;
@@ -32,7 +35,7 @@ export default function ConnectionModels({
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState<ProviderModelEntry | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const data = useResource(() => getProviderModels(true), [connectionId]);
+  const data = useResource(() => getProviderModels(true), [connectionId, reloadKey]);
 
   const models = useMemo(
     () =>
