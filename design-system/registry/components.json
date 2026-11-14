@@ -169,6 +169,10 @@
         "light": "rgb(37 99 235 / 0.35)",
         "dark": "rgb(59 130 246 / 0.45)"
       },
+      "--route-on": {
+        "light": "#ca8a04",
+        "dark": "#facc15"
+      },
       "--surface-2": {
         "light": "#f4f5f7",
         "dark": "#1b1f27"
@@ -2272,8 +2276,8 @@
   "orphanStylesheets": [],
   "tokensOutsideSource": [],
   "stats": {
-    "tokens": 59,
-    "darkOverrides": 51,
+    "tokens": 60,
+    "darkOverrides": 52,
     "blocks": 225,
     "classes": 244,
     "canonicalRules": 5,
