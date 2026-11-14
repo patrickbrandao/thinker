@@ -24,6 +24,16 @@ export function readFallbackRoutes(row: AnyOverrideRow): ModelRoute[] | null {
 }
 
 /**
+ * The stored fallbacks that may serve traffic: readFallbackRoutes without the
+ * routes an administrator disabled. The proxy reads this; writes keep using
+ * readFallbackRoutes so disabled entries stay in the chain.
+ */
+export function servingFallbackRoutes(row: AnyOverrideRow): ModelRoute[] | null {
+  const routes = readFallbackRoutes(row)?.filter((r) => r.disabled !== true) ?? [];
+  return routes.length > 0 ? routes : null;
+}
+
+/**
  * The route a row actually resolves to: the user override when present, else
  * the legacy auto-assigned route. Mirrors the read order of
  * ResolveService.buildResolvedRouteChain — upgraded installs whose tiers are

@@ -5,6 +5,13 @@ export interface ModelRoute {
   authType: AuthType;
   model: string;
   keyLabel?: string | null;
+  /**
+   * Set by an administrator to keep the route in its chain without serving
+   * traffic. Not part of the route's identity (routeEquals ignores it), and
+   * never cleared by discovery: a disabled route whose model comes back stays
+   * disabled.
+   */
+  disabled?: boolean;
 }
 
 export function routeEquals(
@@ -42,6 +49,7 @@ export function isModelRoute(value: unknown): value is ModelRoute {
     typeof v.keyLabel !== 'string'
   )
     return false;
+  if ('disabled' in v && v.disabled !== undefined && typeof v.disabled !== 'boolean') return false;
   return true;
 }
 

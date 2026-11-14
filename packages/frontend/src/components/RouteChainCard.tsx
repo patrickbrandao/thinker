@@ -19,6 +19,13 @@ import { AuthIcon, routeAccountLabel } from './RouteAccount.js';
 import { routeNotInCatalog } from '../lib/route-catalog.js';
 import { t } from '../i18n/index.js';
 import { Button, cx, useClickOutside } from './ui.js';
+import type { ChainRouteStatus } from 'thinker-shared';
+import {
+  RouteStatusBadge,
+  RouteStatusToggle,
+  isDisabledStatus,
+  type RouteToggleTarget,
+} from './RouteStatusControls.js';
 
 /**
  * A named chain of concrete routes: a primary (`override_route`) and up to 5
@@ -68,6 +75,12 @@ export interface RouteChainCardProps {
   titleContent?: ReactNode;
   /** Rendered under the header, before the routes. */
   details?: ReactNode;
+  /** Status of each stored route (backend-computed); badges replace the client-side check. */
+  routeStatus?: ChainRouteStatus;
+  /** Where the per-route disable toggle writes. No toggle when absent. */
+  statusTarget?: Omit<RouteToggleTarget, 'agentName'>;
+  /** Highlights the card (dark orange border): the chain needs attention. */
+  attention?: boolean;
   /** Per-route params, threaded from the routing page boundary to the manager window. */
   getModelParams?: (
     scope: string,
@@ -174,7 +187,20 @@ export default function RouteChainCard(props: RouteChainCardProps) {
     });
   };
 
+  const hasPrimary = props.chain.override_route != null;
+  /** `primary` or the fallback index of the route at `index` in `routes`. */
+  const positionOf = (index: number): 'primary' | number =>
+    hasPrimary ? (index === 0 ? 'primary' : index - 1) : index;
+  const statusOf = (index: number) => {
+    const position = positionOf(index);
+    return position === 'primary'
+      ? props.routeStatus?.override
+      : props.routeStatus?.fallbacks[position];
+  };
+
   const renderRoute = (r: ModelRoute, index: number) => {
+    const status = statusOf(index);
+    const routeDisabled = isDisabledStatus(status);
     const info = modelInfo(r);
     const label = info?.display_name ?? r.model;
     const skipped = isStreamMode && !(info?.capabilities?.includes('stream') ?? false);
@@ -192,6 +218,7 @@ export default function RouteChainCard(props: RouteChainCardProps) {
             'routing-card__route flex items-center gap-2 rounded-control border border-line bg-sunken px-2.5 py-2',
             index === 0 && 'routing-card__model-chip',
             skipped && 'routing-card__route--skipped opacity-60',
+            routeDisabled && 'routing-card__route--disabled opacity-60',
           )}
           title={skipped ? t('routing.skippedWhileStream') : undefined}
         >
@@ -220,9 +247,22 @@ export default function RouteChainCard(props: RouteChainCardProps) {
                   {t('routing.skippedInStream')}
                 </span>
               ) : null}
-              {routeNotInCatalog(r, props.models) ? <NotInCatalogBadge /> : null}
+              {status ? (
+                <RouteStatusBadge info={status} />
+              ) : routeNotInCatalog(r, props.models) ? (
+                <NotInCatalogBadge />
+              ) : null}
             </span>
           </div>
+          {props.statusTarget && status ? (
+            <RouteStatusToggle
+              agentName={props.agentName}
+              chain={props.statusTarget.chain}
+              chainKey={props.statusTarget.chainKey}
+              position={positionOf(index)}
+              info={status}
+            />
+          ) : null}
         </div>
       </div>
     );
@@ -234,7 +274,13 @@ export default function RouteChainCard(props: RouteChainCardProps) {
 
   return (
     <div
-      className={cx('routing-card card flex flex-col gap-3 p-3', props.cardClass, ...rootClasses)}
+      className={cx(
+        'routing-card card flex flex-col gap-3 p-3',
+        props.cardClass,
+        props.attention && 'routing-card--attention border-2 border-attention',
+        ...rootClasses,
+      )}
+      title={props.attention ? t('routing.routeStatus.noRouteLeft') : undefined}
     >
       <div className="routing-card__header flex min-h-7 items-center justify-between gap-2">
         <span className="routing-card__tier header-tier-card__title flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink">

@@ -53,6 +53,10 @@
         "light": "rgb(37 99 235 / 0.1)",
         "dark": "rgb(59 130 246 / 0.14)"
       },
+      "--attention": {
+        "light": "#c2410c",
+        "dark": "#ea580c"
+      },
       "--bg": {
         "light": "#f7f8fa",
         "dark": "#0f1115"
@@ -2268,8 +2272,8 @@
   "orphanStylesheets": [],
   "tokensOutsideSource": [],
   "stats": {
-    "tokens": 58,
-    "darkOverrides": 50,
+    "tokens": 59,
+    "darkOverrides": 51,
     "blocks": 225,
     "classes": 244,
     "canonicalRules": 5,

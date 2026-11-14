@@ -1,5 +1,6 @@
 import type { AuthType } from './auth-types';
 import type { ModelRoute } from './model-route';
+import type { ChainRouteStatus } from './route-status';
 import type { OutputModality } from './output-modality';
 import type { ResponseMode } from './response-mode';
 
@@ -96,6 +97,8 @@ export interface VirtualModelView extends VirtualModel {
    * Always sent by the API; optional only for older clients' fixtures.
    */
   routable?: boolean;
+  /** Status of each stored route (primary, then fallbacks). */
+  route_status?: ChainRouteStatus;
 }
 
 /** A route as a client sends it: only the model name is required. */

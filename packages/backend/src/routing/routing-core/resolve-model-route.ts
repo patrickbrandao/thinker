@@ -1,4 +1,5 @@
 import type { AuthType, ModelRoute } from 'thinker-shared';
+import { isRouteDisabled, withDisabled } from 'thinker-shared';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { openAiModelId } from './public-model-id';
 import { routeMatches } from './route-helpers';
@@ -117,8 +118,10 @@ function resolveGivenRoutes(
   for (const route of routes) {
     const kept = pool.findIndex((s) => routeMatches(s, route));
     if (kept >= 0) {
-      pool.splice(kept, 1);
-      resolved.push(route);
+      // The administrator's disabled flag lives on the stored route; a
+      // client that re-sends the chain without it must not re-enable it.
+      const stored = pool.splice(kept, 1)[0];
+      resolved.push(withDisabled(route, isRouteDisabled(stored)));
       continue;
     }
     const resolution = resolveModelRoute(route.model, available, {

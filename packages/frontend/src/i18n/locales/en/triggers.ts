@@ -34,6 +34,8 @@ export default {
     modelAdded: 'Model added',
     modelRemoved: 'Model removed',
     modelError: 'Model error',
+    routeOutOfService: 'Route out of service',
+    routeRestored: 'Route back in service',
     oauthRefreshFailed: 'OAuth refresh failed',
     triggerFailed: 'Trigger delivery failed',
     auditCreated: 'Audit: created',

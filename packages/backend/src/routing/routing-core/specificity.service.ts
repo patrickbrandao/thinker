@@ -2,12 +2,23 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { DEFAULT_RESPONSE_MODE, DEFAULT_OUTPUT_MODALITY } from 'thinker-shared';
+import {
+  DEFAULT_RESPONSE_MODE,
+  DEFAULT_OUTPUT_MODALITY,
+  isRouteDisabled,
+  withDisabled,
+} from 'thinker-shared';
 import type { AuthType, ModelRoute, ResponseMode } from 'thinker-shared';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { RoutingCacheService } from './routing-cache.service';
-import { explicitRoute, readFallbackRoutes, unambiguousRoute, routeMatches } from './route-helpers';
+import {
+  explicitRoute,
+  readFallbackRoutes,
+  readOverrideRoute,
+  unambiguousRoute,
+  routeMatches,
+} from './route-helpers';
 import { assertStreamableResponseMode } from './response-mode-guard';
 
 @Injectable()
@@ -108,7 +119,11 @@ export class SpecificityService {
         route,
         existing.fallback_routes,
       );
-      existing.override_route = route;
+      const stored = readOverrideRoute(existing);
+      existing.override_route =
+        stored && routeMatches(stored, route)
+          ? withDisabled(route, isRouteDisabled(stored))
+          : route;
       existing.is_active = true;
       existing.updated_at = new Date().toISOString();
       await this.repo.save(existing);
@@ -281,14 +296,17 @@ export class SpecificityService {
     if (routes && routes.length === models.length) {
       const aligned = routes.every((r, i) => r.model === models[i]);
       const pool = [...(storedRoutes ?? [])];
+      const out: ModelRoute[] = [];
       const validated =
         aligned &&
         routes.every((r) => {
           const kept = pool.findIndex((s) => routeMatches(s, r));
           if (kept >= 0) {
-            pool.splice(kept, 1);
+            // Keep the administrator's disabled flag of the stored route.
+            out.push(withDisabled(r, isRouteDisabled(pool.splice(kept, 1)[0])));
             return true;
           }
+          out.push(withDisabled(r, false));
           return available.some(
             (m) =>
               m.id === r.model &&
@@ -296,7 +314,7 @@ export class SpecificityService {
               m.authType === r.authType,
           );
         });
-      if (validated) return routes;
+      if (validated) return out;
     }
     const pool = [...(storedRoutes ?? [])];
     const resolved: ModelRoute[] = [];

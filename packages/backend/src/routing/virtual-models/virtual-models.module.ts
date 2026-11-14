@@ -9,6 +9,9 @@ import { VirtualModelService } from './virtual-model.service';
 import { VirtualModelController } from './virtual-model.controller';
 import { ModelListRoutingService } from './model-list-routing.service';
 import { ModelListController } from './model-list.controller';
+import { RouteStatusService } from '../route-status/route-status.service';
+import { RouteStatusController } from '../route-status/route-status.controller';
+import { RouteImpactService } from '../route-status/route-impact.service';
 
 @Module({
   imports: [
@@ -16,8 +19,8 @@ import { ModelListController } from './model-list.controller';
     ModelDiscoveryModule,
     RoutingCoreModule,
   ],
-  providers: [VirtualModelService, ModelListRoutingService],
-  controllers: [VirtualModelController, ModelListController],
-  exports: [VirtualModelService, ModelListRoutingService],
+  providers: [VirtualModelService, ModelListRoutingService, RouteStatusService, RouteImpactService],
+  controllers: [VirtualModelController, ModelListController, RouteStatusController],
+  exports: [VirtualModelService, ModelListRoutingService, RouteStatusService],
 })
 export class VirtualModelsModule {}

@@ -47,6 +47,11 @@ export class VirtualModelRouteInputDto {
   @MaxLength(MAX_PROVIDER_KEY_LABEL_LENGTH)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   keyLabel?: string;
+
+  /** Echoed back from a read; the stored flag wins for routes already in the chain. */
+  @IsOptional()
+  @IsBoolean()
+  disabled?: boolean;
 }
 
 export class CreateVirtualModelDto {

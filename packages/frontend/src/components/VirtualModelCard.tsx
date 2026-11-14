@@ -69,6 +69,9 @@ export default function VirtualModelCard(props: VirtualModelCardProps) {
       chain={vm}
       cardClass="routing-card--virtual-model"
       classList={{ 'routing-card--virtual-model-inactive': !vm.enabled }}
+      routeStatus={vm.route_status}
+      statusTarget={{ chain: 'virtual_model', chainKey: vm.id }}
+      attention={vm.enabled && vm.routable === false}
       models={props.models}
       customProviders={props.customProviders}
       connectedProviders={props.connectedProviders}

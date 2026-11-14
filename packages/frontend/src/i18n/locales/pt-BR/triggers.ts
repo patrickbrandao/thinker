@@ -37,6 +37,8 @@ const ptBR: Catalog<typeof en> = {
     modelAdded: 'Modelo adicionado',
     modelRemoved: 'Modelo removido',
     modelError: 'Erro de modelo',
+    routeOutOfService: 'Rota fora de serviço',
+    routeRestored: 'Rota de volta ao serviço',
     oauthRefreshFailed: 'Falha ao renovar OAuth',
     triggerFailed: 'Falha na entrega de trigger',
     auditCreated: 'Auditoria: criação',

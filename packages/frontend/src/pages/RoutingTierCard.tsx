@@ -14,6 +14,8 @@ import {
 import { customProviderColor, formatPerRequestCost } from '../services/formatters.js';
 import FallbackList from '../components/FallbackList.js';
 import NotInCatalogBadge from '../components/NotInCatalogBadge.js';
+import { RouteStatusBadge, RouteStatusToggle } from '../components/RouteStatusControls.js';
+import { chainHasServingRoute } from '../services/api/route-status.js';
 import { routeNotInCatalog } from '../lib/route-catalog.js';
 import ModelParamsAffordance from '../components/ModelParamsAffordance.jsx';
 import RouteKeyChip from '../components/RouteKeyChip.js';
@@ -74,6 +76,8 @@ export function providerIdForModel(model: string, apiModels: AvailableModel[]): 
 
 export interface RoutingTierCardProps {
   stage: StageDef;
+  /** Which chain the route-status toggle writes: a tier slot (default) or a category. */
+  statusChain?: 'tier' | 'specificity';
   tier: TierAssignment | undefined;
   models: AvailableModel[];
   customProviders: CustomProviderData[];
@@ -485,7 +489,18 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
                 : priceLabel(modelName)}
             </span>
             {skippedBadge}
-            {tier && routeNotInCatalog(effectiveRoute(tier), props.models) ? (
+            {tier?.override_route && tier.route_status?.override ? (
+              <>
+                <RouteStatusBadge info={tier.route_status.override} />
+                <RouteStatusToggle
+                  agentName={props.agentName}
+                  chain={props.statusChain ?? 'tier'}
+                  chainKey={stageId}
+                  position="primary"
+                  info={tier.route_status.override}
+                />
+              </>
+            ) : tier && routeNotInCatalog(effectiveRoute(tier), props.models) ? (
               <NotInCatalogBadge />
             ) : null}
           </span>
@@ -495,7 +510,15 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
   };
 
   return (
-    <div className="routing-card card flex flex-col gap-3 p-3">
+    <div
+      className={cx(
+        'routing-card card flex flex-col gap-3 p-3',
+        tier &&
+          !tier.auto_assigned_route &&
+          chainHasServingRoute(tier.route_status) === false &&
+          'routing-card--attention border-2 border-attention',
+      )}
+    >
       <div className="routing-card__header flex min-h-7 items-center justify-between gap-2">
         <span className="routing-card__tier flex items-center gap-1.5 text-sm font-semibold text-ink">
           {stageId === 'default' ? (
@@ -545,6 +568,7 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
             <div className="routing-card__right">
               <FallbackList
                 agentName={props.agentName}
+                statusChain={props.statusChain ?? 'tier'}
                 tier={stageId}
                 tierData={tier}
                 fallbacks={props.getFallbacksFor(stageId)}

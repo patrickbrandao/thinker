@@ -14,7 +14,7 @@ import {
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import {
   readAutoAssignedRoute,
-  readFallbackRoutes,
+  servingFallbackRoutes,
   readOverrideRoute,
   routeMatches,
 } from '../routing-core/route-helpers';
@@ -165,7 +165,7 @@ export class ResolveService {
 
     const outputModality = outputModalityFor(assignment);
     const responseMode = responseModeFor(assignment);
-    const fallbackRoutes = readFallbackRoutes(assignment);
+    const fallbackRoutes = servingFallbackRoutes(assignment);
     const routeChain = await this.buildResolvedRouteChain(
       agentId,
       tenantId,
@@ -244,7 +244,7 @@ export class ResolveService {
 
     const outputModality = outputModalityFor(assignment);
     const responseMode = responseModeFor(assignment);
-    const fallbackRoutes = readFallbackRoutes(assignment);
+    const fallbackRoutes = servingFallbackRoutes(assignment);
     const routeChain = await this.buildResolvedRouteChain(
       agentId,
       tenantId,
@@ -490,7 +490,7 @@ export class ResolveService {
 
     const outputModality = outputModalityFor(assignment);
     const responseMode = responseModeFor(assignment);
-    const fallbackRoutes = readFallbackRoutes(assignment);
+    const fallbackRoutes = servingFallbackRoutes(assignment);
     const enrichedRoute = await this.enrichRouteKeyLabel(agentId, tenantId, route);
     const effectiveRoutes = effectiveRoutesForResponseMode(
       responseMode,

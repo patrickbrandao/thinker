@@ -26,6 +26,7 @@ import { authBadgeFor } from './AuthBadge.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import ModelParamsAffordance from './ModelParamsAffordance.jsx';
 import NotInCatalogBadge from './NotInCatalogBadge.js';
+import { RouteStatusBadge, RouteStatusToggle } from './RouteStatusControls.js';
 import { routeNotInCatalog } from '../lib/route-catalog.js';
 import RouteKeyChip from './RouteKeyChip.js';
 import { cx } from './ui.js';
@@ -33,6 +34,8 @@ import { modelParamsScopeForTier } from 'thinker-shared';
 
 interface FallbackListProps {
   agentName: string;
+  /** Which chain the route-status toggle writes (`tier` key or category). */
+  statusChain?: 'tier' | 'specificity';
   tier: string;
   tierData?: RouteSlots;
   fallbacks: string[];
@@ -535,7 +538,20 @@ export default function FallbackList(props: FallbackListProps) {
                           {t('routing.skippedInStream')}
                         </span>
                       ) : null}
-                      {routeNotInCatalog(route, props.models) ? <NotInCatalogBadge /> : null}
+                      {props.tierData?.route_status?.fallbacks[i] ? (
+                        <>
+                          <RouteStatusBadge info={props.tierData.route_status.fallbacks[i]} />
+                          <RouteStatusToggle
+                            agentName={props.agentName}
+                            chain={props.statusChain ?? 'tier'}
+                            chainKey={props.tier}
+                            position={i}
+                            info={props.tierData.route_status.fallbacks[i]}
+                          />
+                        </>
+                      ) : routeNotInCatalog(route, props.models) ? (
+                        <NotInCatalogBadge />
+                      ) : null}
                       {keys.length > 1 ? (
                         <RouteKeyChip
                           keys={keys}

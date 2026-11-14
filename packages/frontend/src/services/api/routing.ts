@@ -8,6 +8,7 @@ import type {
   OutputModality,
 } from 'thinker-shared';
 import { BASE_URL, fetchJson, fetchMutate, parseErrorMessage, routingPath } from './core.js';
+import type { ChainRouteStatus } from 'thinker-shared';
 import { t } from '../../i18n/index.js';
 
 export type { AuthType, ModelCapability, ModelModality, ModelRoute, ResponseMode, OutputModality };
@@ -348,6 +349,8 @@ export interface TierAssignment {
   output_modality?: OutputModality;
   response_mode?: ResponseMode;
   updated_at: string;
+  /** Status of each stored route, computed by the backend on every read. */
+  route_status?: ChainRouteStatus;
 }
 
 export function getTierAssignments(agentName: string) {

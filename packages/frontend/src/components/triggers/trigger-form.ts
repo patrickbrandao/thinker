@@ -52,6 +52,8 @@ const EVENT_LABELS: Record<string, TranslationKey> = {
   'model.added': 'triggers.events.modelAdded',
   'model.removed': 'triggers.events.modelRemoved',
   'model.error': 'triggers.events.modelError',
+  'route.out_of_service': 'triggers.events.routeOutOfService',
+  'route.restored': 'triggers.events.routeRestored',
   'oauth.refresh_failed': 'triggers.events.oauthRefreshFailed',
   'trigger.failed': 'triggers.events.triggerFailed',
   'audit.created': 'triggers.events.auditCreated',
