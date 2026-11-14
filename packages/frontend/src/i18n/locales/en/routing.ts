@@ -39,6 +39,19 @@ export default {
   auto: 'auto',
   skippedInStream: 'Skipped in Stream',
   skippedWhileStream: 'Skipped while Stream mode is active',
+  routeStatus: {
+    outOfService: 'Out of service',
+    disabled: 'Disabled',
+    disabledOutOfService: 'Disabled · out of service',
+    modelMissingTitle:
+      'The provider no longer lists this model. The route is kept and serves again on its own when the model comes back.',
+    providerUnavailableTitle:
+      'The provider is not connected or not enabled for this harness. The route is kept and serves again when it is.',
+    disabledTitle: 'Disabled by an administrator: kept in the chain, never serves.',
+    disable: 'Disable route',
+    enable: 'Enable route',
+    noRouteLeft: 'No route of this chain can serve right now.',
+  },
   notInCatalog: 'Not in catalog',
   notInCatalogTitle:
     'This model is no longer listed by the provider; requests skip to the next route.',

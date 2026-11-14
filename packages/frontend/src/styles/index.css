@@ -35,6 +35,7 @@
   --color-ok-tint: var(--ok-tint);
   --color-warn: var(--warn);
   --color-warn-tint: var(--warn-tint);
+  --color-attention: var(--attention);
   --color-danger: var(--danger);
   --color-danger-tint: var(--danger-tint);
   --color-info: var(--info);

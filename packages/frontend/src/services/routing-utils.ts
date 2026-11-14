@@ -1,3 +1,4 @@
+import type { ChainRouteStatus } from 'thinker-shared';
 import { PROVIDERS } from './providers.js';
 import { inferProviderFromModel, SHARED_PROVIDERS } from 'thinker-shared';
 import type { AuthType, ModelRoute, RoutingProvider } from './api.js';
@@ -8,6 +9,7 @@ export interface RouteSlots {
   override_route?: ModelRoute | null;
   auto_assigned_route?: ModelRoute | null;
   fallback_routes?: ModelRoute[] | null;
+  route_status?: ChainRouteStatus;
 }
 
 /**

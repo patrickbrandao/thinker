@@ -27,6 +27,7 @@ import {
 import { Agent } from '../entities/agent.entity';
 import { AgentRecordingConfigService } from '../common/services/agent-recording-config.service';
 import { MinRole } from '../common/decorators/roles.decorator';
+import { RouteStatusService } from './route-status/route-status.service';
 
 @MinRole('admin')
 @Controller('api/v1/routing')
@@ -34,6 +35,7 @@ export class TierController {
   constructor(
     private readonly tierService: TierService,
     private readonly resolveAgentService: ResolveAgentService,
+    private readonly routeStatus: RouteStatusService,
     @InjectRepository(Agent)
     private readonly agentRepo: Repository<Agent>,
     private readonly recordingConfig: AgentRecordingConfigService,
@@ -42,7 +44,8 @@ export class TierController {
   @Get(':agentName/tiers')
   async getTiers(@TenantCtx() ctx: TenantContext, @Param() params: AgentNameParamDto) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
-    return this.tierService.getTiers(agent.id, agent.tenant_id);
+    const rows = await this.tierService.getTiers(agent.id, agent.tenant_id);
+    return this.routeStatus.withStatus(agent.tenant_id, agent.id, rows);
   }
 
   @Put(':agentName/tiers/:tier')

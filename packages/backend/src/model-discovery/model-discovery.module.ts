@@ -9,6 +9,7 @@ import { ModelDiscoveryService } from './model-discovery.service';
 import { OpencodeCatalogService } from './opencode-catalog.service';
 import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
 import { LiveContextService } from './live-context';
+import { DiscoveryRefreshService } from './discovery-refresh.service';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { LiveContextService } from './live-context';
     OpencodeCatalogService,
     CopilotTokenService,
     LiveContextService,
+    DiscoveryRefreshService,
   ],
   exports: [ModelDiscoveryService, ProviderModelFetcherService, OpencodeCatalogService],
 })

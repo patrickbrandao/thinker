@@ -1,5 +1,12 @@
-import type { ModelRoute, ResponseMode } from 'thinker-shared';
+import type {
+  ChainRouteStatus,
+  ModelRoute,
+  ResponseMode,
+  RouteOutOfServiceReason,
+} from 'thinker-shared';
 import {
+  combineRouteStatus,
+  isRouteDisabled,
   DEFAULT_TIER_SLOT,
   modelParamsScopeForTier,
   modelParamsScopeForVirtualModel,
@@ -238,6 +245,16 @@ export type SnapshotRouteState =
  * name alone, which the snapshot cannot replay.
  */
 export function snapshotRouteState(route: ModelRoute, snapshot: RouteSnapshot): SnapshotRouteState {
+  if (route.disabled === true) return { state: 'unavailable' };
+  return catalogRouteState(route, snapshot);
+}
+
+/**
+ * snapshotRouteState without the administrator's `disabled` flag: what the
+ * catalog alone says about the route. Route status reads it to tell an
+ * out-of-service route from one that is only disabled.
+ */
+export function catalogRouteState(route: ModelRoute, snapshot: RouteSnapshot): SnapshotRouteState {
   const providerNames = expandProviderNames([route.provider]);
   const index = snapshotIndex(snapshot);
   const connectionModels = bucketsFor(index.catalog, providerNames).filter(
@@ -379,4 +396,37 @@ export async function virtualModelRoutable(
       snapshot,
     ).kind !== 'empty'
   );
+}
+
+/**
+ * Why the catalog takes a route out of service, or null when it is in
+ * service or cannot be judged (cold discovery, no provider pin): the
+ * administrator's `disabled` flag is ignored here. A connection that lists
+ * models but not this one is `model_missing`; anything else the snapshot
+ * rules unavailable is `provider_unavailable`.
+ */
+export function routeOutOfServiceReason(
+  route: ModelRoute,
+  snapshot: RouteSnapshot,
+): RouteOutOfServiceReason | null {
+  if (catalogRouteState(route, snapshot).state !== 'unavailable') return null;
+  const providerNames = expandProviderNames([route.provider]);
+  const listed = bucketsFor(snapshotIndex(snapshot).catalog, providerNames).some(
+    (m) => !route.authType || !m.authType || m.authType === route.authType,
+  );
+  return listed ? 'model_missing' : 'provider_unavailable';
+}
+
+/** Status of every stored route of a chain, from one route snapshot. */
+export function chainRouteStatus(
+  row: Pick<VirtualModel, 'override_route' | 'fallback_routes'>,
+  snapshot: RouteSnapshot,
+): ChainRouteStatus {
+  const status = (route: ModelRoute) =>
+    combineRouteStatus(isRouteDisabled(route), routeOutOfServiceReason(route, snapshot));
+  const override = readOverrideRoute(row);
+  return {
+    override: override ? status(override) : null,
+    fallbacks: (readFallbackRoutes(row) ?? []).map(status),
+  };
 }

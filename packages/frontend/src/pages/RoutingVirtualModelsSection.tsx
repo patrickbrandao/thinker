@@ -23,6 +23,7 @@ import { toast } from '../services/toast-store.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 import { deleteVirtualModelPrompt } from '../services/virtual-model-form.js';
+import { ROUTE_STATUS_CHANGED_EVENT } from '../services/api/route-status.js';
 
 // The create/edit modal only mounts on click; keep it out of the route chunk.
 const VirtualModelModal = lazy(() => import('../components/VirtualModelModal.js'));
@@ -78,6 +79,12 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
     [props.agentName],
   );
   dataRef.current = list.data;
+  const reloadList = list.reload;
+  useEffect(() => {
+    const reload = () => void reloadList();
+    window.addEventListener(ROUTE_STATUS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(ROUTE_STATUS_CHANGED_EVENT, reload);
+  }, [reloadList]);
   const items: VirtualModel[] = list.data ?? [];
   const mutate = list.setData;
 

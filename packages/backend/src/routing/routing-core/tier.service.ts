@@ -10,10 +10,18 @@ import type { AuthType, ModelRoute, ResponseMode } from 'thinker-shared';
 import {
   DEFAULT_RESPONSE_MODE,
   DEFAULT_OUTPUT_MODALITY,
+  isRouteDisabled,
+  withDisabled,
   TIER_SLOTS,
   TierSlot,
 } from 'thinker-shared';
-import { effectiveRoute, readFallbackRoutes, routeMatches } from './route-helpers';
+import {
+  effectiveRoute,
+  explicitRoute,
+  readFallbackRoutes,
+  readOverrideRoute,
+  routeMatches,
+} from './route-helpers';
 import {
   describeUnresolvedFallback,
   describeUnresolvedModel,
@@ -98,25 +106,34 @@ export class TierService {
     authType?: AuthType,
     providerKeyLabel?: string,
   ): Promise<TierAssignment> {
-    const available = await this.discoveryService.getModelsForAgent(tenantId, agentId);
-    // Accept any name Thinker publishes for the model (the public
-    // `/v1/models` id, a custom model's bare name, …) and store the canonical
-    // route, so callers never have to know the internal id.
-    const resolution = resolveModelRoute(model, available, {
-      provider,
-      authType,
-      keyLabel: providerKeyLabel,
-    });
-    if (!resolution.ok) {
-      throw new BadRequestException(
-        describeUnresolvedModel(model, resolution.reason, available, { provider, authType }),
-      );
-    }
-    const route = resolution.route;
-
     const existing = await this.tierRepo.findOne({
       where: { agent_id: agentId, tier },
     });
+    // Re-sending the stored primary keeps it as stored, out of service or
+    // disabled included: it was validated when first set, and the catalog
+    // check would refuse a model the provider dropped for now.
+    const stored = existing ? readOverrideRoute(existing) : null;
+    const sent = explicitRoute(model, provider, authType, providerKeyLabel);
+    let route: ModelRoute;
+    if (stored && sent && routeMatches(stored, sent)) {
+      route = withDisabled(sent, isRouteDisabled(stored));
+    } else {
+      const available = await this.discoveryService.getModelsForAgent(tenantId, agentId);
+      // Accept any name Thinker publishes for the model (the public
+      // `/v1/models` id, a custom model's bare name, …) and store the canonical
+      // route, so callers never have to know the internal id.
+      const resolution = resolveModelRoute(model, available, {
+        provider,
+        authType,
+        keyLabel: providerKeyLabel,
+      });
+      if (!resolution.ok) {
+        throw new BadRequestException(
+          describeUnresolvedModel(model, resolution.reason, available, { provider, authType }),
+        );
+      }
+      route = resolution.route;
+    }
 
     if (existing) {
       existing.override_route = route;

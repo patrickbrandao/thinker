@@ -36,6 +36,7 @@ import {
 } from '../routing-core/resolve-model-route';
 import { assertStreamableResponseMode } from '../routing-core/response-mode-guard';
 import {
+  chainRouteStatus,
   computeShadows,
   virtualModelContextLength,
   virtualModelRoutable,
@@ -73,6 +74,23 @@ function isNameUniqueViolation(err: unknown): boolean {
 
 function duplicateName(name: string): ConflictException {
   return new ConflictException(`A virtual model named "${name}" already exists on this agent`);
+}
+
+/**
+ * Whether a client-sent route names a stored one: same model, and the same
+ * provider, auth type and key label wherever the client sent them.
+ */
+function storedMatchesInput(stored: ModelRoute, input: VirtualModelRouteInput): boolean {
+  if (stored.model !== (typeof input.model === 'string' ? input.model.trim() : '')) return false;
+  if (input.provider && input.provider.toLowerCase() !== stored.provider.toLowerCase()) {
+    return false;
+  }
+  if (input.authType && input.authType !== stored.authType) return false;
+  const label = (v: string | null | undefined) => (v ?? '').trim().toLowerCase();
+  if (input.keyLabel !== undefined && label(input.keyLabel) !== label(stored.keyLabel)) {
+    return false;
+  }
+  return true;
 }
 
 /** `sort_order`, then name: the order `/v1/models` will publish them in. */
@@ -244,7 +262,11 @@ export class VirtualModelService {
   ): Promise<VirtualModelView> {
     const row = await this.findOrThrow(agentId, id);
     const catalog = await this.catalog(agentId, tenantId);
-    const route = await this.resolveOverrideRoute(agentId, tenantId, input, catalog);
+    const stored = row.override_route;
+    const route =
+      stored && input && storedMatchesInput(stored, input)
+        ? stored
+        : await this.resolveOverrideRoute(agentId, tenantId, input, catalog);
     assertStreamableResponseMode(
       row.response_mode,
       `virtual model "${row.name}"`,
@@ -280,6 +302,7 @@ export class VirtualModelService {
       models,
       routes,
       await this.catalog(agentId, tenantId),
+      row.fallback_routes ?? [],
     );
     assertStreamableResponseMode(
       row.response_mode,
@@ -424,6 +447,7 @@ export class VirtualModelService {
       shadows: computeShadows(row.name, catalog),
       context_length: contextLengths[i],
       routable: routable[i],
+      route_status: chainRouteStatus(row, routeSnapshot),
     }));
   }
 
@@ -469,8 +493,9 @@ export class VirtualModelService {
    * Create passes its route inputs here, which may carry a key label with no
    * provider. Every entry
    * is checked against the current catalog, previously stored ones included:
-   * a fallback on a provider the agent no longer has is a 400, so the
-   * operator removes it instead of carrying an unreachable route.
+   * a new fallback the catalog does not offer is a 400. Entries already in
+   * the chain are kept as stored (see the loop), so an out-of-service route
+   * stays until the operator removes or disables it.
    */
   private async buildFallbackRoutes(
     agentId: string,
@@ -478,6 +503,7 @@ export class VirtualModelService {
     models: string[],
     routes: readonly VirtualModelRouteInput[] | undefined,
     available: readonly DiscoveredModel[],
+    storedRoutes: readonly ModelRoute[] = [],
   ): Promise<ModelRoute[] | null> {
     if (!Array.isArray(models)) throw new BadRequestException('models must be an array');
     if (models.length > MAX_VIRTUAL_MODEL_FALLBACKS) {
@@ -491,9 +517,20 @@ export class VirtualModelService {
       routes.length === models.length &&
       routes.every((r, i) => r?.model === models[i]);
     const resolved: ModelRoute[] = [];
+    const pool = [...storedRoutes];
     for (let i = 0; i < models.length; i++) {
       const model = typeof models[i] === 'string' ? models[i].trim() : '';
       const given = aligned ? routes![i] : undefined;
+      // A route already in the chain is kept as stored, out of service or
+      // disabled included: it was validated when added, and re-checking it
+      // would make the chain impossible to edit while its model is gone.
+      const kept = pool.findIndex((r) =>
+        given ? storedMatchesInput(r, given) : r.model === model,
+      );
+      if (kept >= 0) {
+        resolved.push(pool.splice(kept, 1)[0]);
+        continue;
+      }
       const resolution = model
         ? resolveModelRoute(model, available, {
             provider: given?.provider,

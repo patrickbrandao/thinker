@@ -221,8 +221,8 @@ describe('virtual models and a provider the agent no longer has', () => {
         mixed: { routable: true, context_length: 128000 },
       });
       const listed = await listedContext();
-      expect('deepseek-only' in listed).toBe(true);
-      expect(listed['deepseek-only']).toBeUndefined();
+      // No route left and no "Continue on Default": hidden from /v1/models (ADR 0011).
+      expect('deepseek-only' in listed).toBe(false);
       expect(listed['mixed']).toBe(128000);
       expect((await routingStatus())['active_virtual_models']).toEqual(['mixed']);
     } finally {

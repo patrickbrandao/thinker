@@ -14,6 +14,7 @@ import {
   type TierAssignment,
 } from '../services/api.js';
 import RouteChainCard from '../components/RouteChainCard.js';
+import { chainHasServingRoute } from '../services/api/route-status.js';
 import VirtualModelTitle from '../components/VirtualModelTitle.js';
 import VirtualModelSnippetModal from '../components/VirtualModelSnippetModal.js';
 
@@ -62,6 +63,9 @@ export default function AutoChainCard(props: AutoChainCardProps) {
           response_mode: tier?.response_mode,
         }}
         cardClass="routing-card--auto"
+        routeStatus={tier?.route_status}
+        statusTarget={{ chain: 'tier', chainKey: TIER }}
+        attention={chainHasServingRoute(tier?.route_status) === false && !tier?.auto_assigned_route}
         models={props.models}
         customProviders={props.customProviders}
         connectedProviders={props.connectedProviders}

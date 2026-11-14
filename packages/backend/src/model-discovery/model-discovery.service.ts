@@ -2,6 +2,7 @@ import { allowsPrivateDestination } from '../common/utils/private-url-policy';
 import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { emitAlert } from '../common/services/alert-sink';
 import { modelChangeAlerts } from './model-change-alerts';
+import { diffModelIds, notifyModelCatalogChange } from './model-catalog-change';
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -394,11 +395,22 @@ export class ModelDiscoveryService {
     }
 
     const changes = modelChangeAlerts(provider, provider.cached_models, filtered);
+    const diff = diffModelIds(provider.cached_models, filtered);
     provider.cached_models = filtered;
     provider.models_fetched_at = new Date().toISOString();
     await this.providerRepo.save(provider);
     for (const alert of changes) emitAlert(alert);
     await this.invalidateProviderAccess(provider);
+    notifyModelCatalogChange({
+      connection: {
+        id: provider.id,
+        tenant_id: provider.tenant_id,
+        provider: provider.provider,
+        auth_type: provider.auth_type,
+        label: provider.label ?? null,
+      },
+      ...diff,
+    });
 
     this.logger.log(
       `Discovered ${filtered.length} models for provider ${provider.provider} (tenant ${provider.tenant_id})`,

@@ -95,6 +95,21 @@ export {
   routeToLegacy,
 } from './model-route';
 export type { ModelRoute, LegacyOverrideTriple } from './model-route';
+export {
+  ROUTE_STATUSES,
+  ROUTE_CHAIN_KINDS,
+  isRouteDisabled,
+  combineRouteStatus,
+  withDisabled,
+} from './route-status';
+export type {
+  RouteStatus,
+  RouteStatusInfo,
+  RouteOutOfServiceReason,
+  ChainRouteStatus,
+  RouteChainKind,
+  SetRouteDisabledRequest,
+} from './route-status';
 export { applyRequestParamDefaults } from './request-params';
 export type { JsonValue, RequestParamDefaults } from './request-params';
 export { snapshotRequestParams } from './request-params-snapshot';
