@@ -43,6 +43,14 @@ vi.mock('../../src/components/RequestDrawer', () => ({
     ) : null,
 }));
 
+// The window manager lives in the app shell; "Watch live" needs it to render.
+vi.mock('../../src/components/live-session/LiveSessionWindows', () => ({
+  useLiveSessions: () => ({
+    openLiveSession: vi.fn(),
+    closeLiveSession: vi.fn(),
+    openSessionIds: [],
+  }),
+}));
 import SessionDetail from '../../src/pages/SessionDetail';
 import { resetLocaleForTests } from '../../src/i18n';
 
@@ -152,16 +160,17 @@ describe('SessionDetail', () => {
     expect(screen.getByText('anthropic')).toBeTruthy();
   });
 
-  it('shows the Active badge only for sessions with activity in the last five minutes', async () => {
+  it('offers Watch live only for sessions with activity in the last five minutes, Replay otherwise', async () => {
     mockGetSession.mockResolvedValue(detail({ last_at: iso(60_000) }));
     const live = renderPage();
     await screen.findByText('ses_main');
-    expect(screen.getByText('Active')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Watch live/ })).toBeTruthy();
     live.unmount();
     mockGetSession.mockResolvedValue(detail({ last_at: iso(30 * 60_000) }));
     renderPage();
     await screen.findByText('ses_main');
-    expect(screen.queryByText('Active')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Watch live/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Replay/ })).toBeTruthy();
   });
 
   it('shows failed request counts next to the request total', async () => {

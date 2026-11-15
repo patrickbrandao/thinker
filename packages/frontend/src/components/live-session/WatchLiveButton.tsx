@@ -1,24 +1,26 @@
 /* Entry points into the live-session window ("Watch live", "Replay", "Open session"). */
 import { History, Radio } from 'lucide-react';
 import { Link } from 'react-router';
-import { Badge, Button, cx } from '../ui.js';
+import { Button, cx } from '../ui.js';
 import { t } from '../../i18n/index.js';
 import { useLiveSessions } from './LiveSessionWindows.js';
 
 /**
- * The "Active" pill of a session with a blinking green dot inside, like a
- * recording light. Green, not red: an active session is good news, and red
- * is kept for errors. The tooltip says when a request is in flight.
+ * Blinking green dot of an active session, like a recording light. Green, not
+ * red: an active session is good news, and red is kept for errors.
  */
-export function ActiveBadge({ inFlight = false }: { inFlight?: boolean }) {
+export function LiveDot({ title }: { title?: string }) {
   return (
-    <Badge tone="ok" title={inFlight ? t('liveSession.entry.inFlight') : undefined}>
-      <span className="relative mr-1 inline-flex size-1.5 shrink-0" aria-hidden="true">
-        <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-70" />
-        <span className="relative inline-flex size-1.5 rounded-full bg-ok" />
-      </span>
-      {t('sessions.active')}
-    </Badge>
+    <span
+      className="relative inline-flex size-2 shrink-0"
+      role={title ? 'img' : undefined}
+      aria-label={title}
+      aria-hidden={title ? undefined : true}
+      title={title}
+    >
+      <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-70" />
+      <span className="relative inline-flex size-2 rounded-full bg-ok" />
+    </span>
   );
 }
 
@@ -26,12 +28,15 @@ export function ActiveBadge({ inFlight = false }: { inFlight?: boolean }) {
 export function WatchLiveButton({
   sessionId,
   live,
+  inFlight = false,
   size = 'sm',
   variant = 'ghost',
   className,
 }: {
   sessionId: string;
   live: boolean;
+  /** A request of the session is in progress (shown in the dot's tooltip). */
+  inFlight?: boolean;
   size?: 'sm' | 'md';
   variant?: 'ghost' | 'primary';
   className?: string;
@@ -50,7 +55,11 @@ export function WatchLiveButton({
         windows.openLiveSession(sessionId, { live });
       }}
     >
-      {live ? <Radio size={13} /> : <History size={13} />}
+      {live ? (
+        <LiveDot title={inFlight ? t('liveSession.entry.inFlight') : undefined} />
+      ) : (
+        <History size={13} />
+      )}
       {open && live
         ? t('liveSession.entry.watching')
         : live
