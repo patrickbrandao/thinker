@@ -8,7 +8,6 @@ import {
 } from '../common/utils/catalog-sync';
 import { loadPricingSnapshot } from '../model-prices/pricing-snapshot';
 import { outboundFetch } from '../common/outbound/outbound-proxy';
-import { catalogUrl } from '../common/outbound/simulation';
 
 interface OpenRouterModel {
   id: string;
@@ -152,9 +151,7 @@ export class PricingSyncService implements OnModuleInit {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await outboundFetch(catalogUrl('openrouter', OPENROUTER_API), {
-        signal: controller.signal,
-      });
+      const res = await outboundFetch(OPENROUTER_API, { signal: controller.signal });
       if (!res.ok) {
         this.logger.error(`OpenRouter API returned ${res.status}`);
         alertCatalogFailure('openrouter', `OpenRouter API returned HTTP ${res.status}`);

@@ -13,7 +13,6 @@ import { PROVIDER_BY_ID } from '../common/constants/providers';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { isCatalogSyncEnabled } from '../common/utils/catalog-sync';
 import { outboundFetch } from '../common/outbound/outbound-proxy';
-import { catalogUrl } from '../common/outbound/simulation';
 import { OPENCODE_USER_AGENT } from '../common/constants/subscription-clients';
 import type { PricingEntry, PricingTimeTier } from '../model-prices/model-pricing-cache.service';
 
@@ -362,10 +361,7 @@ export class OpencodeCatalogService implements OnModuleInit, OnModuleDestroy {
       for (let attempt = 0; ; attempt++) {
         let response: Response;
         try {
-          response = await outboundFetch(catalogUrl('opencode', OPENCODE_MODELS_URL), {
-            headers,
-            signal,
-          });
+          response = await outboundFetch(OPENCODE_MODELS_URL, { headers, signal });
         } catch (err) {
           if (signal.aborted || attempt >= FETCH_RETRIES) throw err;
           await retryDelay(attempt, signal);

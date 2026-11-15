@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pure simulation (docs/dev/simulacao-pura.md): brings every piece up.
+# Simulation (docs/dev/simulacao-pura.md): brings every piece up. Thinker runs
+# exactly as in production; only its accounts point at the White Wizard mocks.
 # Idempotent: what is already up stays up.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
@@ -8,8 +9,7 @@ for b in wwz wwz-load wwz-tools; do
   [ -x "$WWZ_BIN/$b" ] || die "missing $WWZ_BIN/$b (cd $WWZ_REPO && go build -o bin/ ./cmd/wwz ./cmd/wwz-load ./cmd/wwz-tools), or set WWZ_REPO"
 done
 command -v docker >/dev/null || die "docker is required (Postgres container $SIM_PG_CONTAINER)"
-command -v python3 >/dev/null || die "python3 is required (catalog server)"
-mkdir -p "$STATE/logs" "$STATE/pids" "$STATE/rec" "$STATE/agents" "$STATE/catalog"
+mkdir -p "$STATE/logs" "$STATE/pids" "$STATE/rec" "$STATE/agents"
 
 # 1. Environment (once; random local secrets).
 if [ ! -f "$STATE/env" ]; then
@@ -29,15 +29,18 @@ DATABASE_UNPOOLED_URL=$db
 BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 THINKER_ENCRYPTION_KEY=$(openssl rand -hex 32)
 THINKER_SETUP_TOKEN=$(openssl rand -hex 24)
-THINKER_SIMULATION=true
-THINKER_SIM_CATALOG_URLS=models_dev=http://127.0.0.1:$SIM_CATALOG_PORT/models-dev.json,openrouter=http://127.0.0.1:$SIM_CATALOG_PORT/openrouter.json,opencode=http://127.0.0.1:$SIM_CATALOG_PORT/opencode.json
-THINKER_CATALOG_SYNC=true
 THINKER_RECORDING_STORAGE=filesystem
 THINKER_RECORDING_FILESYSTEM_PATH=$STATE/rec
 MCP_ENABLED=false
 ENV
   chmod 600 "$STATE/env"
   log "wrote sim/.state/env"
+fi
+# Older sim/.state/env files carried the removed simulation-mode variables.
+if grep -q '^THINKER_SIM' "$STATE/env"; then
+  grep -v '^THINKER_SIM\|^THINKER_CATALOG_SYNC=' "$STATE/env" >"$STATE/env.tmp" && mv "$STATE/env.tmp" "$STATE/env"
+  chmod 600 "$STATE/env"
+  log "removed old simulation-mode variables from sim/.state/env"
 fi
 load_env
 
@@ -47,12 +50,7 @@ start_bg wwz-openai "$SIM_WWZ_OPENAI_PORT" "$SIM_DIR" "$WWZ_BIN/wwz" serve -conf
 wait_port "$SIM_WWZ_OPENCODE_PORT" 20 wwz-opencode
 wait_port "$SIM_WWZ_OPENAI_PORT" 20 wwz-openai
 
-# 3. Local catalogs (prices equal to the wwz pricing), served on loopback.
-python3 -I "$SIM_DIR/catalog/build.py" "$STATE/catalog" "http://127.0.0.1:$SIM_WWZ_OPENCODE_PORT" >/dev/null
-start_bg catalog "$SIM_CATALOG_PORT" "$STATE/catalog" python3 -I -m http.server "$SIM_CATALOG_PORT" --bind 127.0.0.1 --directory "$STATE/catalog"
-wait_http "http://127.0.0.1:$SIM_CATALOG_PORT/models-dev.json" 20 catalog
-
-# 4. PostgreSQL (data kept in the $SIM_PG_VOLUME volume).
+# 3. PostgreSQL (data kept in the $SIM_PG_VOLUME volume).
 if docker ps --format '{{.Names}}' | grep -qx "$SIM_PG_CONTAINER"; then
   log "$SIM_PG_CONTAINER already up on $SIM_PG_PORT"
 elif docker ps -a --format '{{.Names}}' | grep -qx "$SIM_PG_CONTAINER"; then
@@ -69,7 +67,7 @@ until docker exec "$SIM_PG_CONTAINER" pg_isready -U thinker -d thinker_sim >/dev
   i=$((i + 1)); [ "$i" -lt 30 ] || die "Postgres did not get ready"; sleep 1
 done
 
-# 5. Thinker backend (built from this checkout) and dashboard.
+# 4. Thinker backend (built from this checkout) and dashboard.
 if port_up "$SIM_API_PORT"; then
   log "backend already up on $SIM_API_PORT"
 else
@@ -86,7 +84,7 @@ start_bg web "$SIM_WEB_PORT" "$REPO_DIR/packages/frontend" env VITE_BACKEND_PORT
   "$REPO_DIR/node_modules/.bin/vite" --host 127.0.0.1 --port "$SIM_WEB_PORT" --strictPort
 wait_port "$SIM_WEB_PORT" 60 web
 
-# 6. Initial data (once) and agents.
+# 5. Initial data (once) and agents.
 [ -f "$STATE/seeded" ] || "$SIM_DIR/seed.sh"
 "$SIM_DIR/agents/run.sh"
 

@@ -11,7 +11,6 @@ piece wwz-opencode "$SIM_WWZ_OPENCODE_PORT"
 piece wwz-oc-admin "$SIM_WWZ_OPENCODE_ADMIN_PORT"
 piece wwz-openai "$SIM_WWZ_OPENAI_PORT"
 piece wwz-oa-admin "$SIM_WWZ_OPENAI_ADMIN_PORT"
-piece catalog "$SIM_CATALOG_PORT"
 piece postgres "$SIM_PG_PORT"
 piece backend "$SIM_API_PORT"
 piece dashboard "$SIM_WEB_PORT"
@@ -30,10 +29,13 @@ else
   echo "  none running"
 fi
 
-echo "wwz spend (spend_usd per entity):"
+echo "wwz spend (keys and accounts; per-session entities summarized):"
 for p in "$SIM_WWZ_OPENCODE_ADMIN_PORT" "$SIM_WWZ_OPENAI_ADMIN_PORT"; do
   curl -fsS "http://127.0.0.1:$p/admin/entities" 2>/dev/null \
-    | jq -r --arg p "$p" '(.entities // .)[]? | "  :\($p) \(.entity.kind)/\(.entity.id): spend_usd=\(.spend_usd // 0) requests=\(.requests // 0)"' 2>/dev/null \
+    | jq -r --arg p "$p" '(.entities // .) as $e
+        | ($e[]? | select(.entity.kind == "key" or .entity.kind == "account")
+           | "  :\($p) \(.entity.kind)/\(.entity.id): spend_usd=\((.spend_usd // 0) * 1000000 | round / 1000000) requests=\(.requests // 0)"),
+          "  :\($p) \([$e[]? | select(.entity.kind == "user")] | length) session entities"' 2>/dev/null \
     || echo "  :$p unavailable"
 done
 
