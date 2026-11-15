@@ -11,6 +11,7 @@ import { assertConnectableHost, pinnedDirectFetch, ssrfSafeLookup } from '../uti
 import { getContainerHostAlias } from '../utils/container-host';
 import { Logger } from '@nestjs/common';
 import { planGroup, quarantineProxy, type BalanceMode, type EgressGroup } from './egress-balance';
+import { assertSimulationDestination, isSimulationMode } from './simulation';
 
 const logger = new Logger('OutboundProxy');
 
@@ -639,6 +640,10 @@ export async function fetchViaProxy(
   agent?: ProxyAgent,
 ): Promise<{ response: Response; tunnelMs: number | null }> {
   assertConnectableHost(new URL(url).hostname);
+  // Simulation: both the proxy and the destination must be local.
+  if (isSimulationMode())
+    await assertSimulationDestination(`${proxy.scheme}://${proxy.host}:${proxy.port}`);
+  if (isSimulationMode()) await assertSimulationDestination(url);
   const probe: HopProbe = { tunnelMs: null };
   const dispatcher = agent ?? getProxyAgent(proxy);
   const response = await probeStorage.run(probe, () =>
@@ -895,6 +900,7 @@ export async function outboundFetch(
   opts: OutboundFetchOptions = {},
 ): Promise<Response> {
   const href = typeof url === 'string' ? url : url.href;
+  if (isSimulationMode()) await assertSimulationDestination(href);
   const pin = opts.pinDestination === true;
   const allowPrivate = opts.allowPrivateDestination !== false;
   const scope = currentOutboundScope();

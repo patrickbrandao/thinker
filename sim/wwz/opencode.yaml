@@ -5,7 +5,7 @@
 # Credentials:
 #   - `public` (built in, never listed in keys[]): the keyless free mode. Only
 #     free models (pricing input_per_m 0) answer, with a daily free quota.
-#   - `sim-opencode-go`: an OpenCode Go plan with a deliberately tiny quota, so
+#   - `sim-opencode-go-quota-key`: an OpenCode Go plan with a deliberately tiny quota, so
 #     the 5-hour window runs out in a few dozen requests and Thinker's
 #     quota/fallback behavior can be observed. Raise the numbers to slow it.
 #
@@ -40,7 +40,7 @@ accounts:
     tier: go-tiny
 
 keys:
-  - { key: sim-opencode-go, label: sim-go-quota, account: ws-sim-go }
+  - { key: sim-opencode-go-quota-key, label: sim-go-quota, account: ws-sim-go }
 
 drivers:
   - name: opencode

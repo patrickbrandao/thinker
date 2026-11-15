@@ -31,6 +31,19 @@ describe('HealthController', () => {
     expect(result.uptime_seconds).toBeGreaterThanOrEqual(0);
   });
 
+  it('reports simulation: true only with THINKER_SIMULATION on', () => {
+    const previous = process.env['THINKER_SIMULATION'];
+    try {
+      delete process.env['THINKER_SIMULATION'];
+      expect(controller.getHealth()).not.toHaveProperty('simulation');
+      process.env['THINKER_SIMULATION'] = 'true';
+      expect(controller.getHealth()).toMatchObject({ status: 'healthy', simulation: true });
+    } finally {
+      if (previous === undefined) delete process.env['THINKER_SIMULATION'];
+      else process.env['THINKER_SIMULATION'] = previous;
+    }
+  });
+
   it('does not expose mode or devMode fields', () => {
     const result = controller.getHealth();
     expect(result).not.toHaveProperty('mode');

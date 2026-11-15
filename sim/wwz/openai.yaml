@@ -2,7 +2,7 @@
 # White Wizard (wwz) driver `openai` at the root, so Thinker's OpenAI provider
 # points at http://127.0.0.1:18220 (/v1/chat/completions, /v1/responses).
 #
-# Credential `sim-openai-key`: no credits, no spend cap and no rate limit, so
+# Credential `sk-sim-openai-unlimited-billed-key-0000000000000000000`: no credits, no spend cap and no rate limit, so
 # it never runs out, but every request is priced with the models' pricing
 # below and shows up as spend in the wwz admin stats and panel. Model ids are
 # real OpenAI ids so Thinker prices them from its own catalog too.
@@ -15,7 +15,7 @@ admin:
   listen: "127.0.0.1:18221"
 
 keys:
-  - key: sim-openai-key
+  - key: sk-sim-openai-unlimited-billed-key-0000000000000000000
     label: sim-openai-unlimited
 
 drivers:

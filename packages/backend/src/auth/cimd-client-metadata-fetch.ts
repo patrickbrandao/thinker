@@ -7,6 +7,7 @@ import { request, type RequestOptions } from 'node:https';
 import { isIP, type LookupFunction } from 'node:net';
 import { Readable } from 'node:stream';
 import { isCloudMetadataIp } from '../common/utils/url-validation';
+import { assertSimulationDestination, isSimulationMode } from '../common/outbound/simulation';
 
 /**
  * Whether a CIMD `client_id` URL may resolve to a private or loopback address.
@@ -101,6 +102,7 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
     throw new TypeError('CIMD Node transport supports only GET and HEAD');
   }
 
+  if (isSimulationMode()) await assertSimulationDestination(url);
   const hostname = url.hostname.replace(/^\[|\]$/g, '');
   // A literal address bypasses DNS pinning, and with the opt-in private-host
   // allowance it would let a client reach an arbitrary local service.
