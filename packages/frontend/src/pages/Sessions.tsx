@@ -6,7 +6,7 @@ import Select, { type SelectOption } from '../components/Select.js';
 import { ThemedIcon } from '../components/setup-ui.js';
 import { Badge, Button, cx, Skel, Tabs } from '../components/ui.js';
 import SessionsBubbleChart from '../components/sessions/SessionsBubbleChart.js';
-import { InFlightDot, WatchLiveButton } from '../components/live-session/WatchLiveButton.js';
+import { ActiveBadge, WatchLiveButton } from '../components/live-session/WatchLiveButton.js';
 import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { getAgents } from '../services/api.js';
@@ -204,7 +204,6 @@ export default function Sessions() {
                     >
                       <td>
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {active && s.in_flight > 0 ? <InFlightDot /> : null}
                           <Link
                             to={to}
                             className="mono whitespace-nowrap text-xs text-ink"
@@ -212,7 +211,7 @@ export default function Sessions() {
                           >
                             {shortId(s.id)}
                           </Link>
-                          {active ? <Badge tone="ok">{t('sessions.active')}</Badge> : null}
+                          {active ? <ActiveBadge inFlight={s.in_flight > 0} /> : null}
                           {s.subagents > 0 ? (
                             <Badge>{t('sessions.subagents', { count: s.subagents })}</Badge>
                           ) : null}

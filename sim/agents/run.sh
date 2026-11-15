@@ -16,7 +16,8 @@ agent_loop() { # name key model profile turns think min max ua
   trap 'exit 0' TERM INT
   while :; do
     n=$((n + 1))
-    day="$(date -u +%Y%m%d)"
+    # Date and time make the id unique across restarts (the counter starts over).
+    day="$(date -u +%Y%m%d-%H%M%S)"
     session="sim-$name-$day-$n"
     rc=0
     "$WWZ_BIN/wwz-load" agents --target "$SIM_API" --protocol openai --stream \

@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import ErrorState from '../components/ErrorState.js';
 import MessageTable from '../components/MessageTable.js';
 import RequestDrawerStack from '../components/RequestDrawerStack.js';
-import { InFlightDot, WatchLiveButton } from '../components/live-session/WatchLiveButton.js';
+import { ActiveBadge, WatchLiveButton } from '../components/live-session/WatchLiveButton.js';
 import { useLiveSessions } from '../components/live-session/LiveSessionWindows.js';
 import { DETAILED_COLUMNS, type MessageRow } from '../components/message-table-types.js';
 import { Badge, Button, Panel, Skel } from '../components/ui.js';
@@ -124,12 +124,7 @@ export default function SessionDetail() {
             }
             actions={
               <div className="flex flex-wrap items-center justify-end gap-2">
-                {isActive(s.last_at) ? (
-                  <>
-                    {s.in_flight > 0 ? <InFlightDot /> : null}
-                    <Badge tone="ok">{t('sessions.active')}</Badge>
-                  </>
-                ) : null}
+                {isActive(s.last_at) ? <ActiveBadge inFlight={s.in_flight > 0} /> : null}
                 <WatchLiveButton sessionId={s.id} live={isActive(s.last_at)} />
               </div>
             }
