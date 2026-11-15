@@ -17,6 +17,14 @@ vi.mock('../../src/services/model-display', () => ({
   preloadModelDisplayNames: vi.fn(),
 }));
 
+// The window manager lives in the app shell; "Watch live" needs it to render.
+vi.mock('../../src/components/live-session/LiveSessionWindows', () => ({
+  useLiveSessions: () => ({
+    openLiveSession: vi.fn(),
+    closeLiveSession: vi.fn(),
+    openSessionIds: [],
+  }),
+}));
 import Sessions from '../../src/pages/Sessions';
 import { resetLocaleForTests } from '../../src/i18n';
 
@@ -141,8 +149,9 @@ describe('Sessions page', () => {
     renderPage();
     const live = (await screen.findByText('a')).closest('tr')!;
     const old = screen.getByText('b').closest('tr')!;
-    expect(within(live).getByText('Active')).toBeTruthy();
-    expect(within(old).queryByText('Active')).toBeNull();
+    // Active sessions get "Watch live" with the blinking green dot inside.
+    expect(within(live).getByRole('button', { name: /Watch live/ })).toBeTruthy();
+    expect(within(old).queryByRole('button', { name: /Watch live/ })).toBeNull();
   });
 
   it('shows subagent and failure counts, and collapses models beyond two', async () => {

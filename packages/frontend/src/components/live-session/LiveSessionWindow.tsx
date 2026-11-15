@@ -349,18 +349,12 @@ export default function LiveSessionWindow({
   const dot = (
     <span className="relative flex size-2.5 shrink-0">
       {busy && conn === 'open' && atEnd && (
-        <span className="absolute inline-flex size-full animate-ping rounded-full bg-danger opacity-60" />
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-70" />
       )}
       <span
         className={cx(
           'relative inline-flex size-2.5 rounded-full',
-          !atEnd || !live
-            ? 'bg-[var(--port-2)]'
-            : conn === 'open'
-              ? busy
-                ? 'bg-danger'
-                : 'bg-ok'
-              : 'bg-warn',
+          !atEnd || !live ? 'bg-[var(--port-2)]' : conn === 'open' ? 'bg-ok' : 'bg-warn',
         )}
       />
     </span>
@@ -647,7 +641,7 @@ export default function LiveSessionWindow({
             </div>
             {atEnd ? (
               live ? (
-                <span className="flex w-24 items-center justify-end gap-1 font-medium text-danger">
+                <span className="flex w-24 items-center justify-end gap-1 font-medium text-ok">
                   <Radio size={12} /> {t('liveSession.replay.live')}
                 </span>
               ) : (
