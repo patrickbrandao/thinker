@@ -5,7 +5,7 @@
 # reuse an existing block before inventing one, and when a canonical rule
 # exists for a selector, edit THAT rule — never add a competing one.
 
-## Tokens (60 on :root, 52 dark overrides)
+## Tokens (59 on :root, 51 dark overrides)
 ### chart
 --chart-1: #2563eb | dark: #3b82f6
 --chart-2: #0d9488 | dark: #2dd4bf
@@ -49,7 +49,6 @@
 --port-9: #ea580c | dark: #fb923c
 --ring: rgb(17 24 39 / 0.18) | dark: rgb(243 244 246 / 0.2)
 --ring-accent: rgb(37 99 235 / 0.35) | dark: rgb(59 130 246 / 0.45)
---route-on: #ca8a04 | dark: #facc15
 --surface-2: #f4f5f7 | dark: #1b1f27
 --surface-3: #eceef2 | dark: #222730
 --surface-4: #e3e6eb | dark: #2a303b

@@ -48,7 +48,7 @@ export interface RouteToggleTarget {
 
 /** Icon and color of the toggle for each status. */
 const TOGGLE_LOOK: Record<RouteStatus, { Icon: LucideIcon; tone: string }> = {
-  active: { Icon: Lightbulb, tone: 'text-route-on' },
+  active: { Icon: Lightbulb, tone: 'text-ok' },
   disabled: { Icon: LightbulbOff, tone: 'text-danger' },
   active_oos: { Icon: FaceSlightlyFrowning, tone: 'text-attention' },
   disabled_oos: { Icon: CircleOff, tone: 'text-muted' },
