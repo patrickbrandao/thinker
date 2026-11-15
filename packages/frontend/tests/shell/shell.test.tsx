@@ -36,8 +36,6 @@ vi.mock('../../src/services/session-store', async (orig) => {
 import Sidebar from '../../src/components/shell/Sidebar';
 import CommandPalette from '../../src/components/shell/CommandPalette';
 import AlertsMenu from '../../src/components/shell/AlertsMenu';
-import Topbar from '../../src/components/shell/Topbar';
-import { resetSimulationForTests } from '../../src/services/simulation';
 import { setMe } from '../../src/services/session-store';
 
 function Where() {
@@ -199,50 +197,5 @@ describe('AlertsMenu', () => {
     expect(row.textContent).toContain('upstream exploded');
     fireEvent.click(screen.getByRole('button', { name: 'Mark all as seen' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Alerts' })).toBeTruthy());
-  });
-});
-
-describe('Topbar simulation badge', () => {
-  function renderTopbar() {
-    return render(
-      <MemoryRouter>
-        <Topbar onOpenSearch={() => undefined} onOpenMobileNav={() => undefined} />
-      </MemoryRouter>,
-    );
-  }
-
-  function mockHealth(body: object) {
-    const original = globalThis.fetch;
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) =>
-      String(input).includes('/api/v1/health')
-        ? new Response(JSON.stringify(body), { status: 200 })
-        : original(input),
-    ) as typeof fetch;
-    return () => {
-      globalThis.fetch = original;
-    };
-  }
-
-  it('shows "Simulation" when the health check reports simulation', async () => {
-    resetSimulationForTests();
-    const restore = mockHealth({ status: 'healthy', uptime_seconds: 1, simulation: true });
-    try {
-      renderTopbar();
-      expect(await screen.findByText('Simulation')).toBeTruthy();
-    } finally {
-      restore();
-    }
-  });
-
-  it('shows no badge without simulation', async () => {
-    resetSimulationForTests();
-    const restore = mockHealth({ status: 'healthy', uptime_seconds: 1 });
-    try {
-      renderTopbar();
-      await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-      expect(screen.queryByText('Simulation')).toBeNull();
-    } finally {
-      restore();
-    }
   });
 });

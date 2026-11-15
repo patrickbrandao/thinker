@@ -41,7 +41,6 @@ import { DEFAULT_PORT } from './common/constants/server.constants';
 import { assertLegacyEncryptionKeyMigrated, warnLegacyEnvVars } from './common/utils/legacy-env';
 import { assertEncryptionKeyConfig, StartupConfigError } from './common/utils/crypto.util';
 import { overriddenTimeZoneWarning } from './common/utils/utc-clock';
-import { SimulationConfigError, applySimulationMode } from './common/outbound/simulation';
 
 export async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -55,15 +54,6 @@ export async function bootstrap() {
   // Before the app (and its migrations) start: name any upstream-era
   // variables that are set and ignored, so a stale .env doesn't fail silently.
   warnLegacyEnvVars(process.env, logger);
-
-  // Pure simulation (THINKER_SIMULATION=true): validate the simulated catalog
-  // URLs, refuse every non-local destination and say so loudly.
-  try {
-    applySimulationMode(process.env, logger);
-  } catch (err) {
-    if (err instanceof SimulationConfigError) throw new StartupConfigError(err.message);
-    throw err;
-  }
 
   // Which TCP peers may set X-Forwarded-For / X-Real-IP. An invalid entry
   // stops the boot instead of silently trusting less (or more).

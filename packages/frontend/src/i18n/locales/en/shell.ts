@@ -8,8 +8,6 @@ export default {
     search: 'Search (⌘K)',
     themeLight: 'Switch to light theme',
     themeDark: 'Switch to dark theme',
-    simulation: 'Simulation',
-    simulationHint: 'Simulation mode: providers are simulated and there is no external traffic',
   },
   user: {
     organization: 'Organization',

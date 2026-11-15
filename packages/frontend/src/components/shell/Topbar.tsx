@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import {
   BookOpen,
@@ -24,7 +24,6 @@ import { THINKER_DOCS_URL, THINKER_PROVIDERS_DOCS_URL } from '../../services/thi
 import { effectiveTheme, themePreference, toggleTheme } from '../../lib/theme.js';
 import { useSignal } from '../../lib/signal.js';
 import { brandingSignal } from '../../services/branding.js';
-import { loadSimulation, simulationSignal } from '../../services/simulation.js';
 import { themedIcon } from '../setup-ui.js';
 import { t } from '../../i18n/index.js';
 import { Badge, IconButton, Menu, MenuItem } from '../ui.jsx';
@@ -63,10 +62,6 @@ export default function Topbar({
   const crumbIcon = platformIcon ? themedIcon(platformIcon, dark) : null;
   const version = __THINKER_VERSION__;
   const { hideInfo } = useSignal(brandingSignal);
-  const simulation = useSignal(simulationSignal);
-  useEffect(() => {
-    void loadSimulation();
-  }, []);
 
   return (
     <header className="topbar">
@@ -156,11 +151,6 @@ export default function Topbar({
       </nav>
 
       <div className="topbar-actions">
-        {simulation ? (
-          <Badge tone="warn" title={t('shell.topbar.simulationHint')}>
-            {t('shell.topbar.simulation')}
-          </Badge>
-        ) : null}
         {version && !hideInfo ? (
           <span className="topbar-version" title={t('nav.version', { version })}>
             v{version}
