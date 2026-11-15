@@ -115,7 +115,8 @@ function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) {
-      if (p !== join(root, 'src/i18n')) walk(p, out);
+      // src/pages/lab holds development-only labs, never shipped (see docs/dev/guia.md).
+      if (p !== join(root, 'src/i18n') && p !== join(root, 'src/pages/lab')) walk(p, out);
     } else if (p.endsWith('.tsx')) out.push(p);
   }
   return out;
