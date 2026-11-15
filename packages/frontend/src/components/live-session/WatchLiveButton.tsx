@@ -1,22 +1,24 @@
 /* Entry points into the live-session window ("Watch live", "Replay", "Open session"). */
 import { History, Radio } from 'lucide-react';
 import { Link } from 'react-router';
-import { Button, cx } from '../ui.js';
+import { Badge, Button, cx } from '../ui.js';
 import { t } from '../../i18n/index.js';
 import { useLiveSessions } from './LiveSessionWindows.js';
 
-/** Pulsing red dot: a request of the session is in progress. */
-export function InFlightDot({ className }: { className?: string }) {
+/**
+ * The "Active" pill of a session with a blinking green dot inside, like a
+ * recording light. Green, not red: an active session is good news, and red
+ * is kept for errors. The tooltip says when a request is in flight.
+ */
+export function ActiveBadge({ inFlight = false }: { inFlight?: boolean }) {
   return (
-    <span
-      className={cx('relative inline-flex size-2 shrink-0', className)}
-      role="img"
-      aria-label={t('liveSession.entry.inFlight')}
-      title={t('liveSession.entry.inFlight')}
-    >
-      <span className="absolute inline-flex size-full animate-ping rounded-full bg-danger opacity-60" />
-      <span className="relative inline-flex size-2 rounded-full bg-danger" />
-    </span>
+    <Badge tone="ok" title={inFlight ? t('liveSession.entry.inFlight') : undefined}>
+      <span className="relative mr-1 inline-flex size-1.5 shrink-0" aria-hidden="true">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-70" />
+        <span className="relative inline-flex size-1.5 rounded-full bg-ok" />
+      </span>
+      {t('sessions.active')}
+    </Badge>
   );
 }
 

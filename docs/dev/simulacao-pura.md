@@ -81,7 +81,7 @@ Cada agente é um laço infinito com pausas, uma sessão de cada vez:
 
 ```text
 enquanto não interrompido:
-  sessão = sim-<agente>-<data>-<n>
+  sessão = sim-<agente>-<data>-<hora>-<n>
   wwz-load agents --target http://127.0.0.1:18300 --protocol openai --stream \
     --key <thk_ do harness> --model auto --profile <perfil> --agents 1 --sessions 1 \
     --turns <T> --max-tool-rounds 4 --think-time <pausa entre turnos> \
