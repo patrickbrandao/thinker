@@ -1,0 +1,69 @@
+# Thinker "pure simulation" (docs/dev/simulacao-pura.md): the OpenAI mock.
+# White Wizard (wwz) driver `openai` at the root, so Thinker's OpenAI provider
+# points at http://127.0.0.1:18220 (/v1/chat/completions, /v1/responses).
+#
+# Credential `sim-openai-key`: no credits, no spend cap and no rate limit, so
+# it never runs out, but every request is priced with the models' pricing
+# below and shows up as spend in the wwz admin stats and panel. Model ids are
+# real OpenAI ids so Thinker prices them from its own catalog too.
+server:
+  listen: "127.0.0.1:18220"
+  auth: keys
+  seed: 20261115
+
+admin:
+  listen: "127.0.0.1:18221"
+
+keys:
+  - key: sim-openai-key
+    label: sim-openai-unlimited
+
+drivers:
+  - name: openai
+
+models:
+  - id: gpt-5.5
+    protocols: [openai]
+    owned_by: system
+    context_window: 400000
+    max_output: 128000
+    capabilities: { tools: true, reasoning: true, vision: true, json_schema: true }
+    pricing: { input_per_m: 1.25, output_per_m: 10, cache_read_per_m: 0.125 }
+    latency: reasoner
+    errors: none
+    generation: agent
+  - id: gpt-5.5-mini
+    protocols: [openai]
+    owned_by: system
+    context_window: 400000
+    max_output: 128000
+    capabilities: { tools: true, reasoning: true, vision: true, json_schema: true }
+    pricing: { input_per_m: 0.25, output_per_m: 2, cache_read_per_m: 0.025 }
+    latency: fast
+    errors: none
+    generation: agent
+
+profiles:
+  latency:
+    reasoner:
+      queue: { dist: lognormal, median: 30ms, p99: 300ms }
+      ttft: { dist: normal, mean: 900ms, stddev: 250ms }
+      itl: { dist: normal, mean: 14ms, stddev: 3ms }
+      reasoning_itl: { dist: normal, mean: 8ms, stddev: 2ms }
+    fast:
+      queue: { dist: lognormal, median: 15ms, p99: 150ms }
+      ttft: { dist: normal, mean: 350ms, stddev: 80ms }
+      itl: { dist: normal, mean: 8ms, stddev: 2ms }
+  errors:
+    none: { rate: 0 }
+  generation:
+    # Thinker does not forward x-wwz-* headers, so tool calls and reasoning
+    # come from the profile, not from the agent's x-wwz-tool-prob.
+    agent:
+      mode: random
+      output_tokens: { dist: uniform, min: 60, max: 220 }
+      reasoning_tokens: { min: 80, max: 300, probability: 70 }
+      tool_calls: { probability: 35 }
+
+logging:
+  level: warn
