@@ -1,6 +1,6 @@
 # Especificação: janela de sessão ao vivo
 
-> Status: **proposta**, ainda não implementada. Referência viva: o laboratório em `/lab/live-session` (só em desenvolvimento, ver [Laboratório](#laboratório)).
+> Status: **implementada** (as três entregas). Decisões tomadas na implementação: [backend](#implementação-do-backend) e [frontend](#implementação-do-frontend). Referência viva para evoluir a janela: o laboratório em `/lab/live-session` (só em desenvolvimento, ver [Laboratório](#laboratório)).
 
 ## Objetivo
 
@@ -252,3 +252,29 @@ Cada entrega sai com `scripts/ship.sh`. A 1 mexe no hot path do proxy: roda a su
 ## Diferenças entre o laboratório e esta especificação
 
 O laboratório ainda não simula: `conversation.reset`, subagentes, blocos `redacted`, `cacheWrite` e `errorClass`, agregação de deltas em 50 ms, limites de conexão, sessão sem gravação e persistência das janelas no `localStorage`. Simule ali o que for mudar a janela antes de implementar.
+
+## Implementação do backend
+
+O backend desta especificação está em `packages/backend/src/live-session/` (resumo no [guia](guia.md#sessões)). Decisões tomadas onde a especificação deixava em aberto:
+
+- **Ids**: os ids ao vivo começam no instante (ms) em que a entrada do hub nasce, sem buracos dali em diante; um `Last-Event-ID` de antes de um reinício nunca cai dentro do buffer e recebe `snapshot`. O `/events` sintetizado do banco numera 1, 2, 3… (estável para os mesmos dados).
+- **Snapshot**: quando a entrada do hub nasceu no meio da sessão (reinício, sessão parada), o estado inclui na frente o que o banco tem das requisições anteriores (mesma síntese do `/events`). Só as 10 tentativas mais recentes guardam `headers`/`body` no estado; o estado tem no máximo 3000 itens.
+- **Conversa**: uma requisição com outro system prompt e histórico menor que o conhecido é tratada como requisição lateral do harness (título, resumo) e não gera `conversation.reset`. Responses com `previous_response_id` acrescenta os itens recebidos. A linha `x-anthropic-billing-header` do system prompt do Claude Code é ignorada no hash. Texto de mensagem limitado a 64 KB.
+- **`request.started`**: `route` vem do tier/especificidade (`tier: complex · specificity: coding`) ou do modelo virtual, mais `fallback #n` nas tentativas seguintes; `endpoint` tem credenciais de query mascaradas; `body` acima de 1 MB vira um marcador. `attempt` conta só chamadas reais ao provedor (pulos locais por cooldown não contam).
+- **`stopReason`**: o nativo do provedor; em Responses e Gemini, `tool_calls` quando a resposta tem chamada de ferramenta.
+- **Custo**: `request.completed` sai quando o custo da tentativa é calculado (mesmo cálculo da linha gravada), em até 2 s; depois disso vai com `costUsd: null`.
+- **`session` (meta)**: além de `sessionId`, `agentName` e `harness`, leva `title` (primeira linha do primeiro prompt do usuário, até 80 caracteres) quando há.
+- **Heartbeat**: comentário `: hb` a cada 15 s.
+
+## Implementação do frontend
+
+A janela está em `packages/frontend/src/components/live-session/` e o cliente do feed em `src/services/live-session-feed.ts` (resumo no [guia](guia.md#dashboard-console)). Diferenças em relação ao laboratório e ao texto acima:
+
+- **Organização**: o `EventSource` não manda cabeçalhos, então a URL ao vivo leva `?organization=<id>` (aceito só nessa rota, com a mesma checagem de membro do cabeçalho); o histórico usa o cabeçalho normal.
+- **Título**: o `title` da sessão (primeiro prompt); sem ele, o nome do harness ou o id curto da sessão.
+- **Conexão**: quando o `EventSource` desiste, o cliente consulta o status: 404 mostra "não encontrada", 429 mostra "janelas demais" com botão de tentar de novo, o resto tenta outra vez em 3 s com `?lastEventId=`. Ids repetidos depois de uma reconexão são descartados.
+- **Replay**: o histórico só carrega no primeiro uso da barra (os ids ao vivo não começam em 1, então o clique antes da carga guarda a posição relativa e a aplica quando o histórico chega). Sessão terminada abre no começo, tocando. "Open session" de uma requisição abre a janela parada no fim daquela requisição (ao vivo se a requisição está pendente ou tem menos de 5 minutos).
+- **Thinking** recolhe sempre ao terminar (a opção do laboratório não foi exposta).
+- **Camada**: as janelas ficam logo abaixo dos modais (z-index 66–69), para um modal cobrir a janela.
+- **Tamanho salvo**: só o redimensionamento pelo canto grava o tamanho, para uma tela estreita não virar o tamanho salvo.
+- **Entradas**: "Watch live" nas linhas ativas de Sessões (ponto vermelho quando há requisição em andamento), "Watch live"/"Replay" no detalhe da sessão (também por `?watch=live|replay&request=<id>`), "Open session" no drawer e na página da requisição (lê `session_id` de `GET /messages/:id/details`).

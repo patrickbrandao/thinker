@@ -132,6 +132,29 @@ describe('SessionGuard', () => {
     expect(request['tenantContext']).toMatchObject({ tenantId: 'tenant-42', userId: 'user-1' });
   });
 
+  it('reads ?organization= only on the live session feed, through the same membership check', async () => {
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
+    (auth.api.getSession as jest.Mock).mockResolvedValue({
+      user: { id: 'user-1' },
+      session: { id: 'session-1' },
+    });
+    const live = createMockContext({});
+    Object.assign(live.request, {
+      originalUrl: '/api/v1/sessions/abc/live?organization=org-9',
+      query: { organization: 'org-9' },
+    });
+    await guard.canActivate(live.context);
+    expect(tenantCache.resolveAccess).toHaveBeenLastCalledWith('user-1', 'org-9');
+
+    const other = createMockContext({});
+    Object.assign(other.request, {
+      originalUrl: '/api/v1/sessions/abc?organization=org-9',
+      query: { organization: 'org-9' },
+    });
+    await guard.canActivate(other.context);
+    expect(tenantCache.resolveAccess).toHaveBeenLastCalledWith('user-1', null);
+  });
+
   it('attaches tenantContext with a null tenantId for a fresh user without a tenant', async () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
     (auth.api.getSession as jest.Mock).mockResolvedValue({

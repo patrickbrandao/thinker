@@ -28,6 +28,7 @@ import { RoutingModule } from './routing/routing.module';
 import { PlaygroundModule } from './playground/playground.module';
 import { CommonModule } from './common/common.module';
 import { SseModule } from './sse/sse.module';
+import { LiveSessionModule } from './live-session/live-session.module';
 import { SetupModule } from './setup/setup.module';
 import { McpModule } from './mcp/mcp.module';
 import { TriggersModule } from './triggers/triggers.module';
@@ -92,6 +93,7 @@ const mcpImports = mcpAvailability().enabled ? [McpModule] : [];
     RoutingModule,
     PlaygroundModule,
     SseModule,
+    LiveSessionModule,
     SetupModule,
     OrganizationsModule,
     ConsoleModule,

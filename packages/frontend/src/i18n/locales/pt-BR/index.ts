@@ -20,6 +20,7 @@ import triggers from './triggers.js';
 import proxies from './proxies.js';
 import sessions from './sessions.js';
 import alerts from './alerts.js';
+import liveSession from './liveSession.js';
 
 export default {
   common,
@@ -44,4 +45,5 @@ export default {
   proxies,
   sessions,
   alerts,
+  liveSession,
 };

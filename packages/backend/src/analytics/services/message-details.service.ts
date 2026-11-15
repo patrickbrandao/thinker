@@ -47,6 +47,10 @@ export interface MessageDetailResponse {
     fallback_from_model: string | null;
     fallback_index: number | null;
     session_key: string | null;
+    /** Harness session (`requests.session_id`), for "Open session". */
+    session_id: string | null;
+    /** Main session when `session_id` is a subagent's. */
+    parent_session_id: string | null;
     feedback_rating: string | null;
     feedback_tags: string[] | null;
     feedback_details: string | null;
@@ -213,6 +217,8 @@ export class MessageDetailsService {
         fallback_from_model: message?.fallback_from_model ?? null,
         fallback_index: message?.fallback_index ?? null,
         session_key: request?.session_key ?? message?.session_key ?? null,
+        session_id: request?.session_id ?? message?.session_id ?? null,
+        parent_session_id: request?.parent_session_id ?? null,
         feedback_rating: request?.feedback_rating ?? message?.feedback_rating ?? null,
         feedback_tags: (request?.feedback_tags ?? message?.feedback_tags)?.split(',') ?? null,
         feedback_details: request?.feedback_details ?? message?.feedback_details ?? null,

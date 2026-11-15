@@ -616,6 +616,7 @@ export default function TriggerEditor({
                   id="trigger-gelf-url"
                   className="field font-mono"
                   type="url"
+                  // i18n-ignore: example URL
                   placeholder="https://logs.example.com:12202/gelf"
                   value={form.gelf.url}
                   onChange={(e) => patchIn('gelf', { url: e.currentTarget.value })}

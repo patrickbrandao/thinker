@@ -33,7 +33,7 @@ function splitCsv(value: string | undefined, max = 50): string[] | undefined {
  * instance administrator); members and viewers never receive them. Internal
  * contexts (`role` undefined) skip the role model, as in RolesGuard.
  */
-function canViewRequestHeaders(ctx: TenantContext): boolean {
+export function canViewRequestHeaders(ctx: TenantContext): boolean {
   if (ctx.isInstanceAdmin || ctx.role === undefined) return true;
   return hasRole(ctx.role ?? (ctx.tenantId ? 'viewer' : 'owner'), 'admin');
 }

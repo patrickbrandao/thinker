@@ -7,6 +7,7 @@ import AuthGuard from './components/AuthGuard.jsx';
 import MeGate from './components/MeGate.jsx';
 import { connectSse } from './services/sse.js';
 import { RightSidebarProvider, useRightSidebar } from './services/right-sidebar.jsx';
+import { LiveSessionWindowsProvider } from './components/live-session/LiveSessionWindows.jsx';
 import { cx } from './components/ui.jsx';
 import { t } from './i18n/index.js';
 
@@ -100,7 +101,10 @@ export default function App() {
     <AuthGuard>
       <MeGate>
         <RightSidebarProvider>
-          <Shell />
+          {/* Live-session windows float over every page and survive navigation. */}
+          <LiveSessionWindowsProvider>
+            <Shell />
+          </LiveSessionWindowsProvider>
         </RightSidebarProvider>
       </MeGate>
     </AuthGuard>

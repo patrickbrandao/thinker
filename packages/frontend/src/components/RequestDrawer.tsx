@@ -25,6 +25,8 @@ import { providerIcon } from './ProviderIcon.js';
 import { FallbackIcon } from './message-table-cells.js';
 import { authBadgeFor } from './AuthBadge.js';
 import { RawView, RequestView, ResponseView, ToolsView } from './RequestAttemptViews.js';
+import { OpenSessionButton } from './live-session/WatchLiveButton.js';
+import { isActive } from '../pages/sessions/session-format.js';
 import { RequestTimelineChart } from './RequestTimelineChart.js';
 import { EgressHops, EgressName } from './proxy/ProxyParts.js';
 import type { Egress, EgressHop } from '../services/api/proxies.js';
@@ -757,6 +759,16 @@ export default function RequestDrawer({
                   <>
                     <span className="drawer__meta-sep text-faint">{'·'}</span>
                     <span className="drawer__meta-text">{fmtDate(m.timestamp)}</span>
+                  </>
+                ) : null}
+                {typeof m.session_id === 'string' && m.session_id ? (
+                  <>
+                    <span className="drawer__meta-sep text-faint">{'·'}</span>
+                    <OpenSessionButton
+                      sessionId={m.session_id}
+                      requestId={messageId}
+                      live={requestPending || (!!m.timestamp && isActive(m.timestamp))}
+                    />
                   </>
                 ) : null}
               </div>
