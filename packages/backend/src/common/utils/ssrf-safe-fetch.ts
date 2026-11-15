@@ -4,6 +4,7 @@ import { isIP, type LookupFunction } from 'node:net';
 import { Agent, fetch as undiciFetch, type RequestInit as UndiciRequestInit } from 'undici';
 import { isCloudMetadataHostname, isCloudMetadataIp, isPrivateIp } from './url-validation';
 import { outboundFetch } from '../outbound/outbound-proxy';
+import { assertSimulationDestination, isSimulationMode } from '../outbound/simulation';
 
 /**
  * Connection-time SSRF guard for requests to operator- or tenant-supplied URLs
@@ -158,6 +159,7 @@ export async function pinnedDirectFetch(
   opts: SsrfFetchOptions = {},
 ): Promise<Response> {
   assertConnectableHost(new URL(url).hostname, opts);
+  if (isSimulationMode()) await assertSimulationDestination(url);
   const response = await undiciFetch(url, {
     ...(init as unknown as UndiciRequestInit),
     dispatcher: getSsrfSafeDispatcher(opts),

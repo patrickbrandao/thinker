@@ -1,6 +1,7 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { ShutdownService } from './shutdown.service';
+import { isSimulationMode } from '../common/outbound/simulation';
 
 @Controller('api/v1')
 export class HealthController {
@@ -18,6 +19,9 @@ export class HealthController {
       // server keeps serving in-flight requests through the drain window.
       throw new ServiceUnavailableException({ status: 'shutting_down', uptime_seconds });
     }
-    return { status: 'healthy', uptime_seconds };
+    // Pure simulation (THINKER_SIMULATION=true): only then is the flag present.
+    return isSimulationMode()
+      ? { status: 'healthy', uptime_seconds, simulation: true }
+      : { status: 'healthy', uptime_seconds };
   }
 }

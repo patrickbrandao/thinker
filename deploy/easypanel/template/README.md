@@ -15,7 +15,7 @@ templates/thinker/meta.yaml
 
 The template provisions:
 
-- Thinker app service from `tmsoftbrasil/thinker:0.38`.
+- Thinker app service from `tmsoftbrasil/thinker:0.39`.
 - PostgreSQL 18 service.
 - Persistent app volume for compressed request recordings.
 - Generated database password, Better Auth secret, and Thinker encryption key.

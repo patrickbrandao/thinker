@@ -11,6 +11,8 @@ const shell: Catalog<typeof en> = {
     search: 'Procurar (⌘K)',
     themeLight: 'Mudar para o tema claro',
     themeDark: 'Mudar para o tema escuro',
+    simulation: 'Simulação',
+    simulationHint: 'Modo simulação: os provedores são simulados e não há tráfego externo',
   },
   user: {
     organization: 'Organização',
