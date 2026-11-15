@@ -61,6 +61,8 @@ export interface SessionsTimeline {
 export type SessionFilters = {
   range?: string;
   agent_name?: string;
+  /** 'true': only sessions with activity in the last five minutes. */
+  running?: string;
   has_errors?: string;
   has_subagents?: string;
 };

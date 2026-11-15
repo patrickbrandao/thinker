@@ -328,6 +328,43 @@ describe('Sessions page', () => {
     });
   });
 
+  it('has no intro text above the filters', async () => {
+    renderPage();
+    await screen.findByText('claude-dev');
+    expect(screen.queryByText(/Requests grouped by the session id/)).toBeNull();
+  });
+
+  it('"Running" sits before "With errors" and filters with running=1 / running=true', async () => {
+    renderPage();
+    await screen.findByText('claude-dev');
+    const chips = screen
+      .getAllByRole('button', { pressed: false })
+      .map((b) => b.textContent)
+      .filter((x) => x === 'Running' || x === 'With errors');
+    expect(chips).toEqual(['Running', 'With errors']);
+    fireEvent.click(screen.getByRole('button', { name: 'Running' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toContain('running=1'));
+    await waitFor(() =>
+      expect(mockGetSessions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ running: 'true', offset: '0' }),
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Running' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Running' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).not.toContain('running='));
+  });
+
+  it('"Live agents" opens the live wall in a new tab', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderPage();
+    await screen.findByText('claude-dev');
+    fireEvent.click(screen.getByRole('button', { name: 'Live agents' }));
+    expect(open).toHaveBeenCalledWith('/sessions/live', '_blank', 'noopener');
+    open.mockRestore();
+  });
+
   it('sets the document title and meta description', async () => {
     renderPage();
     await screen.findByText('claude-dev');

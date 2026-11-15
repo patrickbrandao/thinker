@@ -43,6 +43,7 @@ describe('SessionsController.list', () => {
       agentName: undefined,
       hasErrors: false,
       hasSubagents: false,
+      running: false,
       limit: 50,
       offset: 0,
     });
@@ -56,6 +57,15 @@ describe('SessionsController.list', () => {
     );
     expect(
       validateSync(plainToInstance(SessionsQueryDto, { has_errors: 'yes' })).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('passes the running filter through', () => {
+    const { controller, sessions } = build();
+    controller.list(query({ running: 'true' }), ctx());
+    expect(sessions.list).toHaveBeenCalledWith(expect.objectContaining({ running: true }));
+    expect(
+      validateSync(plainToInstance(SessionsQueryDto, { running: 'yes' })).length,
     ).toBeGreaterThan(0);
   });
 
@@ -80,6 +90,7 @@ describe('SessionsController.list', () => {
       agentName: 'bot',
       hasErrors: false,
       hasSubagents: false,
+      running: false,
       limit: 50,
       offset: 100,
     });
@@ -169,6 +180,7 @@ describe('SessionsController.timeline', () => {
       agentName: 'bot',
       hasErrors: true,
       hasSubagents: false,
+      running: false,
     });
   });
 

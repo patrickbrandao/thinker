@@ -131,6 +131,15 @@ export interface LiveSessionWindowProps {
   focusRequestId?: string | null;
   /** Bumped when the same window is asked to position on a request again. */
   focusNonce?: number;
+  /**
+   * Render as a tile in a grid (the live agents wall) instead of a floating
+   * window: no drag, resize or minimize; maximize fills the page.
+   */
+  tile?: boolean;
+  /** Extra title-bar content before the window buttons (tile badges, pin). */
+  titleExtra?: ReactNode;
+  /** The session stopped and its feed was closed on purpose: not a lost connection. */
+  ended?: boolean;
 }
 
 export default function LiveSessionWindow({
@@ -143,6 +152,9 @@ export default function LiveSessionWindow({
   onClose,
   focusRequestId,
   focusNonce = 0,
+  tile = false,
+  titleExtra,
+  ended = false,
 }: LiveSessionWindowProps) {
   useLiveFeed(feed);
   const ref = useRef<HTMLDivElement>(null);
@@ -269,7 +281,7 @@ export default function LiveSessionWindow({
   const onPointerDownCapture = (e: ReactPointerEvent<HTMLDivElement>) => {
     onFocus();
     const el = ref.current;
-    if (!el || mode !== 'normal' || maximized) return;
+    if (tile || !el || mode !== 'normal' || maximized) return;
     const r = el.getBoundingClientRect();
     if (e.clientX < r.right - 20 || e.clientY < r.bottom - 20) return;
     const start = { w: r.width, h: r.height };
@@ -288,7 +300,8 @@ export default function LiveSessionWindow({
 
   // --------------------------------------------------------------- drag
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button') || (maximized && mode === 'normal')) return;
+    if (tile || (e.target as HTMLElement).closest('button') || (maximized && mode === 'normal'))
+      return;
     const r = ref.current!.getBoundingClientRect();
     drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -329,11 +342,13 @@ export default function LiveSessionWindow({
     .filter(Boolean)
     .join(' · ');
   const startHistory = () => void feed.ensureHistory();
-  const lost = live && (conn === 'reconnecting' || (conn === 'closed' && !feed.error));
+  const lost = !ended && live && (conn === 'reconnecting' || (conn === 'closed' && !feed.error));
   const atEnd = replay == null;
 
-  const style: CSSProperties = { zIndex: 66 + z };
-  if (maximized && mode === 'normal')
+  const style: CSSProperties = tile ? {} : { zIndex: 66 + z };
+  if (tile) {
+    if (maximized && mode === 'normal') style.zIndex = 40;
+  } else if (maximized && mode === 'normal')
     Object.assign(style, { inset: 12, width: 'auto', height: 'auto', resize: 'none' });
   else {
     if (pos) Object.assign(style, { left: pos.x, top: pos.y });
@@ -354,7 +369,7 @@ export default function LiveSessionWindow({
       <span
         className={cx(
           'relative inline-flex size-2.5 rounded-full',
-          !atEnd || !live ? 'bg-[var(--port-2)]' : conn === 'open' ? 'bg-ok' : 'bg-warn',
+          !atEnd || !live || ended ? 'bg-[var(--port-2)]' : conn === 'open' ? 'bg-ok' : 'bg-warn',
         )}
       />
     </span>
@@ -383,23 +398,32 @@ export default function LiveSessionWindow({
   return (
     <div
       ref={ref}
-      role="dialog"
+      role={tile ? 'region' : 'dialog'}
       aria-label={t('liveSession.windowLabel', { title })}
       onPointerDownCapture={onPointerDownCapture}
       className={cx(
-        'fixed flex flex-col overflow-hidden rounded-lg border border-line bg-elev shadow-[var(--shadow-float)]',
-        mode === 'normal' &&
+        'flex flex-col overflow-hidden rounded-lg border border-line bg-elev',
+        tile
+          ? maximized && mode === 'normal'
+            ? 'fixed inset-2'
+            : cx('relative', mode === 'normal' ? 'h-[440px]' : 'h-auto')
+          : 'fixed shadow-[var(--shadow-float)]',
+        !tile &&
+          mode === 'normal' &&
           !maximized &&
           'h-[min(720px,calc(100vh-96px))] w-[min(640px,calc(100vw-16px))] min-h-[280px] min-w-[min(380px,calc(100vw-16px))] max-w-[calc(100vw-8px)] resize',
-        mode === 'normal' && maximized && 'h-auto w-auto',
-        mode === 'compact' && 'w-[min(380px,calc(100vw-16px))]',
-        mode === 'minimized' && 'w-[min(320px,calc(100vw-16px))]',
+        !tile && mode === 'normal' && maximized && 'h-auto w-auto',
+        !tile && mode === 'compact' && 'w-[min(380px,calc(100vw-16px))]',
+        !tile && mode === 'minimized' && 'w-[min(320px,calc(100vw-16px))]',
       )}
       style={style}
     >
       {/* Title bar */}
       <div
-        className="flex cursor-grab touch-none select-none items-center gap-2 border-b border-line bg-s2 px-3 py-2 active:cursor-grabbing"
+        className={cx(
+          'flex select-none items-center gap-2 border-b border-line bg-s2 px-3 py-2',
+          !tile && 'cursor-grab touch-none active:cursor-grabbing',
+        )}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -417,6 +441,7 @@ export default function LiveSessionWindow({
             <span className="font-mono">{feed.sessionId}</span>
           </div>
         </div>
+        {titleExtra}
         <IconBtn
           title={mode === 'compact' ? t('liveSession.fullView') : t('liveSession.shortView')}
           active={mode === 'compact'}
@@ -424,12 +449,14 @@ export default function LiveSessionWindow({
         >
           <Rows3 size={14} />
         </IconBtn>
-        <IconBtn
-          title={mode === 'minimized' ? t('liveSession.restore') : t('liveSession.minimize')}
-          onClick={() => setMode(mode === 'minimized' ? 'normal' : 'minimized')}
-        >
-          <Minus size={15} />
-        </IconBtn>
+        {!tile && (
+          <IconBtn
+            title={mode === 'minimized' ? t('liveSession.restore') : t('liveSession.minimize')}
+            onClick={() => setMode(mode === 'minimized' ? 'normal' : 'minimized')}
+          >
+            <Minus size={15} />
+          </IconBtn>
+        )}
         {mode === 'normal' && (
           <IconBtn
             title={maximized ? t('liveSession.restoreSize') : t('liveSession.maximize')}
@@ -640,7 +667,7 @@ export default function LiveSessionWindow({
               />
             </div>
             {atEnd ? (
-              live ? (
+              live && !ended ? (
                 <span className="flex w-24 items-center justify-end gap-1 font-medium text-ok">
                   <Radio size={12} /> {t('liveSession.replay.live')}
                 </span>

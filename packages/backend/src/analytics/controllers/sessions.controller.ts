@@ -30,6 +30,11 @@ export class SessionsQueryDto {
   @IsOptional()
   @IsIn(['true', 'false'])
   has_subagents?: string;
+
+  /** `true` keeps only sessions with activity in the last five minutes. */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  running?: string;
 }
 
 @Controller('api/v1')
@@ -45,6 +50,7 @@ export class SessionsController {
       agentName: query.agent_name || undefined,
       hasErrors: query.has_errors === 'true',
       hasSubagents: query.has_subagents === 'true',
+      running: query.running === 'true',
       limit: Math.min(Math.max(Number(query.limit ?? 50), 1), 200),
       offset: Number(query.offset ?? 0),
     });
@@ -62,6 +68,7 @@ export class SessionsController {
       agentName: query.agent_name || undefined,
       hasErrors: query.has_errors === 'true',
       hasSubagents: query.has_subagents === 'true',
+      running: query.running === 'true',
     });
   }
 

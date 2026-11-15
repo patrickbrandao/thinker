@@ -76,6 +76,7 @@ const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
 const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
 const Topology = lazyReload(() => import('./pages/Topology.jsx'));
 const RequestPage = lazyReload(() => import('./pages/RequestPage.jsx'));
+const LiveAgents = lazyReload(() => import('./pages/LiveAgents.jsx'));
 // Development-only lab (src/pages/lab): `import.meta.env.DEV` is false in
 // `vite build`, so the route and its chunk never reach the product.
 const LiveSessionLab = import.meta.env.DEV
@@ -473,6 +474,10 @@ function AppRoutes() {
       </Route>
       <Route path="cli/auth" element={<GuardedOutlet />}>
         <Route index element={<CliAuth />} />
+      </Route>
+      {/* Live agents wall: its own tab, outside the shell and its floating windows. */}
+      <Route path="sessions/live" element={<GuardedOutlet />}>
+        <Route index element={<LiveAgents />} />
       </Route>
       <Route path="requests/:requestId" element={<GuardedOutlet />}>
         <Route index element={<RequestPage />} />
