@@ -319,6 +319,12 @@ export class ProxyService {
     const stream = body.stream === true || responseMode === 'stream';
     // Pending and cancelled attempt rows are written before any terminal
     // writer sees the meta, so the virtual model rides on each attempt start.
+    const routeLabel = [
+      `tier: ${resolved.tier}`,
+      resolved.specificity_category ? `specificity: ${resolved.specificity_category}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
     const startProviderAttempt: StartProviderAttempt | undefined =
       opts.startProviderAttempt && resolved.virtual_model_id
         ? (start) =>
@@ -327,7 +333,9 @@ export class ProxyService {
               virtualModelId: resolved.virtual_model_id,
               virtualModelName: resolved.virtual_model_name,
             })
-        : opts.startProviderAttempt;
+        : opts.startProviderAttempt
+          ? (start) => opts.startProviderAttempt!({ ...start, routeLabel })
+          : undefined;
     if (!resolved.route) {
       this.logger.warn(
         `No route available for agent=${agentId}: ` +

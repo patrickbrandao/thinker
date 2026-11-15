@@ -145,6 +145,8 @@ describe('MessageDetailsService', () => {
       fallback_from_model: null,
       fallback_index: null,
       session_key: 'sess-001',
+      session_id: null,
+      parent_session_id: null,
       feedback_rating: null,
       feedback_tags: null,
       feedback_details: null,

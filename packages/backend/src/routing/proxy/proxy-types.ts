@@ -41,6 +41,9 @@ export type ProviderWireFormat =
 export interface ProviderAttemptRecordingStart {
   requestBody: Record<string, unknown>;
   wireFormat: ProviderWireFormat;
+  /** Provider URL and headers, for the live session Inspector (never stored). */
+  url?: string;
+  headers?: Record<string, string>;
 }
 
 export interface ProviderAttemptStart {
@@ -62,6 +65,8 @@ export interface ProviderAttemptStart {
    */
   virtualModelId?: string;
   virtualModelName?: string;
+  /** How the route was chosen (`tier: complex`…), shown by the live session window. */
+  routeLabel?: string;
 }
 
 /** Identity and measured start of one Attempt. */

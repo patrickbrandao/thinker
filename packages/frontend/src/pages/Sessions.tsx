@@ -6,6 +6,7 @@ import Select, { type SelectOption } from '../components/Select.js';
 import { ThemedIcon } from '../components/setup-ui.js';
 import { Badge, Button, cx, Skel, Tabs } from '../components/ui.js';
 import SessionsBubbleChart from '../components/sessions/SessionsBubbleChart.js';
+import { InFlightDot, WatchLiveButton } from '../components/live-session/WatchLiveButton.js';
 import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { getAgents } from '../services/api.js';
@@ -185,11 +186,13 @@ export default function Sessions() {
                   <th className="text-right">{t('sessions.col.cost')}</th>
                   <th>{t('sessions.col.models')}</th>
                   <th>{t('sessions.col.lastActivity')}</th>
+                  <th aria-hidden="true" />
                 </tr>
               </thead>
               <tbody>
                 {items.map((s) => {
                   const to = `/sessions/${encodeURIComponent(s.id)}`;
+                  const active = isActive(s.last_at);
                   return (
                     <tr
                       key={`${s.agent_id}:${s.id}`}
@@ -201,6 +204,7 @@ export default function Sessions() {
                     >
                       <td>
                         <div className="flex flex-wrap items-center gap-1.5">
+                          {active && s.in_flight > 0 ? <InFlightDot /> : null}
                           <Link
                             to={to}
                             className="mono whitespace-nowrap text-xs text-ink"
@@ -208,9 +212,7 @@ export default function Sessions() {
                           >
                             {shortId(s.id)}
                           </Link>
-                          {isActive(s.last_at) ? (
-                            <Badge tone="ok">{t('sessions.active')}</Badge>
-                          ) : null}
+                          {active ? <Badge tone="ok">{t('sessions.active')}</Badge> : null}
                           {s.subagents > 0 ? (
                             <Badge>{t('sessions.subagents', { count: s.subagents })}</Badge>
                           ) : null}
@@ -260,6 +262,9 @@ export default function Sessions() {
                       </td>
                       <td className="whitespace-nowrap text-xs text-muted">
                         {formatTimeAgo(s.last_at) ?? formatDateTime(s.last_at)}
+                      </td>
+                      <td className="whitespace-nowrap text-right">
+                        {active ? <WatchLiveButton sessionId={s.id} live /> : null}
                       </td>
                     </tr>
                   );

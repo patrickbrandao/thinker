@@ -18,6 +18,9 @@ import { RequestWithTenantContext } from '../common/decorators/tenant-context.de
 
 /** Dashboard header that picks the active organization (ADR 0006). */
 export const ORGANIZATION_HEADER = 'x-thinker-organization';
+/** Query twin of the header, for EventSource routes (ORGANIZATION_QUERY_ROUTES). */
+export const ORGANIZATION_QUERY = 'organization';
+const ORGANIZATION_QUERY_ROUTES = [/^\/api\/v1\/sessions\/[^/]+\/live$/];
 
 /**
  * While an account still has its temporary password, only these session
@@ -119,7 +122,8 @@ export class SessionGuard implements CanActivate, OnModuleDestroy {
     const userId = (user as { id?: unknown } | null)?.id;
     if (typeof userId !== 'string' || userId.length === 0) return;
     const header = request.headers[ORGANIZATION_HEADER];
-    const requested = typeof header === 'string' && header.trim() ? header.trim() : null;
+    const fromQuery = this.organizationQuery(request);
+    const requested = typeof header === 'string' && header.trim() ? header.trim() : fromQuery;
     try {
       const access = await this.tenantCache.resolveAccess(userId, requested);
       (request as RequestWithTenantContext).tenantContext = { userId, ...access };
@@ -143,6 +147,18 @@ export class SessionGuard implements CanActivate, OnModuleDestroy {
         role: 'viewer',
       };
     }
+  }
+
+  /**
+   * `?organization=<id>` stands in for the header on the routes an
+   * `EventSource` opens (it cannot send headers): only the live session feed.
+   * It goes through the same membership check as the header.
+   */
+  private organizationQuery(request: Request): string | null {
+    const path = (request.originalUrl ?? request.url ?? '').split('?')[0] ?? '';
+    if (!ORGANIZATION_QUERY_ROUTES.some((re) => re.test(path))) return null;
+    const value = (request.query as Record<string, unknown> | undefined)?.[ORGANIZATION_QUERY];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
   }
 
   private isPasswordChangeRoute(request: Request): boolean {

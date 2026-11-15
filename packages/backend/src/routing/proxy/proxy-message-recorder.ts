@@ -464,6 +464,33 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     };
   }
 
+  /**
+   * Cost of one finished attempt for the live session window, priced the
+   * way the success row will be (same canonical keys and price sources).
+   */
+  async estimateAttemptCost(
+    ctx: IngestionContext,
+    start: ProviderAttemptStart,
+    usage: StreamUsage,
+    startedAt: string,
+  ): Promise<number | null> {
+    const canonical = await this.customProviders.canonicalizeAgentMessageKeys(
+      ctx.tenantId,
+      start.provider,
+      start.model,
+    );
+    return this.computeCost(
+      ctx,
+      start.model,
+      start.provider,
+      start.authType,
+      usage,
+      start.tenantProviderId,
+      canonical.provider,
+      new Date(startedAt),
+    );
+  }
+
   private async computeCost(
     ctx: IngestionContext,
     model: string,

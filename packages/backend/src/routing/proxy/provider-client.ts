@@ -540,6 +540,8 @@ export class ProviderClient {
       attempt?.startRecording?.({
         requestBody,
         wireFormat: resolvedWireFormat,
+        url,
+        headers: finalHeaders,
       });
     }
     this.logger.debug(`Forwarding to ${endpointKey}: ${url.replace(/key=[^&]+/, 'key=***')}`);
