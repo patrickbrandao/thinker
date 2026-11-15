@@ -103,6 +103,17 @@ describe('SessionsService.list', () => {
     expect(String(query.mock.calls[0][0])).not.toContain('r.timestamp >=');
   });
 
+  it('filters running sessions: activity in the last five minutes, inside the tenant', async () => {
+    const { service, query } = build();
+    await service.list({ tenantId: TENANT, running: true, limit: 50, offset: 0 });
+    const sql = query.mock.calls[0][0] as string;
+    expect(sql).toMatch(/HAVING EXISTS/);
+    expect(sql).toContain("> NOW() - INTERVAL '5 minutes'");
+    expect(sql).toContain('x.tenant_id = $1');
+    await service.timeline({ tenantId: TENANT, range: '7d', running: true });
+    expect(query.mock.calls[1][0]).toContain("> NOW() - INTERVAL '5 minutes'");
+  });
+
   it('filters sessions with errors and with subagents (combinable, whole session)', async () => {
     const { service, query } = build();
     await service.list({ tenantId: TENANT, limit: 50, offset: 0 });

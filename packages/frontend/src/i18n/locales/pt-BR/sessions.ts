@@ -5,8 +5,6 @@ const ptBR: Catalog<typeof en> = {
   pageTitle: 'Sessões - Thinker',
   metaDescription: 'Sessões dos harnesses: duração, requisições, tokens e custo por sessão.',
   title: 'Sessões',
-  subtitle:
-    'Requisições agrupadas pelo id de sessão que cada harness envia nos cabeçalhos. Sessões de subagentes contam na sessão principal.',
   allHarnesses: 'Todos os harnesses',
   total: '{{ count }} sessões',
   tokensInOut: '{{ input }} entrada · {{ output }} saída',
@@ -18,8 +16,26 @@ const ptBR: Catalog<typeof en> = {
     chart: 'Gráfico',
   },
   filter: {
+    running: 'Em execução',
     withErrors: 'Com erros',
     withSubagents: 'Com sub-agentes',
+  },
+  liveAgents: 'Agentes ao vivo',
+  liveAgentsHint: 'Abre uma nova aba que acompanha ao vivo todas as sessões em execução',
+  wall: {
+    pageTitle: 'Agentes ao vivo - Thinker',
+    title: 'Agentes ao vivo',
+    count: '{{ count }} em execução',
+    emptyTitle: 'Nenhuma sessão em execução',
+    emptyBody:
+      'Um quadro abre aqui sozinho assim que uma sessão de harness tiver atividade, e fecha um minuto depois que a sessão parar.',
+    finished: 'Encerrada',
+    waiting: 'mais {{ count }} aguardando um quadro livre',
+    waitingHint:
+      'No máximo {{ max }} quadros ficam ao vivo ao mesmo tempo (cada um mantém uma conexão com o servidor). Feche um quadro para abrir a próxima sessão em espera.',
+    pin: 'Manter este quadro aberto',
+    unpin: 'Deixar este quadro fechar quando a sessão terminar',
+    loadError: 'Não foi possível carregar as sessões em execução. Tentando de novo…',
   },
   chart: {
     showing: 'Mostrando as {{ shown }} sessões mais ativas de {{ total }}.',
