@@ -8,6 +8,8 @@ import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.
 import { AgentNameParamDto, CopilotPollDto } from '../../dto/routing.dto';
 import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
+import { flowUrlConnection } from '../../provider-urls/provider-urls';
+import { applyFlowUrls } from '../core/flow-urls';
 
 @MinRole('admin', { includeReads: true })
 @UseInterceptors(OutboundProviderScope('copilot'))
@@ -21,13 +23,19 @@ export class CopilotController {
   ) {}
 
   @Post(':agentName/copilot/device-code')
-  async copilotDeviceCode(@TenantCtx() ctx: TenantContext, @Param() params: AgentNameParamDto) {
-    await this.resolveAgentService.resolve(
+  async copilotDeviceCode(
+    @TenantCtx() ctx: TenantContext,
+    @Param() params: AgentNameParamDto,
+    /** Slot id → URL (ADR 0012), for this login and its account. */
+    @Body('urlOverrides') urlOverrides?: unknown,
+  ) {
+    const agent = await this.resolveAgentService.resolve(
       ctx.tenantId,
       params.agentName,
       PROVIDER_CONNECTION_SCOPE,
     );
-    return this.copilotAuth.requestDeviceCode();
+    const urls = await flowUrlConnection('copilot', null, urlOverrides, ctx);
+    return this.copilotAuth.requestDeviceCode(urls, agent.tenant_id);
   }
 
   @Post(':agentName/copilot/poll-token')
@@ -41,10 +49,10 @@ export class CopilotController {
       params.agentName,
       PROVIDER_CONNECTION_SCOPE,
     );
-    const result = await this.copilotAuth.pollForToken(body.deviceCode);
+    const result = await this.copilotAuth.pollForToken(body.deviceCode, agent.tenant_id);
     if (result.status === 'complete' && result.token) {
       const label = await this.providerService.nextOAuthLabel(agent.tenant_id, 'copilot');
-      const { provider: record } = await this.providerService.upsertProvider(
+      const { provider: upserted } = await this.providerService.upsertProvider(
         agent.id,
         agent.tenant_id,
         'copilot',
@@ -54,6 +62,7 @@ export class CopilotController {
         label,
         ctx.userId,
       );
+      const record = await applyFlowUrls(this.providerService, upserted, result.urls, ctx.userId);
       try {
         await this.discoveryService.discoverModels(record);
       } catch {

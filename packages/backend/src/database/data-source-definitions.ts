@@ -96,6 +96,7 @@ import { AddProxyProfileLines1805700000000 } from './migrations/1805700000000-Ad
 import { NotificationLogAlertType1805800000000 } from './migrations/1805800000000-NotificationLogAlertType';
 import { DropOrphanLimitRules1805800000001 } from './migrations/1805800000001-DropOrphanLimitRules';
 import { AllowPrivateDestination1805900000000 } from './migrations/1805900000000-AllowPrivateDestination';
+import { AddTenantProviderUrlOverrides1806000000000 } from './migrations/1806000000000-AddTenantProviderUrlOverrides';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -439,4 +440,5 @@ export const migrations = [
   NotificationLogAlertType1805800000000,
   DropOrphanLimitRules1805800000001,
   AllowPrivateDestination1805900000000,
+  AddTenantProviderUrlOverrides1806000000000,
 ];

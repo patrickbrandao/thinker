@@ -52,6 +52,7 @@ describe('KiroOauthController', () => {
         'tenant-1',
         'user-1',
         {},
+        undefined,
       );
       expect(result.flowId).toBe('flow-1');
     });
@@ -81,6 +82,7 @@ describe('KiroOauthController', () => {
           startUrl: 'https://org.awsapps.com/start',
           region: 'eu-west-1',
         },
+        undefined,
       );
     });
 

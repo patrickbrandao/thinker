@@ -12,6 +12,7 @@ import { t } from '../i18n/index.js';
 import AuthUrlFallback from './AuthUrlFallback.js';
 import { monitorOAuthPopup } from '../services/oauth-popup.js';
 import { Button, IconButton, WindowFooter } from './ui.js';
+import { collectUrlOverrides, useUrlsScope } from './ConnectionUrlsScope.js';
 
 const MAX_LABEL_LENGTH = 50;
 
@@ -200,6 +201,7 @@ export default function OAuthDetailView(props: Props) {
   // Set when the browser blocked the sign-in window: the URL to open by hand.
   const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
   const successHandled = useRef(false);
+  const urlsScope = useUrlsScope();
   const latest = useRef(props);
   latest.current = props;
 
@@ -247,12 +249,16 @@ export default function OAuthDetailView(props: Props) {
 
   const handleOAuthLogin = async () => {
     const p = latest.current;
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
     p.setBusy(true);
     setPasteUrl('');
     setPasteError(null);
     setBlockedUrl(null);
     try {
-      const { url } = await oauthApi().getUrl(p.agentName);
+      const { url } = await (urlOverrides
+        ? oauthApi().getUrl(p.agentName, urlOverrides)
+        : oauthApi().getUrl(p.agentName));
       try {
         setOauthState(new URL(url).searchParams.get('state'));
       } catch {

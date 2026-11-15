@@ -219,8 +219,8 @@ const QWEN_TOKEN_PLAN_BASE = 'https://token-plan.ap-southeast-1.maas.aliyuncs.co
 const ZAI_SUBSCRIPTION_BASE = getZaiCodingPlanBaseUrl('global');
 // OpenCode serves inference per wire protocol under /inference (models.dev
 // `opencode` / `opencode-go` entries); the older /zen paths are retired there.
-const OPENCODE_INFERENCE_BASE = 'https://opencode.ai/inference';
-const OPENCODE_GO_INFERENCE_BASE = 'https://opencode.ai/inference/go';
+export const OPENCODE_INFERENCE_BASE = 'https://opencode.ai/inference';
+export const OPENCODE_GO_INFERENCE_BASE = 'https://opencode.ai/inference/go';
 const KILO_GATEWAY_BASE = 'https://api.kilo.ai/api/gateway';
 const NOUS_PORTAL_BASE = 'https://inference-api.nousresearch.com';
 // OpenAI-compatible aggregators (api-atlascloud, api-edenai, api-requesty).
@@ -820,6 +820,34 @@ export function buildEndpointOverride(baseUrl: string, templateKey: string): Pro
     // MiniMax OAuth resource URL). Treat it as an SSRF candidate and
     // re-validate before each forward.
     requiresSsrfRevalidation: true,
+  };
+}
+
+/**
+ * A connection's overridden inference base (ADR 0012) on the template of the
+ * variant chosen for the model. Only trailing slashes are dropped, plus a
+ * final `/v1` when the template's path starts with `/v1` (it would double):
+ * bases that include `/v1` themselves (Atlas Cloud, Requesty) keep it.
+ */
+export function buildSlotEndpoint(
+  baseUrl: string,
+  templateKey: string,
+  allowPrivateDestination: boolean,
+): ProviderEndpoint {
+  const template = PROVIDER_ENDPOINTS[templateKey];
+  if (!template) {
+    throw new Error(`No provider endpoint template configured for: ${templateKey}`);
+  }
+  let base = baseUrl.replace(/\/+$/, '');
+  if (/\/v1$/.test(base) && /^\/v1(?:\/|$)/.test(template.buildPath('model'))) {
+    base = base.slice(0, -'/v1'.length);
+  }
+  return {
+    ...template,
+    baseUrl: base,
+    requiresSsrfRevalidation: true,
+    allowPrivateDestination,
+    ...(templateKey === 'anthropic' ? { anthropicAccountOverride: true } : {}),
   };
 }
 

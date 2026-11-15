@@ -17,7 +17,7 @@ import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { providerIcon } from './ProviderIcon.js';
 import { Badge, Button, Field, cx, WindowFooter } from './ui.js';
-import type { FormLayout } from './TabbedWindow.js';
+import { SectionTabs, type FormLayout } from './TabbedWindow.js';
 
 export const LOCAL_SERVER_TYPE_NAMES: Record<LocalServerType, string> = {
   ollama: 'Ollama',
@@ -359,6 +359,74 @@ export default function LocalServerForm(props: Props) {
       )}
     </>
   );
+  const prefix = current.path_prefix.trim().replace(/^\/*/, '/').replace(/\/+$/, '');
+  const serverUrl = `${current.scheme}://${current.host.trim() || '…'}:${current.port}${prefix}`;
+  // Scheme, host, port and path prefix live on the URLs tab (ADR 0012).
+  const urlsSection = (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void runProbe();
+      }}
+    >
+      <p className="m-0 text-sm text-muted">{t('providerSetup.localServer.urlsIntro')}</p>
+      <div className="grid grid-cols-[7rem_1fr_6rem] gap-2">
+        <Field label={t('providerSetup.localServer.scheme')} htmlFor={id('scheme')}>
+          <select
+            id={id('scheme')}
+            className="field"
+            value={current.scheme}
+            onChange={(e) => set({ scheme: e.currentTarget.value as 'http' | 'https' })}
+          >
+            {/* i18n-ignore: URL scheme */}
+            <option value="http">http</option>
+            {/* i18n-ignore: URL scheme */}
+            <option value="https">https</option>
+          </select>
+        </Field>
+        <Field label={t('providerSetup.localServer.host')} htmlFor={id('host')}>
+          <input
+            id={id('host')}
+            className="field font-mono"
+            type="text"
+            placeholder="192.168.1.20"
+            value={current.host}
+            onChange={(e) => set({ host: e.currentTarget.value })}
+          />
+        </Field>
+        <Field label={t('providerSetup.localServer.port')} htmlFor={id('port')}>
+          <input
+            id={id('port')}
+            className="field font-mono"
+            type="number"
+            min={1}
+            max={65535}
+            value={current.port}
+            onChange={(e) => set({ port: e.currentTarget.value })}
+          />
+        </Field>
+      </div>
+      <Field
+        label={t('providerSetup.localServer.pathPrefix')}
+        hint={t(
+          props.type === 'llamacpp'
+            ? 'providerSetup.localServer.pathPrefixHintLlamacpp'
+            : 'providerSetup.localServer.pathPrefixHint',
+        )}
+        htmlFor={id('prefix')}
+      >
+        <input
+          id={id('prefix')}
+          className="field font-mono"
+          type="text"
+          placeholder="/"
+          value={current.path_prefix}
+          onChange={(e) => set({ path_prefix: e.currentTarget.value })}
+        />
+      </Field>
+    </form>
+  );
   const serverSection = (
     <div className="flex flex-col gap-4">
       <form
@@ -378,60 +446,9 @@ export default function LocalServerForm(props: Props) {
             onChange={(e) => set({ name: e.currentTarget.value })}
           />
         </Field>
-        <div className="grid grid-cols-[7rem_1fr_6rem] gap-2">
-          <Field label={t('providerSetup.localServer.scheme')} htmlFor={id('scheme')}>
-            <select
-              id={id('scheme')}
-              className="field"
-              value={current.scheme}
-              onChange={(e) => set({ scheme: e.currentTarget.value as 'http' | 'https' })}
-            >
-              {/* i18n-ignore: URL scheme */}
-              <option value="http">http</option>
-              {/* i18n-ignore: URL scheme */}
-              <option value="https">https</option>
-            </select>
-          </Field>
-          <Field label={t('providerSetup.localServer.host')} htmlFor={id('host')}>
-            <input
-              id={id('host')}
-              className="field font-mono"
-              type="text"
-              placeholder="192.168.1.20"
-              value={current.host}
-              onChange={(e) => set({ host: e.currentTarget.value })}
-            />
-          </Field>
-          <Field label={t('providerSetup.localServer.port')} htmlFor={id('port')}>
-            <input
-              id={id('port')}
-              className="field font-mono"
-              type="number"
-              min={1}
-              max={65535}
-              value={current.port}
-              onChange={(e) => set({ port: e.currentTarget.value })}
-            />
-          </Field>
-        </div>
-        <Field
-          label={t('providerSetup.localServer.pathPrefix')}
-          hint={t(
-            props.type === 'llamacpp'
-              ? 'providerSetup.localServer.pathPrefixHintLlamacpp'
-              : 'providerSetup.localServer.pathPrefixHint',
-          )}
-          htmlFor={id('prefix')}
-        >
-          <input
-            id={id('prefix')}
-            className="field font-mono"
-            type="text"
-            placeholder="/"
-            value={current.path_prefix}
-            onChange={(e) => set({ path_prefix: e.currentTarget.value })}
-          />
-        </Field>
+        <p className="m-0 text-xs text-muted" data-testid="local-server-url">
+          {t('providerSetup.localServer.urlSummary', { url: serverUrl })}
+        </p>
         <Field
           label={t('providerSetup.localServer.apiKey')}
           hint={
@@ -870,6 +887,7 @@ export default function LocalServerForm(props: Props) {
             </div>
           ),
         },
+        { key: 'urls', label: t('providerSetup.urls.tab'), content: urlsSection },
         {
           key: 'models',
           label: t('providers.detail.manageTab.models'),
@@ -883,8 +901,22 @@ export default function LocalServerForm(props: Props) {
   return (
     <div className="flex flex-col gap-4">
       {header}
-      {serverSection}
-      {isEdit ? editModelsSection : modelsSection}
+      <SectionTabs
+        label={typeName}
+        sections={[
+          {
+            key: 'server',
+            label: t('providers.detail.manageTab.server'),
+            content: (
+              <div className="flex flex-col gap-4">
+                {serverSection}
+                {isEdit ? editModelsSection : modelsSection}
+              </div>
+            ),
+          },
+          { key: 'urls', label: t('providerSetup.urls.tab'), content: urlsSection },
+        ]}
+      />
       <WindowFooter>{actions}</WindowFooter>
     </div>
   );

@@ -1,4 +1,5 @@
 import { normalizeProviderBaseUrl } from './provider-base-url';
+import { fetchProviderUrl, scopedProviderUrl } from './provider-urls/provider-url-scope';
 
 const QWEN_REGION_BASE_URLS = {
   singapore: 'https://dashscope-intl.aliyuncs.com/compatible-mode',
@@ -25,7 +26,8 @@ export const QWEN_REGION_VALIDATION_MESSAGE =
 export type QwenResolvedRegion = keyof typeof QWEN_REGION_BASE_URLS;
 export type QwenRegion = string;
 
-function buildModelsUrl(region: QwenResolvedRegion): string {
+/** The models URL the region detection probes for one region. */
+export function qwenRegionModelsUrl(region: QwenResolvedRegion): string {
   return `${QWEN_REGION_BASE_URLS[region]}/v1/models`;
 }
 
@@ -101,10 +103,17 @@ export async function detectQwenRegion(
 
   for (const region of QWEN_REGION_DETECTION_ORDER) {
     try {
-      const response = await fetchImpl(buildModelsUrl(region), {
-        headers,
-        signal: AbortSignal.timeout(QWEN_DETECTION_TIMEOUT_MS),
-      });
+      // A connect-time override (`region_probe_<region>`) replaces that probe.
+      const target = scopedProviderUrl(
+        'qwen',
+        'api_key',
+        `region_probe_${region}`,
+        qwenRegionModelsUrl(region),
+      );
+      const init = { headers, signal: AbortSignal.timeout(QWEN_DETECTION_TIMEOUT_MS) };
+      const response = target.overridden
+        ? await fetchProviderUrl(target, init)
+        : await fetchImpl(target.url, init);
       if (response.ok) return region;
     } catch {
       // Try the next official region before giving up.

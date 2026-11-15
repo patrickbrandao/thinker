@@ -41,7 +41,7 @@ describe('AnthropicOauthController', () => {
       });
       const result = await ctrl.authorize('demo-agent', ctx);
       expect(result).toEqual({ url: expect.any(String), state: 's1' });
-      expect(oauth.generateAuthorizationUrl).toHaveBeenCalledWith('agent-1', 'tenant-1');
+      expect(oauth.generateAuthorizationUrl).toHaveBeenCalledWith('agent-1', 'tenant-1', undefined);
     });
   });
 

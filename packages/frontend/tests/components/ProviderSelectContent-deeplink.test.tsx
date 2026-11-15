@@ -58,8 +58,11 @@ describe('ProviderSelectContent — providerDeepLink', () => {
     // The detail view should be visible (provider-modal__view--from-right)
     const detailView = container.querySelector('.provider-modal__view--from-right');
     expect(detailView).not.toBeNull();
-    // The tab list (part of provider list view) should not be visible
-    expect(container.querySelector('[role="tablist"]')).toBeNull();
+    // The only tab list is the flow's own: Connection, then the optional URLs tab.
+    const tabs = [...container.querySelectorAll('[role="tablist"] [role="tab"]')].map(
+      (tab) => tab.textContent,
+    );
+    expect(tabs).toEqual(['Connection', 'URLs']);
   });
 
   it('shows the correct provider name in the detail view', () => {

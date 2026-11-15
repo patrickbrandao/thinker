@@ -13,7 +13,37 @@ import {
   type OAuthTokenBlob,
 } from '../core';
 import { ANTHROPIC_OAUTH } from './anthropic-oauth.config';
-import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import {
+  fetchProviderUrl,
+  runWithProviderUrls,
+  scopedProviderUrl,
+  type ProviderUrlConnection,
+} from '../../provider-urls/provider-url-scope';
+import { applyFlowUrls } from '../core/flow-urls';
+import type { PendingFlowUrls } from '../core/oauth-pending-flow.store';
+
+/** A pending flow's stored overrides as the connection its calls use. */
+function pendingConnection(urls: PendingFlowUrls | null | undefined) {
+  return urls
+    ? {
+        provider: 'anthropic',
+        authType: 'subscription',
+        urlOverrides: urls.overrides,
+        allowPrivate: urls.allowPrivate,
+      }
+    : undefined;
+}
+
+/** The slot URL for the Claude login in scope (ADR 0012). */
+function anthropicUrl(slot: 'oauth_authorize' | 'oauth_token' | 'oauth_redirect') {
+  const builtIn =
+    slot === 'oauth_authorize'
+      ? ANTHROPIC_OAUTH.AUTHORIZE_URL
+      : slot === 'oauth_token'
+        ? ANTHROPIC_OAUTH.TOKEN_URL
+        : ANTHROPIC_OAUTH.REDIRECT_URI;
+  return scopedProviderUrl('anthropic', 'subscription', slot, builtIn);
+}
 
 export interface AuthorizeResult {
   url: string;
@@ -73,27 +103,40 @@ export class AnthropicOauthService {
    * Build the authorize URL the user opens in a new tab. The state is also
    * returned so the SPA can pre-fill it on the paste-code step.
    */
-  async generateAuthorizationUrl(agentId: string, tenantId: string): Promise<AuthorizeResult> {
+  async generateAuthorizationUrl(
+    agentId: string,
+    tenantId: string,
+    /** The account's URL overrides, for this flow and the account it creates. */
+    urls?: ProviderUrlConnection,
+  ): Promise<AuthorizeResult> {
     const { verifier, challenge } = generatePkce();
     // Claude Code's Anthropic OAuth flow uses the PKCE verifier as state.
     const state = verifier;
+    const stored: PendingFlowUrls | null = urls?.urlOverrides
+      ? { overrides: urls.urlOverrides, allowPrivate: urls.allowPrivate !== false }
+      : null;
     await this.pendingFlows.create(
       PROVIDER,
-      { state, verifier, agentId, tenantId },
+      { state, verifier, agentId, tenantId, urls: stored },
       ANTHROPIC_OAUTH.STATE_TTL_MS,
     );
+    return runWithProviderUrls(pendingConnection(stored), () =>
+      this.authorizeUrl(state, challenge),
+    );
+  }
 
+  private authorizeUrl(state: string, challenge: string): AuthorizeResult {
     const params = new URLSearchParams({
       code: 'true',
       client_id: ANTHROPIC_OAUTH.CLIENT_ID,
       response_type: 'code',
-      redirect_uri: ANTHROPIC_OAUTH.REDIRECT_URI,
+      redirect_uri: anthropicUrl('oauth_redirect').url,
       scope: ANTHROPIC_OAUTH.SCOPE,
       state,
       code_challenge: challenge,
       code_challenge_method: 'S256',
     });
-    return { url: `${ANTHROPIC_OAUTH.AUTHORIZE_URL}?${params.toString()}`, state };
+    return { url: `${anthropicUrl('oauth_authorize').url}?${params.toString()}`, state };
   }
 
   /**
@@ -122,16 +165,26 @@ export class AnthropicOauthService {
     if (pending.expiresAt < Date.now()) {
       throw new Error('OAuth state expired');
     }
+    await runWithProviderUrls(pendingConnection(pending.urls), () =>
+      this.completeExchange(pending, code, state, createdByUserId),
+    );
+  }
 
+  private async completeExchange(
+    pending: { agentId: string; tenantId: string; verifier: string; urls?: PendingFlowUrls | null },
+    code: string,
+    state: string,
+    createdByUserId?: string | null,
+  ): Promise<void> {
     const tokenRequest = {
       grant_type: 'authorization_code',
       code,
       state,
       client_id: ANTHROPIC_OAUTH.CLIENT_ID,
-      redirect_uri: ANTHROPIC_OAUTH.REDIRECT_URI,
+      redirect_uri: anthropicUrl('oauth_redirect').url,
       code_verifier: pending.verifier || state,
     };
-    const response = await outboundFetch(ANTHROPIC_OAUTH.TOKEN_URL, {
+    const response = await fetchProviderUrl(anthropicUrl('oauth_token'), {
       method: 'POST',
       headers: ANTHROPIC_OAUTH_TOKEN_HEADERS,
       body: JSON.stringify(tokenRequest),
@@ -153,7 +206,7 @@ export class AnthropicOauthService {
     };
 
     const label = await this.providerService.nextOAuthLabel(pending.tenantId, PROVIDER);
-    const { provider: savedProvider } = await this.providerService.upsertProvider(
+    const { provider: upserted } = await this.providerService.upsertProvider(
       pending.agentId,
       pending.tenantId,
       PROVIDER,
@@ -161,6 +214,12 @@ export class AnthropicOauthService {
       'subscription',
       undefined,
       label,
+      createdByUserId,
+    );
+    const savedProvider = await applyFlowUrls(
+      this.providerService,
+      upserted,
+      pendingConnection(pending.urls),
       createdByUserId,
     );
     try {
@@ -172,7 +231,7 @@ export class AnthropicOauthService {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<OAuthTokenBlob> {
-    const response = await outboundFetch(ANTHROPIC_OAUTH.TOKEN_URL, {
+    const response = await fetchProviderUrl(anthropicUrl('oauth_token'), {
       method: 'POST',
       headers: ANTHROPIC_OAUTH_TOKEN_HEADERS,
       body: JSON.stringify({

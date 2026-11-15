@@ -1,5 +1,6 @@
 import type { AuthType } from 'thinker-shared';
 import { fetchJson } from './core.js';
+import type { ConnectionUrl } from './provider-urls.js';
 
 export interface TenantProviderConnection {
   id: string;
@@ -20,6 +21,8 @@ export interface TenantProviderConnection {
   /** The official URL used when `base_url` is null. */
   default_base_url?: string | null;
   supports_base_url?: boolean;
+  /** Every URL slot of the account with its override (null = default). */
+  urls?: ConnectionUrl[];
 }
 
 /**

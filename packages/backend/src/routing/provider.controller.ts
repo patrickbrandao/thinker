@@ -44,13 +44,19 @@ import {
 import { MinRole } from '../common/decorators/roles.decorator';
 import { providerKeyDisplay } from '../common/utils/provider-key-mask';
 import { isLocalOnlyProvider } from '../common/utils/provider-availability';
-import {
-  assertCanUseLocalRunners,
-  canUsePrivateDestinations,
-} from '../common/utils/private-url-policy';
+import { assertCanUseLocalRunners } from '../common/utils/private-url-policy';
 import { PROVIDER_CONNECTION_SCOPE } from './routing-core/resolve-agent.service';
 import { checkAccountBaseUrl } from './account-base-url-check';
 import { supportsAccountBaseUrl } from './account-base-url';
+import {
+  checkUrlOverrides,
+  connectionUrls,
+  effectiveUrlOverrides,
+  emitUrlsChangedAlert,
+  legacyBaseUrlOverrides,
+  parseUrlOverridesInput,
+  runWithProviderUrls,
+} from './provider-urls/provider-urls';
 
 @MinRole('admin')
 @Controller('api/v1/routing')
@@ -204,6 +210,42 @@ export class ProviderController {
         'Only API-key connections of a built-in provider take a base URL',
       );
     }
+    // Editable URLs (ADR 0012). `accountBaseUrl` (CLI, older clients) is the
+    // inference slot; `urlOverrides` wins where both name a slot.
+    const urlChanges = parseUrlOverridesInput(body.urlOverrides);
+    const authType = body.authType ?? 'api_key';
+    const requestedChanges =
+      !isCustomProvider && (urlChanges || accountBaseUrl !== undefined)
+        ? {
+            ...(accountBaseUrl
+              ? legacyBaseUrlOverrides(lowerProvider, 'api_key', accountBaseUrl)
+              : accountBaseUrl === null
+                ? Object.fromEntries(
+                    Object.keys(legacyBaseUrlOverrides(lowerProvider, 'api_key', 'x')).map(
+                      (slot) => [slot, null],
+                    ),
+                  )
+                : {}),
+            ...(urlChanges ?? {}),
+          }
+        : undefined;
+    const requestedUrls = requestedChanges
+      ? await checkUrlOverrides(
+          { provider: lowerProvider, authType, region: qwenRegion ?? body.region ?? null },
+          {},
+          requestedChanges,
+          ctx,
+        )
+      : undefined;
+    // Connect-time calls (Qwen's region detection) already use them.
+    const connectUrls = requestedUrls
+      ? {
+          provider: lowerProvider,
+          authType,
+          urlOverrides: requestedUrls.overrides,
+          allowPrivate: requestedUrls.allowPrivate,
+        }
+      : undefined;
 
     // Sync Ollama models before connecting so tier assignment has data
     if (body.provider.toLowerCase() === 'ollama') {
@@ -213,23 +255,41 @@ export class ProviderController {
     // The service handles enabled-provider rows itself: new rows fan out to
     // every owned agent, updates re-enable the connecting agent via
     // afterProviderChange — no controller-side insert needed.
-    let { provider: result } = await this.providerService.upsertProvider(
-      agent.id,
-      agent.tenant_id,
-      body.provider,
-      body.apiKey,
-      body.authType,
-      qwenRegion,
-      label,
-      ctx.userId,
-    );
-    if (accountBaseUrl !== undefined) {
-      result = await this.providerService.setBaseUrl(
+    let { provider: result } = await runWithProviderUrls(connectUrls, () =>
+      this.providerService.upsertProvider(
+        agent.id,
         agent.tenant_id,
-        result.id,
-        accountBaseUrl,
-        canUsePrivateDestinations(ctx),
+        body.provider,
+        body.apiKey,
+        body.authType,
+        qwenRegion,
+        label,
+        ctx.userId,
+      ),
+    );
+    if (requestedChanges) {
+      // Merged onto what an existing connection already has.
+      const conn = connectionUrls(result);
+      const { overrides, changed, allowPrivate } = await checkUrlOverrides(
+        conn,
+        effectiveUrlOverrides(conn),
+        requestedChanges,
+        ctx,
       );
+      if (changed.length > 0) {
+        result = await this.providerService.setUrlOverrides(
+          agent.tenant_id,
+          result.id,
+          overrides,
+          allowPrivate,
+        );
+        emitUrlsChangedAlert({
+          tenantId: agent.tenant_id,
+          userId: ctx.userId,
+          connection: result,
+          changed,
+        });
+      }
     }
 
     // Discover models before returning so the frontend sees updated model

@@ -91,6 +91,7 @@ describe('XaiOauthController', () => {
         'tenant-1',
         'https://xai.example.com',
         'user-1',
+        undefined,
       );
     });
 
@@ -103,6 +104,7 @@ describe('XaiOauthController', () => {
         'tenant-1',
         'https://api.example.com',
         'user-1',
+        undefined,
       );
     });
 
@@ -207,8 +209,8 @@ describe('XaiOauthController', () => {
         blobKey('Default', 'access-1', 'refresh-1'),
       ]);
       await ctrl.revoke('agent', undefined, ctx);
-      expect(oauth.revokeToken).toHaveBeenCalledWith('access-1');
-      expect(oauth.revokeToken).toHaveBeenCalledWith('refresh-1');
+      expect(oauth.revokeToken).toHaveBeenCalledWith('access-1', expect.anything());
+      expect(oauth.revokeToken).toHaveBeenCalledWith('refresh-1', expect.anything());
       // Verify agent.tenant_id is threaded through to removeProvider
       expect(providerService.removeProvider).toHaveBeenCalledWith(
         'agent-1',
@@ -237,8 +239,8 @@ describe('XaiOauthController', () => {
         blobKey('Work', 'a2', 'r2'),
       ]);
       await ctrl.revoke('agent', 'work', ctx);
-      expect(oauth.revokeToken).toHaveBeenCalledWith('a2');
-      expect(oauth.revokeToken).toHaveBeenCalledWith('r2');
+      expect(oauth.revokeToken).toHaveBeenCalledWith('a2', expect.anything());
+      expect(oauth.revokeToken).toHaveBeenCalledWith('r2', expect.anything());
       expect(oauth.revokeToken).not.toHaveBeenCalledWith('a1');
       expect(providerService.removeProvider).toHaveBeenCalledWith(
         'agent-1',

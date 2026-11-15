@@ -1,15 +1,13 @@
 /**
  * Editable base URL of an API-key connection (`tenant_providers.base_url`).
  *
- * Precedence when forwarding and discovering models: the connection's own
- * base URL, then its region, then the provider's built-in endpoint. The URL
- * replaces only the base; every API path stays the same. Subscriptions
- * (OAuth/token) keep their fixed hosts, so a token is never sent elsewhere.
+ * Since ADR 0012 it is the `inference` slot of the connection's editable
+ * URLs (routing/provider-urls); this module keeps the legacy shortcut
+ * (`PATCH .../base-url`, `accountBaseUrl` on connect, `base_url` fields).
  */
 import { CustomProviderService } from './custom-provider/custom-provider.service';
-import { PROVIDER_ENDPOINTS, resolveEndpointKey } from './proxy/provider-endpoints';
-import { resolveForwardEndpoint } from './proxy/forward-endpoint-resolver';
-import { normalizeProviderBaseUrl } from './provider-base-url';
+import { resolveEndpointKey } from './proxy/provider-endpoints';
+import { defaultProviderUrl, legacyBaseUrlFor } from './provider-urls/provider-urls';
 
 const MAX_BASE_URL_LENGTH = 2048;
 
@@ -45,29 +43,20 @@ export function normalizeAccountBaseUrl(raw: string | null | undefined): string 
 }
 
 /**
- * The URL a connection uses when it has no base URL of its own: the region's
- * endpoint when the region changes it, else the provider's built-in one.
+ * The URL a connection uses when it has no base URL of its own, in the
+ * legacy `base_url` shape: the inference slot default (ADR 0012), region
+ * included; OpenCode's OpenAI-protocol base, Bedrock's Mantle host.
  */
 export function defaultAccountBaseUrl(
   provider: string,
   authType: string | undefined,
   region: string | null | undefined,
 ): string | null {
-  const { customEndpoint } = resolveForwardEndpoint({
-    provider,
-    authType: authType ?? 'api_key',
-    model: '',
-    providerRegion: region ?? null,
-  });
-  if (customEndpoint) return customEndpoint.baseUrl;
-  const key = resolveEndpointKey(provider);
-  return key ? (PROVIDER_ENDPOINTS[key]?.baseUrl ?? null) : null;
-}
-
-/** Rewrites a built-in URL (e.g. a models endpoint) onto the connection's base. */
-export function rebaseUrl(url: string, officialBase: string | null, accountBase: string): string {
-  if (!officialBase) return url;
-  const from = normalizeProviderBaseUrl(officialBase);
-  if (!url.startsWith(from)) return url;
-  return `${normalizeProviderBaseUrl(accountBase)}${url.slice(from.length)}`;
+  const auth = authType ?? 'api_key';
+  const defaults: Record<string, string> = {};
+  for (const slot of ['inference', 'inference_mantle']) {
+    const value = defaultProviderUrl(provider, auth, region, slot);
+    if (value) defaults[slot] = value;
+  }
+  return legacyBaseUrlFor(provider, defaults);
 }

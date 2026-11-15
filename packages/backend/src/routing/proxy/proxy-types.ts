@@ -1,3 +1,4 @@
+import type { ProviderUrlConnection } from '../provider-urls/provider-url-scope';
 import type { EgressHop, EgressSummary, OutboundScope } from '../../common/outbound/outbound-proxy';
 import type { IncomingHttpHeaders } from 'http';
 import type { RecordingResponseBody } from './attempt-recording.types';
@@ -130,6 +131,11 @@ export interface ForwardOptions {
    */
   extraHeaders?: Record<string, string>;
   customEndpoint?: ProviderEndpoint;
+  /**
+   * The serving connection's URLs (ADR 0012). An overridden inference slot
+   * replaces the base of the variant ProviderClient picks for the model.
+   */
+  urls?: ProviderUrlConnection;
   authType?: string;
   /** Lookup for re-injecting cached thought_signature values (Google only). */
   signatureLookup?: SignatureLookup;

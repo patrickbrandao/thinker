@@ -210,6 +210,17 @@ describe('LocalServerForm validation', () => {
   });
 });
 
+describe('LocalServerForm URLs tab', () => {
+  it('moves scheme, host, port and path prefix to a URLs tab after Server', async () => {
+    await renderNew();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Server', 'URLs']);
+    for (const label of ['Scheme', 'Host', 'Port', 'Path prefix']) {
+      expect(field(label).closest('[role="tabpanel"]')?.getAttribute('data-section')).toBe('urls');
+    }
+    expect(field('Name').closest('[role="tabpanel"]')?.getAttribute('data-section')).toBe('server');
+  });
+});
+
 describe('LocalServerForm connection test', () => {
   it('sends the typed config (trimmed, in ms) and the key only when typed', async () => {
     await renderNew();

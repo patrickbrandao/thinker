@@ -3,6 +3,7 @@ import type { TenantContext } from '../common/decorators/tenant-context.decorato
 import { canUsePrivateDestinations } from '../common/utils/private-url-policy';
 import { validatePublicUrl } from '../common/utils/url-validation';
 import type { TenantProvider } from '../entities/tenant-provider.entity';
+import { connectionUrls, connectionUrlViews } from './provider-urls/provider-urls';
 import {
   defaultAccountBaseUrl,
   normalizeAccountBaseUrl,
@@ -33,12 +34,17 @@ export async function checkAccountBaseUrl(
   return url;
 }
 
-/** Base URL fields of a connection for the dashboard. */
+/** Base URL and editable URL fields of a connection for the dashboard. */
 export function baseUrlFields(
-  p: Pick<TenantProvider, 'provider' | 'auth_type' | 'region' | 'base_url'>,
+  p: Pick<
+    TenantProvider,
+    'provider' | 'auth_type' | 'region' | 'base_url' | 'url_overrides' | 'allow_private_destination'
+  >,
 ) {
   const supports = supportsAccountBaseUrl(p.provider, p.auth_type);
   return {
+    /** Every editable URL of the connection (ADR 0012); `value` null = the default. */
+    urls: connectionUrlViews(connectionUrls(p)),
     region: p.region ?? null,
     base_url: supports ? (p.base_url ?? null) : null,
     default_base_url: supports ? defaultAccountBaseUrl(p.provider, p.auth_type, p.region) : null,

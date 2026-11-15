@@ -1,4 +1,5 @@
 import { withOrganizationHeader } from '../org-context.js';
+import { urlOverridesBody, urlOverridesInit, type UrlOverrides } from './provider-urls.js';
 import type {
   AuthType,
   ModelCapability,
@@ -68,6 +69,8 @@ export function connectProvider(
     base_url?: string;
     /** API-key connections: replaces the provider's official base URL. */
     accountBaseUrl?: string;
+    /** URLs tab: slot id to URL, only the slots the user changed. */
+    urlOverrides?: UrlOverrides;
   },
 ) {
   return fetchMutate<{
@@ -81,7 +84,11 @@ export function connectProvider(
   }>(routingPath(agentName, 'providers'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      urlOverrides: undefined,
+      ...urlOverridesBody(data.urlOverrides),
+    }),
   });
 }
 
@@ -198,25 +205,6 @@ export function setConnectionStreamIdle(connectionId: string, streamIdleTimeoutM
   );
 }
 
-export function setConnectionBaseUrl(connectionId: string, baseUrl: string | null) {
-  return fetchMutate<{ id: string; base_url: string | null; default_base_url: string | null }>(
-    `/providers/connections/${encodeURIComponent(connectionId)}/base-url`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base_url: baseUrl }),
-    },
-  );
-}
-
-/** Official base URL of a provider (and region) for the base URL placeholder. */
-export function getDefaultBaseUrl(provider: string, authType: string, region?: string) {
-  return fetchJson<{ supports_base_url: boolean; default_base_url: string | null }>(
-    '/providers/default-base-url',
-    { provider, auth_type: authType, ...(region ? { region } : {}) },
-  );
-}
-
 export function refreshConnectionModels() {
   return fetchMutate<{ ok: boolean }>('/providers/refresh-models', { method: 'POST' });
 }
@@ -249,9 +237,10 @@ export interface DeviceCodeResponse {
 
 export type CopilotPollStatus = 'pending' | 'complete' | 'expired' | 'denied' | 'slow_down';
 
-export function copilotDeviceCode(agentName: string) {
+export function copilotDeviceCode(agentName: string, urlOverrides?: UrlOverrides) {
   return fetchMutate<DeviceCodeResponse>(routingPath(agentName, 'copilot/device-code'), {
     method: 'POST',
+    ...urlOverridesInit(urlOverrides),
   });
 }
 

@@ -50,6 +50,7 @@ describe('MinimaxOauthController', () => {
       'tenant-1',
       'cn',
       'user-1',
+      undefined,
     );
     expect(result.flowId).toBe('flow-1');
   });

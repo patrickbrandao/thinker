@@ -20,7 +20,6 @@ import {
   type ProviderEndpoint,
 } from './provider-endpoints';
 import { CustomProviderService } from '../custom-provider/custom-provider.service';
-import { stripModelPrefix } from './model-prefix';
 import { normalizeMinimaxSubscriptionBaseUrl } from '../provider-base-url';
 import {
   getBedrockMantleBaseUrl,
@@ -58,13 +57,6 @@ export interface ResolveForwardEndpointParams {
   model: string;
   /** Persisted region for the credential (e.g. `cn`), when known. */
   providerRegion?: string | null;
-  /**
-   * The API-key connection's own base URL. Wins over the region and the
-   * built-in endpoint; only the base changes, the API paths stay the same.
-   */
-  providerBaseUrl?: string | null;
-  /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
-  providerBaseUrlAllowsPrivate?: boolean;
   /** OAuth resource_url (MiniMax region base URL), when present. */
   resourceUrl?: string;
   /**
@@ -98,8 +90,6 @@ export function resolveForwardEndpoint(
     authType,
     model,
     providerRegion,
-    providerBaseUrl,
-    providerBaseUrlAllowsPrivate,
     resourceUrl,
     customProvider,
     logger,
@@ -159,16 +149,8 @@ export function resolveForwardEndpoint(
       );
       forwardModel = CustomProviderService.rawModelName(model);
     }
-  } else if (providerBaseUrl && authType === 'api_key' && resolveEndpointKey(provider)) {
-    const key = resolveEndpointKey(provider)!;
-    const overrideKey = key === 'bedrock' ? resolveBedrockEndpointKey(model, apiMode) : key;
-    customEndpoint = buildEndpointOverride(providerBaseUrl, overrideKey);
-    // The override reaches ProviderClient as a custom endpoint, which forwards
-    // the model untouched; strip the catalog prefix (opencode-go/glm-5.3) here,
-    // exactly as the native endpoint would have.
-    forwardModel = stripModelPrefix(forwardModel, overrideKey);
-    customEndpoint.allowPrivateDestination = allowsPrivateDestination(providerBaseUrlAllowsPrivate);
-    if (overrideKey === 'anthropic') customEndpoint.anthropicAccountOverride = true;
+    // A connection's own URLs (ADR 0012) are not resolved here: ProviderClient
+    // applies them after choosing the per-model variant (resolveProviderUrl).
   } else if (resolveEndpointKey(provider) === 'bedrock' && isBedrockRegion(providerRegion)) {
     const bedrockEndpointKey = resolveBedrockEndpointKey(model, apiMode);
     customEndpoint = buildEndpointOverride(
@@ -181,7 +163,13 @@ export function resolveForwardEndpoint(
     // Connections that carry `project/location` address Vertex the way Google
     // Cloud accounts do; everything else stays on the express base URL.
     customEndpoint = buildEndpointOverride(getVertexBaseUrl(vertexDeployment), 'vertex');
-  } else if (resolveEndpointKey(provider) === 'qwen' && isQwenResolvedEndpoint(providerRegion)) {
+  } else if (
+    // The API-key regions only: a Token Plan connection keeps its own host
+    // (and its Responses variant) even if a region were ever stored on it.
+    authType !== 'subscription' &&
+    resolveEndpointKey(provider) === 'qwen' &&
+    isQwenResolvedEndpoint(providerRegion)
+  ) {
     customEndpoint = buildEndpointOverride(getQwenCompatibleBaseUrl(providerRegion), 'qwen');
   } else if (authType === 'api_key' && lower === 'minimax' && providerRegion === 'cn') {
     customEndpoint = buildEndpointOverride(MINIMAX_BASE_URLS.cn, 'minimax');

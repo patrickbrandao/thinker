@@ -15,7 +15,6 @@ import {
   DEFAULT_REGION,
   getMinimaxBaseUrl,
   buildMinimaxCodeUrl,
-  buildMinimaxTokenUrl,
   buildMinimaxResourceUrl,
   getMinimaxResourceUrl,
   getMinimaxOauthBaseUrl,
@@ -24,7 +23,15 @@ import {
   toPollIntervalMs,
   isOAuthTokenBlob,
 } from './minimax-oauth-helpers';
-import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import {
+  fetchProviderUrl,
+  runWithProviderUrls,
+  scopedProviderUrl,
+  withPath,
+  type ProviderUrlConnection,
+  type ResolvedProviderUrl,
+} from '../../provider-urls/provider-url-scope';
+import { applyFlowUrls } from '../core/flow-urls';
 
 /** Parse a stored MiniMax credential into a validated OAuth blob, or null. */
 function parseMinimaxBlob(raw: string): OAuthTokenBlob | null {
@@ -51,6 +58,10 @@ interface PendingMinimaxOAuth {
   /** Acting user, audit only (tenant_providers.created_by_user_id). */
   createdByUserId: string | null;
   baseUrl: string;
+  /** The `oauth` slot (ADR 0012): the region's OAuth base unless overridden. */
+  oauth: ResolvedProviderUrl;
+  /** URL overrides the login was started with. */
+  urls?: ProviderUrlConnection;
   resourceUrl: string;
   expiresAt: number;
   pollIntervalMs: number;
@@ -108,6 +119,7 @@ export class MinimaxOauthService {
     tenantId: string,
     region: MinimaxRegion = DEFAULT_REGION,
     createdByUserId?: string | null,
+    urls?: ProviderUrlConnection,
   ): Promise<MinimaxOAuthStartResult> {
     this.cleanupExpired();
     const verifier = randomBytes(32).toString('base64url');
@@ -115,22 +127,29 @@ export class MinimaxOauthService {
     const flowId = randomBytes(16).toString('base64url');
     const baseUrl = getMinimaxBaseUrl(region);
     const resourceUrl = buildMinimaxResourceUrl(baseUrl);
-    const response = await outboundFetch(buildMinimaxCodeUrl(baseUrl), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-        'x-request-id': randomUUID(),
+    const oauth = runWithProviderUrls(urls, () =>
+      scopedProviderUrl('minimax', 'subscription', 'oauth', baseUrl),
+    );
+    const response = await fetchProviderUrl(
+      oauth,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+          'x-request-id': randomUUID(),
+        },
+        body: new URLSearchParams({
+          response_type: 'code',
+          client_id: this.clientId,
+          scope: SCOPE,
+          code_challenge: challenge,
+          code_challenge_method: 'S256',
+          state: flowId,
+        }),
       },
-      body: new URLSearchParams({
-        response_type: 'code',
-        client_id: this.clientId,
-        scope: SCOPE,
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-        state: flowId,
-      }),
-    });
+      buildMinimaxCodeUrl(oauth.url),
+    );
     if (!response.ok) {
       const text = await response.text();
       this.logger.error(`MiniMax OAuth code request failed: ${text}`);
@@ -153,6 +172,8 @@ export class MinimaxOauthService {
       tenantId,
       createdByUserId: createdByUserId ?? null,
       baseUrl,
+      oauth,
+      ...(urls ? { urls } : {}),
       resourceUrl,
       expiresAt,
       pollIntervalMs,
@@ -182,7 +203,7 @@ export class MinimaxOauthService {
       this.pending.delete(flowId);
       return { status: 'error', message: 'MiniMax login expired. Start again.' };
     }
-    const response = await outboundFetch(buildMinimaxTokenUrl(pending.baseUrl), {
+    const response = await fetchProviderUrl(withPath(pending.oauth, '/oauth/token'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -230,7 +251,7 @@ export class MinimaxOauthService {
       u: resourceUrl,
     };
     const label = await this.providerService.nextOAuthLabel(pending.tenantId, 'minimax');
-    const { provider: savedProvider } = await this.providerService.upsertProvider(
+    const { provider: upserted } = await this.providerService.upsertProvider(
       pending.agentId,
       pending.tenantId,
       'minimax',
@@ -238,6 +259,12 @@ export class MinimaxOauthService {
       'subscription',
       undefined,
       label,
+      pending.createdByUserId,
+    );
+    const savedProvider = await applyFlowUrls(
+      this.providerService,
+      upserted,
+      pending.urls,
       pending.createdByUserId,
     );
     try {
@@ -251,7 +278,9 @@ export class MinimaxOauthService {
 
   async refreshAccessToken(refreshToken: string, resourceUrl?: string): Promise<OAuthTokenBlob> {
     const baseUrl = getMinimaxOauthBaseUrl(resourceUrl);
-    const response = await outboundFetch(buildMinimaxTokenUrl(baseUrl), {
+    // The connection in scope (credential resolution) may override the base.
+    const oauth = scopedProviderUrl('minimax', 'subscription', 'oauth', baseUrl);
+    const response = await fetchProviderUrl(withPath(oauth, '/oauth/token'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

@@ -1,4 +1,10 @@
-import AccountBaseUrlField from '../../components/AccountBaseUrlField.js';
+import ConnectionUrlsTab, {
+  type UrlDraft,
+  urlDraftErrors,
+  urlDraftFrom,
+  urlOverrideChanges,
+} from '../../components/ConnectionUrlsTab.js';
+import { setConnectionUrls, type ConnectionUrl } from '../../services/api/provider-urls.js';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import {
@@ -23,13 +29,16 @@ import { PROVIDERS } from '../../services/providers.js';
 import { providerIcon } from '../../components/ProviderIcon.jsx';
 import FilterSelect from '../../components/FilterSelect.jsx';
 import { formatNumber, formatCost, formatTimeAgo } from '../../services/formatters.js';
-import { getAgents, getCustomProviders as fetchCustomProviders } from '../../services/api.js';
+import {
+  getAgents,
+  getCustomProviders as fetchCustomProviders,
+  getGlobalProviders,
+} from '../../services/api.js';
 import {
   renameConnection,
   disconnectConnection,
   setConnectionStreamWarmup,
   setConnectionStreamIdle,
-  setConnectionBaseUrl,
   connectProvider,
   getProviders as getAgentProviders,
   startConnectionReauth,
@@ -119,6 +128,8 @@ interface ConnectionInfo {
   base_url?: string | null;
   default_base_url?: string | null;
   supports_base_url?: boolean;
+  /** Every URL slot of the account with its override (null = default). */
+  urls?: ConnectionUrl[];
   last_used_at: string | null;
 }
 
@@ -195,6 +206,24 @@ const ConnectionDetail = () => {
   const authType = conn?.auth_type;
   const provider = conn?.provider;
   const label = conn?.label;
+
+  // The account's URL slots: on the detail when the backend sends them,
+  // otherwise from the provider list (`GET /providers`).
+  const urlSlots = useResource(
+    async (): Promise<ConnectionUrl[]> => {
+      if (!conn) return [];
+      if (conn.urls) return conn.urls;
+      const { providers } = await getGlobalProviders();
+      for (const p of providers) {
+        const found = p.connections.find((x) => x.id === conn.id);
+        if (found) return found.urls ?? [];
+      }
+      return [];
+    },
+    [conn?.id, conn?.urls],
+    { enabled: !!conn && !isCustomProvider },
+  );
+  const connUrls = conn?.urls ?? urlSlots.data ?? [];
 
   // Only the custom-provider edit form still goes through agent-scoped routes.
   const agents = useResource(async () => {
@@ -426,16 +455,16 @@ const ConnectionDetail = () => {
   const [warmupError, setWarmupError] = useState('');
   const [idleValue, setIdleValue] = useState('');
   const [idleError, setIdleError] = useState('');
-  const [baseUrlValue, setBaseUrlValue] = useState('');
-  const [baseUrlError, setBaseUrlError] = useState('');
+  const [urlDraft, setUrlDraft] = useState<UrlDraft>({});
+  const [urlsError, setUrlsError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deletingConnection, setDeletingConnection] = useState(false);
 
   const openManageModal = () => {
     if (conn) setRenameValue(conn.label);
-    setBaseUrlValue(conn?.base_url ?? '');
-    setBaseUrlError('');
+    setUrlDraft(urlDraftFrom(connUrls));
+    setUrlsError('');
     setRenameError('');
     setWarmupValue(warmupMsToSecondsInput(conn?.stream_warmup_ms));
     setWarmupError('');
@@ -456,11 +485,12 @@ const ConnectionDetail = () => {
   const deleteConfirmMatches = !!conn && deleteConfirmName === conn.label;
 
   const labelChanged = !!conn && renameValue.trim() !== conn.label;
-  const baseUrlChanged =
-    !!conn?.supports_base_url && baseUrlValue.trim() !== (conn?.base_url ?? '');
+  const urlsLocked = !!conn && !roleCan.editAccountUrls(conn.auth_type);
+  const urlChanges = urlsLocked ? {} : urlOverrideChanges(connUrls, urlDraft);
+  const urlsChanged = Object.keys(urlChanges).length > 0;
   const warmupUnchanged = parseWarmupSeconds(warmupValue) === (conn?.stream_warmup_ms ?? null);
   const idleUnchanged = parseIdleSeconds(idleValue) === (conn?.stream_idle_timeout_ms ?? null);
-  const manageDirty = labelChanged || baseUrlChanged || !warmupUnchanged || !idleUnchanged;
+  const manageDirty = labelChanged || urlsChanged || !warmupUnchanged || !idleUnchanged;
 
   /**
    * Applies every changed setting of the window. Settings keyed by the
@@ -487,6 +517,10 @@ const ConnectionDetail = () => {
       setManageTab('streaming');
       return;
     }
+    if (urlsChanged && Object.keys(urlDraftErrors(connUrls, urlDraft)).length) {
+      setManageTab('urls');
+      return;
+    }
     const fail = (tab: string, set: (m: string) => void, fallback: string) => (e: any) => {
       set(e?.message ?? fallback);
       setManageTab(tab);
@@ -494,9 +528,9 @@ const ConnectionDetail = () => {
     };
     setSavingAll(true);
     try {
-      if (baseUrlChanged) {
-        await setConnectionBaseUrl(conn.id, baseUrlValue.trim() || null).catch(
-          fail('general', setBaseUrlError, t('providers.detail.saveFailed')),
+      if (urlsChanged) {
+        await setConnectionUrls(conn.id, urlChanges).catch(
+          fail('urls', setUrlsError, t('providerSetup.urls.saveFailed')),
         );
       }
       if (!warmupUnchanged) {
@@ -517,6 +551,7 @@ const ConnectionDetail = () => {
       toast.success(t('providers.detail.changesSaved'));
       closeManageModal();
       void detail.reload();
+      if (urlsChanged) void urlSlots.reload();
     } catch {
       // The field error is shown on its tab.
       void detail.reload();
@@ -756,22 +791,6 @@ const ConnectionDetail = () => {
             />
             {renameError ? <p className="form-error mt-1">{renameError}</p> : null}
           </div>
-          {c.supports_base_url ? (
-            <div>
-              <AccountBaseUrlField
-                id="connection-base-url"
-                provider={c.provider}
-                defaultUrl={c.default_base_url ?? null}
-                value={baseUrlValue}
-                onChange={(v) => {
-                  setBaseUrlValue(v);
-                  setBaseUrlError('');
-                }}
-                disabled={savingAll}
-              />
-              {baseUrlError ? <p className="form-error mt-1">{baseUrlError}</p> : null}
-            </div>
-          ) : null}
           <p className="m-0 text-sm text-muted">
             {t('providers.detail.connectedVia')}{' '}
             {c.auth_type === 'subscription'
@@ -781,6 +800,25 @@ const ConnectionDetail = () => {
                 : t('providers.detail.viaLocal')}
           </p>
         </div>
+      ),
+    },
+    {
+      key: 'urls',
+      label: t('providerSetup.urls.tab'),
+      content: (
+        <ConnectionUrlsTab
+          slots={connUrls}
+          // Stored overrides that loaded after the window opened show too.
+          value={{ ...urlDraftFrom(connUrls), ...urlDraft }}
+          onChange={(next) => {
+            setUrlDraft(next);
+            setUrlsError('');
+          }}
+          disabled={savingAll}
+          locked={urlsLocked}
+          loading={urlSlots.loading}
+          error={urlsError}
+        />
       ),
     },
     {

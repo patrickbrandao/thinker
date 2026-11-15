@@ -25,7 +25,14 @@ import {
   oauthRefreshKey,
   subscriptionCredentialLock,
 } from './oauth-refresh-coordinator';
-import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import {
+  fetchProviderUrl,
+  runWithProviderUrls,
+  scopedProviderUrl,
+  type ProviderUrlConnection,
+  type ResolvedProviderUrl,
+} from '../../provider-urls/provider-url-scope';
+import { applyFlowUrls } from './flow-urls';
 
 export interface RedirectPkceOauthConfig {
   /** Provider id stored on `tenant_providers.provider_id`. */
@@ -91,6 +98,8 @@ interface RedirectPkcePendingOAuth {
   /** Acting user, audit only (tenant_providers.created_by_user_id). */
   createdByUserId: string | null;
   backendUrl: string;
+  /** URL overrides the login was started with (ADR 0012). */
+  urls?: ProviderUrlConnection;
   expiresAt: number;
 }
 
@@ -143,6 +152,8 @@ export abstract class RedirectPkceOauthBaseService {
     tenantId: string,
     backendUrl?: string,
     createdByUserId?: string | null,
+    /** The account's URL overrides, for this flow and the account it creates. */
+    urls?: ProviderUrlConnection,
   ): Promise<string> {
     const state = generateState();
     const { verifier, challenge } = generatePkce();
@@ -156,6 +167,7 @@ export abstract class RedirectPkceOauthBaseService {
       tenantId,
       createdByUserId: createdByUserId ?? null,
       backendUrl: safeBackendUrl,
+      ...(urls ? { urls } : {}),
     });
     if (this.useCallbackServer) {
       await this.ensureCallbackServer();
@@ -171,7 +183,22 @@ export abstract class RedirectPkceOauthBaseService {
       code_challenge_method: 'S256',
       ...(this.oauthConfig.extraAuthorizeParams ?? {}),
     });
-    return `${this.oauthConfig.authorizeUrl}?${params.toString()}`;
+    const authorize = runWithProviderUrls(urls, () => this.slotUrl('oauth_authorize'));
+    return `${authorize?.url ?? this.oauthConfig.authorizeUrl}?${params.toString()}`;
+  }
+
+  /** The URL of one of the provider's OAuth slots, for the connection in scope. */
+  protected slotUrl(
+    slot: 'oauth_authorize' | 'oauth_token' | 'oauth_revoke',
+  ): ResolvedProviderUrl | null {
+    const builtIn =
+      slot === 'oauth_authorize'
+        ? this.oauthConfig.authorizeUrl
+        : slot === 'oauth_token'
+          ? this.oauthConfig.tokenUrl
+          : this.oauthConfig.revokeUrl;
+    if (!builtIn) return null;
+    return scopedProviderUrl(this.oauthConfig.providerId, 'subscription', slot, builtIn);
   }
 
   async exchangeCode(state: string, code: string): Promise<void> {
@@ -182,6 +209,11 @@ export abstract class RedirectPkceOauthBaseService {
       throw new Error('OAuth state expired');
     }
     this.pending.delete(state);
+    // The token exchange and any onboarding use the URLs the flow started with.
+    await runWithProviderUrls(pending.urls, () => this.completeExchange(pending, code));
+  }
+
+  private async completeExchange(pending: RedirectPkcePendingOAuth, code: string): Promise<void> {
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
@@ -190,7 +222,7 @@ export abstract class RedirectPkceOauthBaseService {
       code_verifier: pending.verifier,
     });
     if (this.clientSecret) body.set('client_secret', this.clientSecret);
-    const response = await outboundFetch(this.oauthConfig.tokenUrl, {
+    const response = await fetchProviderUrl(this.slotUrl('oauth_token')!, {
       method: 'POST',
       headers: this.tokenHeaders(),
       body,
@@ -217,7 +249,7 @@ export abstract class RedirectPkceOauthBaseService {
       pending.tenantId,
       this.oauthConfig.providerId,
     );
-    const { provider: savedProvider } = await this.providerService.upsertProvider(
+    const { provider: upserted } = await this.providerService.upsertProvider(
       pending.agentId,
       pending.tenantId,
       this.oauthConfig.providerId,
@@ -225,6 +257,12 @@ export abstract class RedirectPkceOauthBaseService {
       'subscription',
       undefined,
       label,
+      pending.createdByUserId,
+    );
+    const savedProvider = await applyFlowUrls(
+      this.providerService,
+      upserted,
+      pending.urls,
       pending.createdByUserId,
     );
     try {
@@ -245,7 +283,8 @@ export abstract class RedirectPkceOauthBaseService {
       client_id: this.clientId,
     });
     if (this.clientSecret) body.set('client_secret', this.clientSecret);
-    const response = await outboundFetch(this.oauthConfig.tokenUrl, {
+    // The connection in scope (credential resolution) picks the token URL.
+    const response = await fetchProviderUrl(this.slotUrl('oauth_token')!, {
       method: 'POST',
       headers: this.tokenHeaders(),
       body,
@@ -316,13 +355,13 @@ export abstract class RedirectPkceOauthBaseService {
   }
 
   /** Revoke an OAuth token at the provider (best-effort; no-op if no revoke URL). */
-  async revokeToken(token: string): Promise<void> {
-    const revokeUrl = this.oauthConfig.revokeUrl;
+  async revokeToken(token: string, urls?: ProviderUrlConnection): Promise<void> {
+    const revokeUrl = runWithProviderUrls(urls, () => this.slotUrl('oauth_revoke'));
     if (!revokeUrl) return;
     try {
       const body = new URLSearchParams({ token, client_id: this.clientId });
       if (this.clientSecret) body.set('client_secret', this.clientSecret);
-      const response = await outboundFetch(revokeUrl, {
+      const response = await fetchProviderUrl(revokeUrl, {
         method: 'POST',
         headers: this.tokenHeaders(),
         body,

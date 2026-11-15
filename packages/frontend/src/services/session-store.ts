@@ -45,6 +45,17 @@ export const roleCan = {
   manageMembers: allow(canManageMembers),
   /** Rename/delete the organization. */
   manageOrganization: allow(canManageOrganization),
+  /**
+   * Change the URLs of an account (ADR 0012): subscriptions need the
+   * organization owner or an instance admin; API keys follow manageProviders.
+   */
+  editAccountUrls: (authType: string): boolean => {
+    const m = me();
+    if (!m) return true;
+    const role = m.organization?.role ?? null;
+    if (authType === 'subscription') return m.isInstanceAdmin === true || role === 'owner';
+    return canManageProviders(role);
+  },
 };
 
 async function requestMe(): Promise<Response> {

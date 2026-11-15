@@ -196,6 +196,8 @@ export default {
   customForm: {
     estimatedPrice: 'Estimated price. This may not be accurate.',
     enterBaseUrl: 'Enter a base URL first',
+    baseUrlOnUrlsTab: 'Enter the base URL on the URLs tab.',
+    urlsIntro: "The address of the provider's API, used for inference and for fetching models.",
     noModels: 'Server returned no models',
     probeFailed: 'Probe failed',
     connectedToast: '{{ name }} connected',

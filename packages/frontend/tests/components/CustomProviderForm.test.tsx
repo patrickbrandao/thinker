@@ -66,6 +66,23 @@ describe('CustomProviderForm', () => {
     expect(screen.getByPlaceholderText('Model name')).toBeDefined();
   });
 
+  it('keeps the base URL on a URLs tab after General and points there when it is missing', async () => {
+    render(<CustomProviderForm agentName="test-agent" onCreated={onCreated} onBack={onBack} />);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['General', 'URLs']);
+    const urlInput = screen.getByPlaceholderText('https://api.example.com/v1');
+    expect(urlInput.closest('[role="tabpanel"]')?.getAttribute('data-section')).toBe('urls');
+
+    fireEvent.change(screen.getByPlaceholderText('e.g. Groq, Together, Azure'), {
+      target: { value: 'Groq' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Model name'), {
+      target: { value: 'llama-3.1-70b' },
+    });
+    fireEvent.click(screen.getByText('Connect'));
+    expect(await screen.findByText('Enter the base URL on the URLs tab.')).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'URLs' }).getAttribute('aria-selected')).toBe('true');
+  });
+
   it('Create button is disabled when required fields are empty', () => {
     render(<CustomProviderForm agentName="test-agent" onCreated={onCreated} onBack={onBack} />);
     const createBtn = screen.getByText('Connect');

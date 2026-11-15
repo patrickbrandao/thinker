@@ -70,6 +70,7 @@ describe('OpenaiOauthController', () => {
         'tenant-1',
         'http://localhost:2099',
         'user-1',
+        undefined,
       );
       expect(result).toEqual({ url: 'https://auth.openai.com/oauth/...' });
     });
@@ -151,6 +152,7 @@ describe('OpenaiOauthController', () => {
         'tenant-1',
         'https://thinker.example.com',
         'user-1',
+        undefined,
       );
     });
   });
@@ -200,10 +202,10 @@ describe('OpenaiOauthController', () => {
         'openai',
         'subscription',
       );
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-tok');
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-tok');
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-2');
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-2');
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-tok', expect.anything());
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-tok', expect.anything());
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-2', expect.anything());
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-2', expect.anything());
       expect(providerService.removeProvider).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
@@ -240,8 +242,8 @@ describe('OpenaiOauthController', () => {
 
       expect(oauthService.revokeToken).not.toHaveBeenCalledWith('access-tok');
       expect(oauthService.revokeToken).not.toHaveBeenCalledWith('refresh-tok');
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-2');
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-2');
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-2', expect.anything());
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-2', expect.anything());
       expect(providerService.removeProvider).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',

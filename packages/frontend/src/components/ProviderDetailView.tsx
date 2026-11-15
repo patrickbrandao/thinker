@@ -18,6 +18,7 @@ import OAuthDetailView from './OAuthDetailView.js';
 import AnthropicOAuthDetailView from './AnthropicOAuthDetailView.js';
 import DeviceCodeDetailView from './DeviceCodeDetailView.js';
 import OpencodeGoUsageMeter from './OpencodeGoUsageMeter.js';
+import { collectUrlOverrides, useUrlsScope } from './ConnectionUrlsScope.js';
 import { getRoutingProviderApiKeyUrl } from '../services/provider-api-key-urls.js';
 import { maskedKeyLabel } from '../services/key-mask.js';
 import { Badge, Button, cx } from './ui.js';
@@ -117,12 +118,16 @@ export default function ProviderDetailView(props: ProviderDetailViewProps) {
     !addKeyOpen &&
     (!!props.reauthLabel || (!subscriptionClosed && activeKeys.length < MAX_KEYS_PER_PROVIDER));
 
+  const urlsScope = useUrlsScope();
   const handleOllamaConnect = async () => {
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
     props.setBusy(true);
     try {
       await connectProvider(props.agentName, {
         provider: props.provId,
         authType: authType,
+        ...(urlOverrides && { urlOverrides }),
       });
       toast.success(t('providerSetup.shared.connected', { name: provDef.name }));
       props.onBack();

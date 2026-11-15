@@ -17,6 +17,7 @@ import { AnthropicOauthExchangeError, AnthropicOauthService } from './anthropic-
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
+import { flowUrlConnection } from '../../provider-urls/provider-urls';
 
 @MinRole('admin', { includeReads: true })
 @UseInterceptors(OutboundProviderScope('anthropic'))
@@ -36,7 +37,12 @@ export class AnthropicOauthController {
    * the authorization code for the user to paste into the SPA.
    */
   @Post('authorize')
-  async authorize(@Query('agentName') agentName: string, @TenantCtx() ctx: TenantContext) {
+  async authorize(
+    @Query('agentName') agentName: string,
+    @TenantCtx() ctx: TenantContext,
+    /** Slot id → URL (ADR 0012), for this login and its account. */
+    @Body('urlOverrides') urlOverrides?: unknown,
+  ) {
     if (!agentName) {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
     }
@@ -45,7 +51,8 @@ export class AnthropicOauthController {
       agentName,
       PROVIDER_CONNECTION_SCOPE,
     );
-    return this.oauthService.generateAuthorizationUrl(agent.id, agent.tenant_id);
+    const urls = await flowUrlConnection('anthropic', null, urlOverrides, ctx);
+    return this.oauthService.generateAuthorizationUrl(agent.id, agent.tenant_id, urls);
   }
 
   /**
