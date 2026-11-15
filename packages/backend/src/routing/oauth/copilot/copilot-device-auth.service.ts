@@ -1,9 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import { COPILOT_URLS } from '../../provider-urls/provider-url-constants';
+import {
+  fetchProviderUrl,
+  runWithProviderUrls,
+  scopedProviderUrl,
+  type ProviderUrlConnection,
+} from '../../provider-urls/provider-url-scope';
 
 const GITHUB_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
-const DEVICE_CODE_URL = 'https://github.com/login/device/code';
-const ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
+/** A started login keeps its URL overrides this long (GitHub device codes last 15 min). */
+const PENDING_TTL_MS = 20 * 60 * 1000;
+
+interface PendingCopilotUrls {
+  tenantId: string;
+  urls: ProviderUrlConnection;
+  expiresAt: number;
+}
 
 export interface DeviceCodeResponse {
   device_code: string;
@@ -18,9 +30,17 @@ export type PollStatus = 'pending' | 'complete' | 'expired' | 'denied' | 'slow_d
 @Injectable()
 export class CopilotDeviceAuthService {
   private readonly logger = new Logger(CopilotDeviceAuthService.name);
+  /** URL overrides of started logins (ADR 0012), by device code. */
+  private readonly pending = new Map<string, PendingCopilotUrls>();
 
-  async requestDeviceCode(): Promise<DeviceCodeResponse> {
-    const res = await outboundFetch(DEVICE_CODE_URL, {
+  async requestDeviceCode(
+    urls?: ProviderUrlConnection,
+    tenantId?: string,
+  ): Promise<DeviceCodeResponse> {
+    const deviceCodeUrl = runWithProviderUrls(urls, () =>
+      scopedProviderUrl('copilot', 'subscription', 'device_code', COPILOT_URLS.deviceCode),
+    );
+    const res = await fetchProviderUrl(deviceCodeUrl, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -41,11 +61,32 @@ export class CopilotDeviceAuthService {
     if (!data.device_code || !data.user_code) {
       throw new Error('Invalid device code response from GitHub');
     }
+    this.cleanup();
+    if (urls && tenantId) {
+      this.pending.set(data.device_code, {
+        tenantId,
+        urls,
+        expiresAt: Date.now() + PENDING_TTL_MS,
+      });
+    }
     return data;
   }
 
-  async pollForToken(deviceCode: string): Promise<{ status: PollStatus; token?: string }> {
-    const res = await outboundFetch(ACCESS_TOKEN_URL, {
+  /**
+   * Poll the token endpoint. `urls` in the result are the overrides the login
+   * was started with, for the account the caller creates on `complete`.
+   */
+  async pollForToken(
+    deviceCode: string,
+    tenantId?: string,
+  ): Promise<{ status: PollStatus; token?: string; urls?: ProviderUrlConnection }> {
+    this.cleanup();
+    const started = this.pending.get(deviceCode);
+    const urls = started && started.tenantId === tenantId ? started.urls : undefined;
+    const tokenUrl = runWithProviderUrls(urls, () =>
+      scopedProviderUrl('copilot', 'subscription', 'device_token', COPILOT_URLS.deviceToken),
+    );
+    const res = await fetchProviderUrl(tokenUrl, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -63,7 +104,20 @@ export class CopilotDeviceAuthService {
       throw new Error(`GitHub token poll failed: ${res.status}`);
     }
 
-    return this.parsePollResponse((await res.json()) as { access_token?: string; error?: string });
+    const result = this.parsePollResponse(
+      (await res.json()) as { access_token?: string; error?: string },
+    );
+    if (result.status !== 'pending' && result.status !== 'slow_down') {
+      this.pending.delete(deviceCode);
+    }
+    return urls && result.status === 'complete' ? { ...result, urls } : result;
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [code, entry] of this.pending) {
+      if (entry.expiresAt <= now) this.pending.delete(code);
+    }
   }
 
   private parsePollResponse(data: { access_token?: string; error?: string }): {

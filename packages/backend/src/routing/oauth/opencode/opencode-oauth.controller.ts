@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpException,
@@ -17,6 +18,11 @@ import { ProviderKeyService } from '../../routing-core/provider-key.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
+import {
+  flowUrlConnection,
+  keyUrlConnection,
+  runWithProviderUrls,
+} from '../../provider-urls/provider-urls';
 
 @MinRole('admin', { includeReads: true })
 @UseInterceptors(OutboundProviderScope('opencode-go'))
@@ -41,17 +47,22 @@ export class OpencodeOauthController {
     }
     const keyLabel = optionalTrimmedStringQuery(label, 'label');
     const agent = await this.resolveAgent.resolve(ctx.tenantId, agentName);
-    const rawValue = await this.providerKeys.getProviderApiKey(
+    const key = await this.providerKeys.selectProviderKey(
       agent.tenant_id,
       'opencode-go',
       'subscription',
       keyLabel,
       agent.id,
     );
-    if (!rawValue) return { usage: null };
+    const rawValue = key?.apiKey;
+    if (!key || !rawValue) return { usage: null };
     try {
+      // The login's own usage and Console URLs (ADR 0012).
+      const urls = keyUrlConnection('opencode-go', 'subscription', key);
       return {
-        usage: await this.oauthService.readGoUsage(rawValue, agent.id, agent.tenant_id, keyLabel),
+        usage: await runWithProviderUrls(urls, () =>
+          this.oauthService.readGoUsage(rawValue, agent.id, agent.tenant_id, keyLabel),
+        ),
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to read OpenCode Go usage';
@@ -64,6 +75,8 @@ export class OpencodeOauthController {
     @Query('agentName') agentName: string,
     @Query('provider') provider: string | undefined,
     @TenantCtx() ctx: TenantContext,
+    /** Slot id → URL (ADR 0012), for this login and its account. */
+    @Body('urlOverrides') urlOverrides?: unknown,
   ) {
     if (!agentName) {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
@@ -74,12 +87,14 @@ export class OpencodeOauthController {
       PROVIDER_CONNECTION_SCOPE,
     );
     const consoleKind = consoleProvider(provider);
+    const urls = await flowUrlConnection(consoleKind, null, urlOverrides, ctx);
     try {
       return await this.oauthService.startAuthorization(
         agent.id,
         agent.tenant_id,
         ctx.userId,
         consoleKind,
+        urls,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start OpenCode login';

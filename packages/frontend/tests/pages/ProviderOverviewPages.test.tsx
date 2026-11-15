@@ -1524,6 +1524,70 @@ describe('ConnectionDetail (analytics)', () => {
     expect(apiMocks.getConnectionDetail.mock.calls.length).toBeGreaterThan(1);
   });
 
+  it('edits URLs on their own tab after General and restores a default with PATCH urls', async () => {
+    apiMocks.getConnectionDetail.mockResolvedValue({
+      ...connectionDetail,
+      connection: {
+        ...connectionDetail.connection,
+        urls: [
+          {
+            id: 'inference',
+            purpose: 'inference',
+            kind: 'base',
+            credential: 'access',
+            default: 'https://api.openai.com/v1',
+            value: 'https://proxy.test/v1',
+          },
+          {
+            id: 'models',
+            purpose: 'models',
+            kind: 'url',
+            credential: 'access',
+            default: 'https://api.openai.com/v1/models',
+            value: null,
+          },
+        ],
+      },
+    });
+    renderPage(<ConnectionDetail />);
+    await openManageModal();
+
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(tabs.indexOf('URLs')).toBe(tabs.indexOf('General') + 1);
+    fireEvent.click(screen.getByRole('tab', { name: 'URLs' }));
+    expect((screen.getByLabelText('Inference') as HTMLInputElement).value).toBe(
+      'https://proxy.test/v1',
+    );
+    expect((screen.getByLabelText('Model list') as HTMLInputElement).placeholder).toBe(
+      'https://api.openai.com/v1/models',
+    );
+    fireEvent.click(screen.getByText('Restore default'));
+    fireEvent.click(screen.getByText('Save changes'));
+
+    await waitFor(() =>
+      expect(apiMocks.fetchMutate).toHaveBeenCalledWith(
+        '/providers/connections/conn-openai/urls',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ overrides: { inference: null } }),
+        }),
+      ),
+    );
+    expect(toastMock.success).toHaveBeenCalledWith('Changes saved');
+  });
+
+  it('saves a rename without sending URLs', async () => {
+    renderPage(<ConnectionDetail />);
+    const input = await openManageModal();
+
+    fireEvent.input(input, { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByText('Save changes'));
+
+    await waitFor(() => expect(apiMocks.renameConnection).toHaveBeenCalled());
+    const paths = apiMocks.fetchMutate.mock.calls.map((call) => String(call[0]));
+    expect(paths.some((path) => path.endsWith('/urls'))).toBe(false);
+  });
+
   it('shows an inline error when renaming a connection fails', async () => {
     apiMocks.renameConnection.mockRejectedValueOnce(new Error('rename boom'));
     renderPage(<ConnectionDetail />);

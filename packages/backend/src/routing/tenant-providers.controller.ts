@@ -1,5 +1,6 @@
 import { Audit } from '../alerts/audit.decorator';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -33,7 +34,18 @@ import {
   SetStreamWarmupDto,
   SetStreamIdleDto,
   SetBaseUrlDto,
+  SetUrlOverridesDto,
 } from './dto/routing.dto';
+import {
+  checkUrlOverrides,
+  connectionUrls,
+  connectionUrlViews,
+  effectiveUrlOverrides,
+  emitUrlsChangedAlert,
+  legacyBaseUrlOverrides,
+  parseUrlOverridesInput,
+  urlSlotViews,
+} from './provider-urls/provider-urls';
 import { MinRole } from '../common/decorators/roles.decorator';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { providerKeyDisplay } from '../common/utils/provider-key-mask';
@@ -106,6 +118,64 @@ export class TenantProvidersController {
     return {
       models: buildProviderModels(rows, customProviders, includeInactive === 'true'),
     };
+  }
+
+  /**
+   * The editable URLs of an account that does not exist yet (ADR 0012): one
+   * entry per slot, with the default it would use (region and plan included).
+   */
+  @Get('url-slots')
+  urlSlots(
+    @Query('provider') provider: string,
+    @Query('auth_type') authType?: string,
+    @Query('region') region?: string,
+  ) {
+    if (!provider) throw new BadRequestException('provider is required');
+    return { slots: urlSlotViews(provider, authType || 'api_key', region || null) };
+  }
+
+  /**
+   * Change a connection's editable URLs: `{ overrides: { slot: url | null } }`,
+   * null back to the default. Unknown slots are a 400; a subscription needs
+   * the organization owner or an instance admin. Emits `provider.urls_changed`
+   * and discovers the models again.
+   */
+  @Audit({
+    entity: 'connection',
+    action: 'updated',
+    lookup: { table: 'tenant_providers', nameColumn: 'label' },
+  })
+  @Patch('connections/:id/urls')
+  async setUrls(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() body: SetUrlOverridesDto,
+  ) {
+    const tenantId = this.requireTenant(ctx);
+    const row = await this.providerRepo.findOne({ where: { id, tenant_id: tenantId } });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    const conn = connectionUrls(row);
+    const { overrides, changed, allowPrivate } = await checkUrlOverrides(
+      conn,
+      effectiveUrlOverrides(conn),
+      parseUrlOverridesInput(body.overrides) ?? {},
+      ctx,
+    );
+    if (changed.length === 0) return { id: row.id, urls: connectionUrlViews(conn) };
+    const updated = await this.providerService.setUrlOverrides(
+      tenantId,
+      id,
+      overrides,
+      allowPrivate,
+    );
+    emitUrlsChangedAlert({ tenantId, userId: ctx.userId, connection: updated, changed });
+    await this.invalidateTenantRouting(tenantId);
+    try {
+      await this.discoveryService.discoverModels(updated);
+    } catch {
+      // Non-fatal: "Refresh models" retries.
+    }
+    return { id: updated.id, urls: connectionUrlViews(connectionUrls(updated)) };
   }
 
   /** Official base URL of a provider (and region), for the base URL field's placeholder. */
@@ -181,12 +251,21 @@ export class TenantProvidersController {
   ) {
     const tenantId = this.requireTenant(ctx);
     const baseUrl = await checkAccountBaseUrl(body.base_url, ctx);
+    const before = await this.providerRepo.findOne({ where: { id, tenant_id: tenantId } });
     const updated = await this.providerService.setBaseUrl(
       tenantId,
       id,
       baseUrl,
       canUsePrivateDestinations(ctx),
     );
+    if ((before?.base_url ?? null) !== (updated.base_url ?? null)) {
+      emitUrlsChangedAlert({
+        tenantId,
+        userId: ctx.userId,
+        connection: updated,
+        changed: Object.keys(legacyBaseUrlOverrides(updated.provider, 'api_key', 'x')),
+      });
+    }
     await this.invalidateTenantRouting(tenantId);
     try {
       await this.discoveryService.discoverModels(updated);

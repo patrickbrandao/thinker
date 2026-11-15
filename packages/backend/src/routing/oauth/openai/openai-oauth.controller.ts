@@ -24,6 +24,7 @@ import { ProviderKeyService } from '../../routing-core/provider-key.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
+import { flowUrlConnection, keyUrlConnection } from '../../provider-urls/provider-urls';
 
 @MinRole('admin', { includeReads: true })
 @UseInterceptors(OutboundProviderScope('openai'))
@@ -49,6 +50,8 @@ export class OpenaiOauthController {
     @Query('agentName') agentName: string,
     @TenantCtx() ctx: TenantContext,
     @Req() req: Request,
+    /** JSON map of slot id → URL (ADR 0012), for this login and its account. */
+    @Query('urlOverrides') urlOverrides?: string,
   ) {
     if (!agentName) {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
@@ -63,12 +66,14 @@ export class OpenaiOauthController {
     // the dev case where BETTER_AUTH_URL isn't set.
     const trustedBackendUrl = this.configService.get<string>('BETTER_AUTH_URL');
     const backendUrl = trustedBackendUrl || `${req.protocol}://${req.get('host')}`;
+    const urls = await flowUrlConnection('openai', null, urlOverrides, ctx);
     try {
       const url = await this.oauthService.generateAuthorizationUrl(
         agent.id,
         agent.tenant_id,
         backendUrl,
         ctx.userId,
+        urls,
       );
       return { url };
     } catch (err) {
@@ -108,8 +113,16 @@ export class OpenaiOauthController {
       if (!key.apiKey) continue;
       try {
         const blob = JSON.parse(key.apiKey) as OAuthTokenBlob;
-        if (blob.t) await this.oauthService.revokeToken(blob.t);
-        if (blob.r) await this.oauthService.revokeToken(blob.r);
+        if (blob.t)
+          await this.oauthService.revokeToken(
+            blob.t,
+            keyUrlConnection('openai', 'subscription', key),
+          );
+        if (blob.r)
+          await this.oauthService.revokeToken(
+            blob.r,
+            keyUrlConnection('openai', 'subscription', key),
+          );
       } catch {
         this.logger.warn('Could not parse OAuth token blob for revocation');
       }

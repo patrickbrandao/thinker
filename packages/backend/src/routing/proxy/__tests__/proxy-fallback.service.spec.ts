@@ -1511,7 +1511,10 @@ describe('ProxyFallbackService', () => {
         sessionKey: 'sess-1',
       });
 
-      expect(copilotToken.getCopilotToken).toHaveBeenCalledWith('ghu_token');
+      expect(copilotToken.getCopilotToken).toHaveBeenCalledWith(
+        'ghu_token',
+        expect.objectContaining({ overridden: false }),
+      );
       expect(providerClient.forward).toHaveBeenCalledWith(
         expect.objectContaining({
           provider: 'copilot',

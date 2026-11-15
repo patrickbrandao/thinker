@@ -3,7 +3,21 @@ import { randomBytes } from 'crypto';
 import { ProviderService } from '../../routing-core/provider.service';
 import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 import { scrubSecrets } from '../../../common/utils/secret-scrub';
-import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import {
+  canonicalUrlProvider,
+  currentProviderUrls,
+  fetchProviderUrl,
+  runWithProviderUrls,
+  scopedProviderUrl,
+  withPath,
+  type ProviderUrlConnection,
+  type ResolvedProviderUrl,
+} from '../../provider-urls/provider-url-scope';
+import {
+  OPENCODE_CONSOLE_SERVER,
+  OPENCODE_GO_USAGE_URL,
+} from '../../provider-urls/provider-url-constants';
+import { applyFlowUrls } from '../core/flow-urls';
 import { OPENCODE_USER_AGENT } from '../../../common/constants/subscription-clients';
 import {
   coordinateOAuthRefresh,
@@ -23,9 +37,7 @@ import {
  * authenticates OpenCode and OpenCode Go inference as a Bearer token; refresh
  * tokens rotate on every refresh.
  */
-export const OPENCODE_CONSOLE_SERVER = 'https://opencode.ai/console';
-/** OpenCode Go allowance meter: rolling 5-hour, weekly and monthly windows. */
-export const OPENCODE_GO_USAGE_URL = 'https://opencode.ai/zen/go/v1/usage';
+export { OPENCODE_CONSOLE_SERVER, OPENCODE_GO_USAGE_URL };
 const USAGE_TIMEOUT_MS = 15_000;
 const CLIENT_ID = 'opencode-cli';
 /** Providers a Console login connects; each keeps its own subscription row. */
@@ -56,6 +68,8 @@ interface PendingOpencodeOAuth {
   nextPollAt: number;
   /** The upstream poll in progress; polls are strictly sequential, like the client's. */
   inFlight: Promise<OpencodeOAuthPollResult> | null;
+  /** URL overrides the login was started with (ADR 0012). */
+  urls?: ProviderUrlConnection;
 }
 
 interface DeviceCodeResponse {
@@ -130,8 +144,27 @@ function parseJson<T>(text: string): T | null {
   }
 }
 
-function postJson(url: string, body: Record<string, string | boolean>, signal?: AbortSignal) {
-  return outboundFetch(url, {
+/**
+ * A Console URL (the `console` slot, ADR 0012) for the login in scope. With
+ * no provider given, the OpenCode connection in scope, if any, decides.
+ */
+function consoleUrl(path: string, provider?: OpencodeConsoleProvider): ResolvedProviderUrl {
+  const inScope = currentProviderUrls();
+  const scoped = inScope ? canonicalUrlProvider(inScope.provider) : '';
+  const which =
+    provider ?? (scoped === 'opencode' || scoped === 'opencode-go' ? scoped : 'opencode-go');
+  return withPath(
+    scopedProviderUrl(which, 'subscription', 'console', OPENCODE_CONSOLE_SERVER),
+    path,
+  );
+}
+
+function postJson(
+  url: ResolvedProviderUrl,
+  body: Record<string, string | boolean>,
+  signal?: AbortSignal,
+) {
+  return fetchProviderUrl(url, {
     method: 'POST',
     headers: { ...CONSOLE_HEADERS, 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -140,8 +173,9 @@ function postJson(url: string, body: Record<string, string | boolean>, signal?: 
 }
 
 /** A Console GET with the access token; like the client, any non-2xx fails. */
-async function getConsoleJson<T>(url: string, accessToken: string): Promise<T> {
-  const response = await outboundFetch(url, {
+async function getConsoleJson<T>(target: ResolvedProviderUrl, accessToken: string): Promise<T> {
+  const url = target.url;
+  const response = await fetchProviderUrl(target, {
     headers: { ...CONSOLE_HEADERS, authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error(`OpenCode Console ${url} returned ${response.status}`);
@@ -198,9 +232,13 @@ export class OpencodeOauthService {
     tenantId: string,
     createdByUserId?: string | null,
     provider: OpencodeConsoleProvider = 'opencode-go',
+    urls?: ProviderUrlConnection,
   ): Promise<OpencodeOAuthStartResult> {
     this.cleanupExpired();
-    const response = await postJson(`${OPENCODE_CONSOLE_SERVER}/auth/device/code`, {
+    const deviceCodeUrl = runWithProviderUrls(urls, () =>
+      consoleUrl('/auth/device/code', provider),
+    );
+    const response = await postJson(deviceCodeUrl, {
       client_id: CLIENT_ID,
       supports_org_scope: true,
     });
@@ -220,7 +258,10 @@ export class OpencodeOauthService {
     ) {
       throw new Error('OpenCode returned an incomplete device authorization payload.');
     }
-    const verification = new URL(payload.verification_uri_complete, `${OPENCODE_CONSOLE_SERVER}/`);
+    const verification = new URL(
+      payload.verification_uri_complete,
+      `${deviceCodeUrl.url.slice(0, -'/auth/device/code'.length)}/`,
+    );
     if (verification.protocol !== 'https:' && verification.protocol !== 'http:') {
       throw new Error('OpenCode returned an invalid verification URL.');
     }
@@ -239,6 +280,7 @@ export class OpencodeOauthService {
       pollIntervalMs,
       nextPollAt: now + pollIntervalMs,
       inFlight: null,
+      ...(urls ? { urls } : {}),
     });
     return {
       flowId,
@@ -267,7 +309,9 @@ export class OpencodeOauthService {
     if (pending.inFlight) return pending.inFlight;
     const wait = pending.nextPollAt - Date.now();
     if (wait > 0) return { status: 'pending', pollIntervalMs: wait };
-    const inFlight = this.pollUpstream(flowId, pending).finally(() => {
+    const inFlight = runWithProviderUrls(pending.urls, () =>
+      this.pollUpstream(flowId, pending),
+    ).finally(() => {
       pending.inFlight = null;
       pending.nextPollAt = Date.now() + pending.pollIntervalMs;
     });
@@ -280,7 +324,7 @@ export class OpencodeOauthService {
     pending: PendingOpencodeOAuth,
   ): Promise<OpencodeOAuthPollResult> {
     // The token endpoint answers pending/slow_down in the body, not the status.
-    const response = await postJson(`${OPENCODE_CONSOLE_SERVER}/auth/device/token`, {
+    const response = await postJson(consoleUrl('/auth/device/token', pending.provider), {
       grant_type: DEVICE_GRANT_TYPE,
       device_code: pending.deviceCode,
       client_id: CLIENT_ID,
@@ -306,8 +350,14 @@ export class OpencodeOauthService {
     let orgId: string | undefined;
     try {
       const [, orgs] = await Promise.all([
-        getConsoleJson<ConsoleUser>(`${OPENCODE_CONSOLE_SERVER}/api/user`, payload.access_token),
-        getConsoleJson<ConsoleOrg[]>(`${OPENCODE_CONSOLE_SERVER}/api/orgs`, payload.access_token),
+        getConsoleJson<ConsoleUser>(
+          consoleUrl('/api/user', pending.provider),
+          payload.access_token,
+        ),
+        getConsoleJson<ConsoleOrg[]>(
+          consoleUrl('/api/orgs', pending.provider),
+          payload.access_token,
+        ),
       ]);
       const list = Array.isArray(orgs) ? orgs : [];
       const org =
@@ -330,7 +380,7 @@ export class OpencodeOauthService {
       ...(orgId ? { u: orgId } : {}),
     };
     const label = await this.providerService.nextOAuthLabel(pending.tenantId, pending.provider);
-    const { provider: savedProvider } = await this.providerService.upsertProvider(
+    const { provider: upserted } = await this.providerService.upsertProvider(
       pending.agentId,
       pending.tenantId,
       pending.provider,
@@ -338,6 +388,12 @@ export class OpencodeOauthService {
       'subscription',
       undefined,
       label,
+      pending.createdByUserId,
+    );
+    const savedProvider = await applyFlowUrls(
+      this.providerService,
+      upserted,
+      pending.urls,
       pending.createdByUserId,
     );
     try {
@@ -363,10 +419,13 @@ export class OpencodeOauthService {
    * replaced. A 400 `invalid_grant` throws `OpencodeSignedOutError` and marks
    * the refresh token as signed out, like the client's `SignedOutError`.
    */
-  async refreshAccessToken(current: OAuthTokenBlob): Promise<OAuthTokenBlob> {
+  async refreshAccessToken(
+    current: OAuthTokenBlob,
+    provider?: OpencodeConsoleProvider,
+  ): Promise<OAuthTokenBlob> {
     if (this.signedOut.has(current.r)) throw new OpencodeSignedOutError();
     const response = await postJson(
-      `${OPENCODE_CONSOLE_SERVER}/auth/device/token`,
+      consoleUrl('/auth/device/token', provider),
       { grant_type: 'refresh_token', refresh_token: current.r, client_id: CLIENT_ID },
       AbortSignal.timeout(REFRESH_TIMEOUT_MS),
     );
@@ -455,7 +514,7 @@ export class OpencodeOauthService {
       logger: this.logger,
       callerBlob: blob,
       parse: parseOAuthTokenBlob,
-      refresh: (current) => this.refreshAccessToken(current),
+      refresh: (current) => this.refreshAccessToken(current, provider),
       expirySkewMs: REFRESH_MARGIN_MS,
       withLock: subscriptionCredentialLock(
         (t, p, l, fn) => this.providerService.withSubscriptionCredentialLock(t, p, l, fn),
@@ -482,7 +541,8 @@ export class OpencodeOauthService {
     if (!orgId) return null;
     const token = await this.unwrapToken(rawValue, agentId, tenantId, keyLabel, 'opencode-go');
     if (!token) return null;
-    const response = await outboundFetch(OPENCODE_GO_USAGE_URL, {
+    const usage = scopedProviderUrl('opencode-go', 'subscription', 'usage', OPENCODE_GO_USAGE_URL);
+    const response = await fetchProviderUrl(usage, {
       headers: {
         ...CONSOLE_HEADERS,
         authorization: `Bearer ${token}`,
@@ -526,7 +586,7 @@ export class OpencodeOauthService {
       return false;
     }
     this.configReadAt.set(loginKey, now);
-    const response = await outboundFetch(`${OPENCODE_CONSOLE_SERVER}/api/v2/config`, {
+    const response = await fetchProviderUrl(consoleUrl('/api/v2/config'), {
       headers: {
         ...CONSOLE_HEADERS,
         authorization: `Bearer ${accessToken}`,

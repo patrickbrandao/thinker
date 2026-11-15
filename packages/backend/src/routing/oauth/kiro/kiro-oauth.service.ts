@@ -15,9 +15,6 @@ import {
   KIRO_REFRESH_GRANT,
   KIRO_REGISTER_GRANT_TYPES,
   KiroAuthorizationOptions,
-  buildKiroDeviceAuthorizationUrl,
-  buildKiroRegisterUrl,
-  buildKiroTokenUrl,
   getKiroOidcBaseUrl,
   normalizeKiroRegion,
   normalizeKiroStartUrl,
@@ -27,7 +24,15 @@ import {
   toPollIntervalMs,
   type KiroOAuthTokenBlob,
 } from './kiro-oidc';
-import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import {
+  fetchProviderUrl,
+  runWithProviderUrls,
+  scopedProviderUrl,
+  withPath,
+  type ProviderUrlConnection,
+  type ResolvedProviderUrl,
+} from '../../provider-urls/provider-url-scope';
+import { applyFlowUrls } from '../core/flow-urls';
 
 interface PendingKiroOAuth {
   clientId: string;
@@ -39,6 +44,10 @@ interface PendingKiroOAuth {
   /** Acting user, audit only (tenant_providers.created_by_user_id). */
   createdByUserId: string | null;
   region: string;
+  /** The `oidc` slot (ADR 0012): the region's OIDC base unless overridden. */
+  oidc: ResolvedProviderUrl;
+  /** URL overrides the login was started with. */
+  urls?: ProviderUrlConnection;
   expiresAt: number;
   pollIntervalMs: number;
 }
@@ -117,12 +126,19 @@ export class KiroOauthService {
     tenantId: string,
     createdByUserId?: string | null,
     options: KiroAuthorizationOptions = {},
+    urls?: ProviderUrlConnection,
   ): Promise<KiroOAuthStartResult> {
     this.cleanupExpired();
-    const { region, startUrl } = this.resolveAuthorizationOptions(options);
-    const baseUrl = getKiroOidcBaseUrl(region);
-    const { clientId, clientSecret } = await this.registerClient(baseUrl);
-    const device = await this.startDeviceAuthorization(baseUrl, clientId, clientSecret, startUrl);
+    // A `start_url` override (ADR 0012) wins over the `startUrl` option.
+    const { region, startUrl } = this.resolveAuthorizationOptions({
+      ...options,
+      ...(urls?.urlOverrides?.start_url ? { startUrl: urls.urlOverrides.start_url } : {}),
+    });
+    const oidc = runWithProviderUrls(urls, () =>
+      scopedProviderUrl('kiro', 'subscription', 'oidc', getKiroOidcBaseUrl(region)),
+    );
+    const { clientId, clientSecret } = await this.registerClient(oidc);
+    const device = await this.startDeviceAuthorization(oidc, clientId, clientSecret, startUrl);
 
     const flowId = randomBytes(16).toString('base64url');
     const expiresAt = toAbsoluteExpiryTimestamp(device.expiresIn);
@@ -135,6 +151,8 @@ export class KiroOauthService {
       tenantId,
       createdByUserId: createdByUserId ?? null,
       region,
+      oidc,
+      ...(urls ? { urls } : {}),
       expiresAt,
       pollIntervalMs,
     });
@@ -164,8 +182,7 @@ export class KiroOauthService {
       return { status: 'error', message: 'Kiro login expired. Start again.' };
     }
 
-    const baseUrl = getKiroOidcBaseUrl(pending.region);
-    const response = await outboundFetch(buildKiroTokenUrl(baseUrl), {
+    const response = await fetchProviderUrl(withPath(pending.oidc, '/token'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -214,7 +231,7 @@ export class KiroOauthService {
       region: pending.region,
     };
     const label = await this.providerService.nextOAuthLabel(pending.tenantId, 'kiro');
-    const { provider: savedProvider } = await this.providerService.upsertProvider(
+    const { provider: upserted } = await this.providerService.upsertProvider(
       pending.agentId,
       pending.tenantId,
       'kiro',
@@ -222,6 +239,12 @@ export class KiroOauthService {
       'subscription',
       undefined,
       label,
+      pending.createdByUserId,
+    );
+    const savedProvider = await applyFlowUrls(
+      this.providerService,
+      upserted,
+      pending.urls,
       pending.createdByUserId,
     );
     try {
@@ -269,9 +292,9 @@ export class KiroOauthService {
   }
 
   private async registerClient(
-    baseUrl: string,
+    oidc: ResolvedProviderUrl,
   ): Promise<{ clientId: string; clientSecret: string }> {
-    const response = await outboundFetch(buildKiroRegisterUrl(baseUrl), {
+    const response = await fetchProviderUrl(withPath(oidc, '/client/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -294,7 +317,7 @@ export class KiroOauthService {
   }
 
   private async startDeviceAuthorization(
-    baseUrl: string,
+    oidc: ResolvedProviderUrl,
     clientId: string,
     clientSecret: string,
     startUrl: string,
@@ -302,7 +325,7 @@ export class KiroOauthService {
     Required<Pick<KiroDeviceAuthorizationResponse, 'deviceCode' | 'userCode' | 'expiresIn'>> &
       KiroDeviceAuthorizationResponse
   > {
-    const response = await outboundFetch(buildKiroDeviceAuthorizationUrl(baseUrl), {
+    const response = await fetchProviderUrl(withPath(oidc, '/device_authorization'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ clientId, clientSecret, startUrl }),
@@ -337,8 +360,14 @@ export class KiroOauthService {
   }
 
   private async refreshAccessToken(blob: KiroOAuthTokenBlob): Promise<KiroOAuthTokenBlob> {
-    const baseUrl = getKiroOidcBaseUrl(blob.region ?? this.region);
-    const response = await outboundFetch(buildKiroTokenUrl(baseUrl), {
+    // The connection in scope (credential resolution) may override the OIDC base.
+    const oidc = scopedProviderUrl(
+      'kiro',
+      'subscription',
+      'oidc',
+      getKiroOidcBaseUrl(blob.region ?? this.region),
+    );
+    const response = await fetchProviderUrl(withPath(oidc, '/token'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({

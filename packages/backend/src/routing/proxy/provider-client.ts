@@ -10,9 +10,17 @@ import {
   PROVIDER_ENDPOINTS,
   ProviderEndpoint,
   buildEndpointOverride,
+  buildSlotEndpoint,
   resolveBedrockEndpointKey,
   resolveEndpointKey,
 } from './provider-endpoints';
+import { CustomProviderService } from '../custom-provider/custom-provider.service';
+import {
+  effectiveUrlOverrides,
+  inferenceSlotForEndpoint,
+  resolveProviderUrl,
+  type ProviderUrlConnection,
+} from '../provider-urls/provider-urls';
 import { applyParamPolicy } from './param-policy';
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
@@ -435,6 +443,7 @@ export class ProviderClient {
       model,
       opts.apiMode,
       body,
+      opts.urls,
     );
     const isGoogle = endpoint.format === 'google';
     const isAnthropic = endpoint.format === 'anthropic';
@@ -472,6 +481,15 @@ export class ProviderClient {
         signal,
         timeoutMs: PROVIDER_TIMEOUT_MS,
         extraHeaders,
+        ...(endpoint.requiresSsrfRevalidation
+          ? {
+              endpoint: {
+                url: endpoint.baseUrl,
+                overridden: true,
+                allowPrivate: endpoint.allowPrivateDestination !== false,
+              },
+            }
+          : {}),
       });
       const response = timeProviderResponse(kiroResponse, opts.attempt);
       return {
@@ -620,6 +638,7 @@ export class ProviderClient {
     model: string,
     apiMode: ForwardOptions['apiMode'],
     body?: Record<string, unknown>,
+    urls?: ProviderUrlConnection,
   ): Promise<{ endpoint: ProviderEndpoint; endpointKey: string }> {
     // Runtime Chat Completions rejects function tools next to reasoning on GPT
     // profiles, so those chat requests go to Runtime Responses instead.
@@ -630,19 +649,63 @@ export class ProviderClient {
       (apiMode === undefined || apiMode === 'chat_completions') &&
       process.env.THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES !== 'false' &&
       bedrockRuntimeChatNeedsResponses(model, body);
-    if (customEndpoint) {
-      // A stored-region or account base URL connection arrives as the Runtime
-      // chat override; swap it for the Responses template on the same host.
-      if (viaResponses && customEndpoint.format === 'openai') {
-        const responsesEndpoint = buildEndpointOverride(
-          customEndpoint.baseUrl,
-          'bedrock-runtime-responses',
-        );
-        responsesEndpoint.allowPrivateDestination = customEndpoint.allowPrivateDestination;
-        return { endpoint: responsesEndpoint, endpointKey: 'custom' };
+    // A connection's own inference URL (ADR 0012) replaces the base only
+    // after the variant is chosen for the model, so the format choice below
+    // (Responses, Anthropic, Google, Mantle or Runtime) still applies. An
+    // override beats the region endpoint.
+    const ownInference =
+      urls !== undefined &&
+      !CustomProviderService.isCustom(provider) &&
+      Object.keys(effectiveUrlOverrides(urls)).some((slot) => slot.startsWith('inference'));
+    if (customEndpoint && !ownInference) return this.regionEndpoint(customEndpoint, viaResponses);
+    const native = await this.resolveNativeEndpointKey(
+      provider,
+      authType,
+      model,
+      apiMode,
+      body,
+      viaResponses,
+    );
+    if (ownInference) {
+      const target = resolveProviderUrl(urls, inferenceSlotForEndpoint(native));
+      if (target?.overridden) {
+        return {
+          endpoint: buildSlotEndpoint(target.url, native, target.allowPrivate),
+          endpointKey: native,
+        };
       }
-      return { endpoint: customEndpoint, endpointKey: 'custom' };
+      if (customEndpoint) return this.regionEndpoint(customEndpoint, viaResponses);
     }
+    return { endpoint: PROVIDER_ENDPOINTS[native], endpointKey: native };
+  }
+
+  /** A stored-region (or custom provider) endpoint, as resolveForwardEndpoint built it. */
+  private regionEndpoint(
+    customEndpoint: ProviderEndpoint,
+    viaResponses: boolean,
+  ): { endpoint: ProviderEndpoint; endpointKey: string } {
+    // A stored-region connection arrives as the Runtime chat override; swap
+    // it for the Responses template on the same host.
+    if (viaResponses && customEndpoint.format === 'openai') {
+      const responsesEndpoint = buildEndpointOverride(
+        customEndpoint.baseUrl,
+        'bedrock-runtime-responses',
+      );
+      responsesEndpoint.allowPrivateDestination = customEndpoint.allowPrivateDestination;
+      return { endpoint: responsesEndpoint, endpointKey: 'custom' };
+    }
+    return { endpoint: customEndpoint, endpointKey: 'custom' };
+  }
+
+  /** The endpoint key a model of this provider goes to: the per-model variant. */
+  private async resolveNativeEndpointKey(
+    provider: string,
+    authType: string | undefined,
+    model: string,
+    apiMode: ForwardOptions['apiMode'],
+    body: Record<string, unknown> | undefined,
+    viaResponses: boolean,
+  ): Promise<string> {
     let resolved = resolveEndpointKey(provider);
     if (!resolved) {
       throw new Error(`No endpoint configured for provider: ${provider}`);
@@ -700,7 +763,7 @@ export class ProviderClient {
         resolved = 'commandcode-anthropic';
       }
     }
-    return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved };
+    return resolved;
   }
 
   /**

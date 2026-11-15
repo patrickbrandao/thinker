@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ProviderService } from '../../routing-core/provider.service';
 import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 import { RedirectPkceOauthBaseService } from '../core/redirect-pkce-oauth.base';
+import { XAI_OAUTH_URLS } from '../../provider-urls/provider-url-constants';
 
 const DEFAULT_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
 const CALLBACK_PORT = 56121;
@@ -19,9 +20,9 @@ export class XaiOauthService extends RedirectPkceOauthBaseService {
       serviceName: XaiOauthService.name,
       defaultClientId: DEFAULT_CLIENT_ID,
       clientIdEnvVar: 'XAI_OAUTH_CLIENT_ID',
-      authorizeUrl: 'https://auth.x.ai/oauth2/authorize',
-      tokenUrl: 'https://auth.x.ai/oauth2/token',
-      revokeUrl: 'https://auth.x.ai/oauth2/revoke',
+      authorizeUrl: XAI_OAUTH_URLS.authorize,
+      tokenUrl: XAI_OAUTH_URLS.token,
+      revokeUrl: XAI_OAUTH_URLS.revoke,
       // The Grok CLI proxy requires the conversations/workspaces scopes (sub-xai G2).
       scope:
         'openid profile email offline_access grok-cli:access api:access conversations:read conversations:write workspaces:read workspaces:write',

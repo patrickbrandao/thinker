@@ -13,6 +13,7 @@ import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { usePageWake } from '../lib/use-page-wake.js';
 import { Button, IconButton, WindowFooter } from './ui.js';
+import { collectUrlOverrides, useUrlsScope } from './ConnectionUrlsScope.js';
 
 type Phase = 'idle' | 'loading' | 'awaiting' | 'success' | 'error';
 
@@ -44,6 +45,7 @@ export default function CopilotDeviceLogin(props: Props) {
   // The pending poll's device code and interval, and whether a request is out.
   const pollState = useRef<{ code: string; delaySec: number } | null>(null);
   const pollInFlight = useRef(false);
+  const urlsScope = useUrlsScope();
   const latest = useRef(props);
   latest.current = props;
 
@@ -121,11 +123,15 @@ export default function CopilotDeviceLogin(props: Props) {
   });
 
   const startLogin = async () => {
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
     setPhase('loading');
     setError('');
     cancelled.current = false;
     try {
-      const result = await copilotDeviceCode(props.agentName);
+      const result = await (urlOverrides
+        ? copilotDeviceCode(props.agentName, urlOverrides)
+        : copilotDeviceCode(props.agentName));
       setUserCode(result.user_code);
       setVerificationUri(result.verification_uri);
       setPhase('awaiting');

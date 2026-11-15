@@ -21,9 +21,13 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { scrubSecrets } from '../../../common/utils/secret-scrub';
-import { outboundFetch } from '../../../common/outbound/outbound-proxy';
+import { CODE_ASSIST_BASE } from '../../provider-urls/provider-url-constants';
+import {
+  fetchProviderUrl,
+  scopedProviderUrl,
+  withPath,
+} from '../../provider-urls/provider-url-scope';
 
-const CODE_ASSIST_BASE = 'https://cloudcode-pa.googleapis.com';
 const CODE_ASSIST_VERSION = 'v1internal';
 const CODE_ASSIST_OPERATION_POLL_MS = 5_000;
 const CODE_ASSIST_OPERATION_MAX_POLLS = 12;
@@ -107,20 +111,27 @@ export class CodeAssistClientService {
     return current;
   }
 
+  /** The `code_assist` slot of the login in scope (ADR 0012). */
+  private base() {
+    return scopedProviderUrl('gemini', 'subscription', 'code_assist', CODE_ASSIST_BASE);
+  }
+
   private async callJson<T>(
     method: ':loadCodeAssist' | ':onboardUser',
     accessToken: string,
     body: Record<string, unknown>,
   ): Promise<T> {
-    const url = `${CODE_ASSIST_BASE}/${CODE_ASSIST_VERSION}${method}`;
-    const response = await outboundFetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
+    const response = await fetchProviderUrl(
+      withPath(this.base(), `/${CODE_ASSIST_VERSION}${method}`),
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+    );
     if (!response.ok) {
       const text = await response.text();
       this.logger.error(`CodeAssist ${method} failed (${response.status}): ${scrubSecrets(text)}`);
@@ -130,14 +141,16 @@ export class CodeAssistClientService {
   }
 
   private async callOperation(name: string, accessToken: string): Promise<LongRunningOperation> {
-    const url = `${CODE_ASSIST_BASE}/${CODE_ASSIST_VERSION}/${name}`;
-    const response = await outboundFetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
+    const response = await fetchProviderUrl(
+      withPath(this.base(), `/${CODE_ASSIST_VERSION}/${name}`),
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
       },
-    });
+    );
     if (!response.ok) {
       const text = await response.text();
       this.logger.error(

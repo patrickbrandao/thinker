@@ -5,6 +5,7 @@ import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.
 import { OAuthTokenBlob } from '../core';
 import { RedirectPkceOauthBaseService } from '../core/redirect-pkce-oauth.base';
 import { CodeAssistClientService } from './codeassist-client.service';
+import { GEMINI_OAUTH_URLS } from '../../provider-urls/provider-url-constants';
 
 // Default OAuth client borrowed from the open-source `gemini-cli` (Google's
 // own CLI for personal-account access to the CodeAssist API). The "secret"
@@ -38,9 +39,9 @@ export class GeminiOauthService extends RedirectPkceOauthBaseService {
       defaultClientSecret: DEFAULT_CLIENT_SECRET,
       clientIdEnvVar: 'GEMINI_OAUTH_CLIENT_ID',
       clientSecretEnvVar: 'GEMINI_OAUTH_CLIENT_SECRET',
-      authorizeUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-      tokenUrl: 'https://oauth2.googleapis.com/token',
-      revokeUrl: 'https://oauth2.googleapis.com/revoke',
+      authorizeUrl: GEMINI_OAUTH_URLS.authorize,
+      tokenUrl: GEMINI_OAUTH_URLS.token,
+      revokeUrl: GEMINI_OAUTH_URLS.revoke,
       // cloud-platform is what gemini-cli requests; it gives access to the
       // CodeAssist (cloudcode-pa.googleapis.com) endpoints for free-tier
       // personal accounts. email/profile let us identify the user.

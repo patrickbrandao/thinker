@@ -322,3 +322,11 @@ export type {
   LiveRequestStartedData,
   LiveSessionStatus,
 } from './live-session';
+export { PROVIDER_URL_SLOTS, PROVIDER_URL_MAX_LENGTH, providerUrlSlots } from './provider-urls';
+export type {
+  ProviderUrlKind,
+  ProviderUrlCredential,
+  ProviderUrlAuthType,
+  ProviderUrlSlot,
+  ProviderUrlOverrides,
+} from './provider-urls';

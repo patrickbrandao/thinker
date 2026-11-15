@@ -44,7 +44,16 @@ export class TenantProvider {
   base_url!: string | null;
 
   /**
-   * Whether `base_url` may reach private/LAN addresses at connect time: what
+   * Editable URLs of the connection (ADR 0012): slot id → URL, only what
+   * differs from the default. `base_url` mirrors the inference slot of an
+   * API-key connection for rollback; resolution reads both
+   * (routing/provider-urls).
+   */
+  @Column('jsonb', { nullable: true, default: null })
+  url_overrides!: Record<string, string> | null;
+
+  /**
+   * Whether `base_url` and `url_overrides` may reach private/LAN addresses at connect time: what
    * THINKER_PROVIDER_PRIVATE_URLS allowed whoever set it (ADR 0006 item 7).
    */
   @Column('boolean', { default: true })

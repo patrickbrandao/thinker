@@ -515,6 +515,7 @@ export class ProxyService {
       providerRegion: credentials.providerRegion,
       providerBaseUrl: credentials.providerBaseUrl,
       providerBaseUrlAllowsPrivate: credentials.providerBaseUrlAllowsPrivate,
+      providerUrlOverrides: credentials.providerUrlOverrides,
       signatureLookup,
       thinkingLookup,
       clientAnthropicBeta: headers?.['anthropic-beta'],

@@ -8,6 +8,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindOptionsWhere, EntityManager } from 'typeorm';
 import { supportsAccountBaseUrl } from '../account-base-url';
+import {
+  connectionUrls,
+  effectiveUrlOverrides,
+  legacyBaseUrlFor,
+  legacyBaseUrlOverrides,
+} from '../provider-urls/provider-urls';
 import { TenantProvider } from '../../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
@@ -737,8 +743,9 @@ export class ProviderService {
   }
 
   /**
-   * Set or clear (null) an API-key connection's base URL. The caller has
-   * normalized and SSRF-checked it (routing/account-base-url.ts).
+   * Set or clear (null) an API-key connection's base URL: the shortcut of
+   * its inference slot (ADR 0012). The caller has normalized and SSRF-checked
+   * it (routing/account-base-url.ts).
    */
   async setBaseUrl(
     tenantId: string,
@@ -756,10 +763,44 @@ export class ProviderService {
         'Only API-key connections of a built-in provider take a base URL',
       );
     }
-    row.base_url = baseUrl;
-    row.allow_private_destination = baseUrl === null ? true : allowPrivate;
+    const overrides = { ...effectiveUrlOverrides(connectionUrls(row)) };
+    for (const slot of Object.keys(legacyBaseUrlOverrides(row.provider, 'api_key', 'x'))) {
+      delete overrides[slot];
+    }
+    Object.assign(overrides, legacyBaseUrlOverrides(row.provider, row.auth_type, baseUrl));
+    return this.saveUrlOverrides(row, overrides, allowPrivate);
+  }
+
+  /**
+   * Replace a connection's URL overrides (ADR 0012), already validated by
+   * `checkUrlOverrides`. The legacy `base_url` mirrors the inference slot of
+   * an API-key connection, for rollback.
+   */
+  async setUrlOverrides(
+    tenantId: string,
+    connectionId: string,
+    overrides: Record<string, string>,
+    allowPrivate: boolean,
+  ): Promise<TenantProvider> {
+    const row = await this.providerRepo.findOne({
+      where: { id: connectionId, tenant_id: tenantId },
+    });
+    if (!row) throw new NotFoundException('Provider connection not found');
+    return this.saveUrlOverrides(row, overrides, allowPrivate);
+  }
+
+  private async saveUrlOverrides(
+    row: TenantProvider,
+    overrides: Record<string, string>,
+    allowPrivate: boolean,
+  ): Promise<TenantProvider> {
+    row.url_overrides = { ...overrides };
+    row.base_url =
+      (row.auth_type ?? 'api_key') === 'api_key' ? legacyBaseUrlFor(row.provider, overrides) : null;
+    row.allow_private_destination = Object.keys(overrides).length === 0 ? true : allowPrivate;
     row.updated_at = new Date().toISOString();
     await this.providerRepo.save(row);
+    this.routingCache.invalidateTenant(row.tenant_id);
     return row;
   }
 

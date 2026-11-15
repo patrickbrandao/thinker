@@ -9,6 +9,7 @@ import {
 import type { CustomProviderPrefill, ProviderDeepLink } from '../services/routing-params.js';
 import CustomProviderForm from './CustomProviderForm.js';
 import CopilotDeviceLogin from './CopilotDeviceLogin.js';
+import { AddConnectionUrlsTabs } from './ConnectionUrlsScope.js';
 import LocalServerForm from './LocalServerForm.js';
 import ProviderDetailView from './ProviderDetailView.js';
 
@@ -197,48 +198,52 @@ export default function ProviderSelectContent(props: ProviderSelectContentProps)
       {/* -- Device Login Detail View (Copilot) -- */}
       {selectedProvider !== null && noFormOpen && selectedDef?.deviceLogin ? (
         <div className={VIEW_CLASS}>
-          <CopilotDeviceLogin
-            agentName={props.agentName}
-            connected={isSubscriptionWithToken(selectedProvider)}
-            activeKeys={getActiveProviderKeys(selectedProvider, 'subscription')}
-            onBack={goBack}
-            onConnected={async () => {
-              await props.onUpdate();
-              goBack();
-            }}
-            onUpdated={props.onUpdate}
-            onDisconnected={() => {
-              goBack();
-              props.onUpdate();
-            }}
-            newConnection={props.newConnection}
-          />
+          <AddConnectionUrlsTabs provider={selectedProvider} authType="subscription">
+            <CopilotDeviceLogin
+              agentName={props.agentName}
+              connected={isSubscriptionWithToken(selectedProvider)}
+              activeKeys={getActiveProviderKeys(selectedProvider, 'subscription')}
+              onBack={goBack}
+              onConnected={async () => {
+                await props.onUpdate();
+                goBack();
+              }}
+              onUpdated={props.onUpdate}
+              onDisconnected={() => {
+                goBack();
+                props.onUpdate();
+              }}
+              newConnection={props.newConnection}
+            />
+          </AddConnectionUrlsTabs>
         </div>
       ) : null}
 
       {/* -- Detail View (API Key / Token) -- */}
       {selectedProvider !== null && noFormOpen && !selectedDef?.deviceLogin ? (
         <div className={VIEW_CLASS}>
-          <ProviderDetailView
-            provId={selectedProvider}
-            agentName={props.agentName}
-            providers={props.providers}
-            selectedAuthType={selectedAuthType}
-            busy={busy}
-            setBusy={setBusy}
-            keyInput={keyInput}
-            setKeyInput={setKeyInput}
-            editing={editing}
-            setEditing={setEditing}
-            validationError={validationError}
-            setValidationError={setValidationError}
-            onBack={goBack}
-            onUpdate={props.onUpdate}
-            onPollProviders={props.onPollProviders}
-            onClose={closeHandler}
-            reauthLabel={props.reauthLabel}
-            newConnection={props.newConnection}
-          />
+          <AddConnectionUrlsTabs provider={selectedProvider} authType={selectedAuthType}>
+            <ProviderDetailView
+              provId={selectedProvider}
+              agentName={props.agentName}
+              providers={props.providers}
+              selectedAuthType={selectedAuthType}
+              busy={busy}
+              setBusy={setBusy}
+              keyInput={keyInput}
+              setKeyInput={setKeyInput}
+              editing={editing}
+              setEditing={setEditing}
+              validationError={validationError}
+              setValidationError={setValidationError}
+              onBack={goBack}
+              onUpdate={props.onUpdate}
+              onPollProviders={props.onPollProviders}
+              onClose={closeHandler}
+              reauthLabel={props.reauthLabel}
+              newConnection={props.newConnection}
+            />
+          </AddConnectionUrlsTabs>
         </div>
       ) : null}
     </>

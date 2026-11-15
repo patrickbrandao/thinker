@@ -24,6 +24,8 @@ export interface CachedProviderKey {
   baseUrl?: string | null;
   /** `tenant_providers.allow_private_destination` (absent = allowed). */
   baseUrlAllowsPrivate?: boolean;
+  /** `tenant_providers.url_overrides` (ADR 0012), absent for the synthetic Ollama key. */
+  urlOverrides?: Record<string, string> | null;
   /** `tenant_providers.stream_warmup_ms` (#244); absent for the synthetic Ollama key. */
   streamWarmupMs?: number | null;
   /** `tenant_providers.stream_idle_timeout_ms`; absent for the synthetic Ollama key. */

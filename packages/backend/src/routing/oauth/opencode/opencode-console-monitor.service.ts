@@ -1,4 +1,9 @@
 import {
+  connectionUrls,
+  runWithProviderUrls,
+  type ProviderUrlConnection,
+} from '../../provider-urls/provider-urls';
+import {
   Inject,
   Injectable,
   Logger,
@@ -38,6 +43,8 @@ interface ConsoleRow {
   label: string;
   blob: OAuthTokenBlob;
   loginKey: string;
+  /** The row's URLs (ADR 0012): its Console base, if overridden. */
+  urls: ProviderUrlConnection;
 }
 
 type LoginStatus = 'ok' | 'error' | 'signed_out';
@@ -256,9 +263,10 @@ export class OpencodeConsoleMonitor implements OnApplicationBootstrap, OnModuleD
   }
 
   private inScope<T>(row: ConsoleRow, fn: () => Promise<T>): Promise<T> {
+    const withUrls = () => runWithProviderUrls(row.urls, fn);
     return this.egress
-      ? this.egress.runForConnection(row.tenantId, row.provider, row.id, fn)
-      : fn();
+      ? this.egress.runForConnection(row.tenantId, row.provider, row.id, withUrls)
+      : withUrls();
   }
 
   /** Active OpenCode subscription rows whose value is a Console OAuth blob. */
@@ -292,6 +300,7 @@ export class OpencodeConsoleMonitor implements OnApplicationBootstrap, OnModuleD
         label: row.label,
         blob,
         loginKey: opencodeLoginKey(row.tenant_id, blob.u, row.label),
+        urls: connectionUrls(row),
       });
     }
     return out;
