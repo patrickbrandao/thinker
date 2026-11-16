@@ -2,11 +2,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Check,
+  ChevronDown,
+  ChevronUp,
   ClipboardCopy,
   FlaskConical,
   Moon,
-  PanelRightClose,
-  PanelRightOpen,
   Pause,
   Play,
   RotateCcw,
@@ -47,6 +47,7 @@ export interface LabSettings {
 export const LAB_SETTINGS_KEY = 'thinker.lab.liveAgents.settings';
 export const LAB_NOTES_KEY = 'thinker.lab.liveAgents.notes';
 const PANEL_KEY = 'thinker.lab.liveAgents.panel';
+const WINDOW_POS_KEY = 'thinker.lab.liveAgents.window';
 
 export const DEFAULT_SETTINGS: LabSettings = {
   fleet: DEFAULT_FLEET,
@@ -247,6 +248,8 @@ export default function LiveAgentsLab() {
   const [notes, setNotes] = useState(() => read(LAB_NOTES_KEY));
   const [panel, setPanel] = useState(() => read(PANEL_KEY, 'open') !== 'closed');
   const [copied, setCopied] = useState(false);
+  const [agentFilter, setAgentFilter] = useState('');
+  const [agentNames, setAgentNames] = useState<string[]>([]);
   const [wallKey, setWallKey] = useState(0);
   const [wallStats, setWallStats] = useState<WallStats>({
     running: 0,
@@ -276,6 +279,25 @@ export default function LiveAgentsLab() {
     return () => fleet.dispose();
   }, [fleet]);
   useEffect(() => fleet.configure(settings.fleet), [fleet, settings.fleet]);
+
+  // Harness names for the filter in the controls window (the fleet's fake API).
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fleet
+        .fetch('/api/v1/agents')
+        .then((r) => r.json() as Promise<{ agents?: { agent_name: string }[] }>)
+        .then((d) => {
+          if (alive) setAgentNames((d.agents ?? []).map((a) => a.agent_name).sort());
+        })
+        .catch(() => undefined);
+    void load();
+    const timer = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [fleet]);
 
   // Counters: every fleet change, and a tick for the running window.
   useEffect(() => {
@@ -599,63 +621,149 @@ export default function LiveAgentsLab() {
     </div>
   );
 
-  return (
-    <div className="flex h-screen flex-col bg-bg">
-      <header className="flex items-center gap-3 border-b border-line bg-elev px-4 py-3">
-        <FlaskConical size={18} className="shrink-0 text-[var(--port-2)]" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[16px]">Lab · Live agents</h1>
-          <div className="truncate text-[12px] text-muted">
-            The wall over a simulated fleet of harnesses: customize here, then port to the official
-            page.
-          </div>
-        </div>
-        <button
-          type="button"
-          className="rounded-md p-2 text-muted hover:bg-s2 hover:text-ink"
-          title={dark ? 'Light theme' : 'Dark theme'}
-          aria-label={dark ? 'Light theme' : 'Dark theme'}
-          onClick={toggleTheme}
-        >
-          {dark ? <Sun size={17} /> : <Moon size={17} />}
-        </button>
-        <button
-          type="button"
-          className="rounded-md p-2 text-muted hover:bg-s2 hover:text-ink"
-          title={panel ? 'Hide controls' : 'Show controls'}
-          aria-label={panel ? 'Hide controls' : 'Show controls'}
-          aria-expanded={panel}
-          onClick={() => setPanel((p) => !p)}
-        >
-          {panel ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
-        </button>
-      </header>
+  const toolbar = (
+    <>
+      <select
+        className="field h-7 w-auto max-w-[160px] py-0 text-[12px]"
+        aria-label="Harness filter"
+        value={agentFilter}
+        onChange={(e) => setAgentFilter(e.target.value)}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <option value="">All harnesses</option>
+        {agentNames.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="rounded-md p-1.5 text-muted hover:bg-s3 hover:text-ink"
+        title={dark ? 'Light theme' : 'Dark theme'}
+        aria-label={dark ? 'Light theme' : 'Dark theme'}
+        onClick={toggleTheme}
+      >
+        {dark ? <Sun size={15} /> : <Moon size={15} />}
+      </button>
+    </>
+  );
 
-      <div className="relative flex min-h-0 flex-1">
-        <main className="min-w-0 flex-1 overflow-auto">
-          <LiveAgentsWall
-            key={wallKey}
-            fetch={fleet.fetch}
-            createFeed={createFeed}
-            maxTiles={maxTiles}
-            layout={l}
-            timing={timing}
-            onStats={setWallStats}
-          />
-        </main>
-        {panel ? (
-          <aside
-            className={cx(
-              'overflow-y-auto border-l border-line bg-elev',
-              // A drawer over the wall on narrow screens, a side panel otherwise.
-              'absolute inset-y-0 right-0 z-30 w-[min(400px,100%)] lg:static lg:w-[400px] lg:shrink-0',
-            )}
-            aria-label="Lab controls"
-          >
-            {controls}
-          </aside>
-        ) : null}
+  return (
+    <div className="h-screen overflow-auto bg-bg">
+      <LiveAgentsWall
+        key={wallKey}
+        fetch={fleet.fetch}
+        createFeed={createFeed}
+        maxTiles={maxTiles}
+        layout={l}
+        timing={timing}
+        onStats={setWallStats}
+        hideHeader
+        agentFilter={agentFilter}
+      />
+      <ControlsWindow
+        open={panel}
+        onToggle={() => setPanel((p) => !p)}
+        summary={`${wallStats.running} running · ${wallStats.shown} live · ${wallStats.waiting} waiting`}
+        toolbar={toolbar}
+      >
+        {controls}
+      </ControlsWindow>
+    </div>
+  );
+}
+
+/**
+ * The lab's floating controls window: draggable by its title bar, collapsible
+ * to the bar alone, position remembered in localStorage. It floats over the
+ * wall so the wall keeps the whole page.
+ */
+function ControlsWindow({
+  open,
+  onToggle,
+  summary,
+  toolbar,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  summary: string;
+  toolbar: ReactNode;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const v = JSON.parse(read(WINDOW_POS_KEY, 'null')) as { x: number; y: number } | null;
+      return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (pos) write(WINDOW_POS_KEY, JSON.stringify(pos));
+  }, [pos]);
+
+  // Keep the bar on screen after a resize.
+  const clamp = useCallback((p: { x: number; y: number }) => {
+    const w = ref.current?.offsetWidth ?? 380;
+    return {
+      x: Math.min(Math.max(p.x, 0), Math.max(0, window.innerWidth - w)),
+      y: Math.min(Math.max(p.y, 0), Math.max(0, window.innerHeight - 44)),
+    };
+  }, []);
+  useEffect(() => {
+    const onResize = () => setPos((p) => (p ? clamp(p) : p));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clamp]);
+
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label="Lab controls"
+      className="fixed z-[80] flex w-[min(380px,calc(100vw-16px))] flex-col overflow-hidden rounded-lg border border-line bg-elev shadow-[var(--shadow-float)]"
+      style={
+        pos
+          ? { left: pos.x, top: pos.y, maxHeight: `calc(100vh - ${pos.y + 8}px)` }
+          : { right: 16, bottom: 16, maxHeight: 'calc(100vh - 32px)' }
+      }
+    >
+      <div
+        className="flex cursor-grab select-none items-center gap-2 border-b border-line bg-s2 px-2.5 py-1.5 active:cursor-grabbing"
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest('button, select')) return;
+          const r = ref.current!.getBoundingClientRect();
+          drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current) return;
+          setPos(clamp({ x: e.clientX - drag.current.dx, y: e.clientY - drag.current.dy }));
+        }}
+        onPointerUp={() => (drag.current = null)}
+      >
+        <FlaskConical size={15} className="shrink-0 text-[var(--port-2)]" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] font-semibold text-ink">Simulation</div>
+          <div className="truncate text-[11px] text-muted">{summary}</div>
+        </div>
+        {toolbar}
+        <button
+          type="button"
+          className="rounded-md p-1.5 text-muted hover:bg-s3 hover:text-ink"
+          title={open ? 'Collapse' : 'Expand'}
+          aria-label={open ? 'Collapse controls' : 'Expand controls'}
+          aria-expanded={open}
+          onClick={onToggle}
+        >
+          {open ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+        </button>
       </div>
+      {open ? <div className="min-h-0 flex-1 overflow-y-auto">{children}</div> : null}
     </div>
   );
 }
