@@ -26,6 +26,7 @@ import {
   type FleetConfig,
   type FleetStats,
 } from './live-agents-sim.js';
+import { BridgeHost } from './live-agents-bridge.js';
 import LiveAgentsWall, {
   DEFAULT_LAYOUT,
   DEFAULT_TIMING,
@@ -289,10 +290,15 @@ export default function LiveAgentsLab() {
   useEffect(() => write(LAB_NOTES_KEY, notes), [notes]);
   useEffect(() => write(PANEL_KEY, panel ? 'open' : 'closed'), [panel]);
 
-  // The fleet runs while the page is mounted.
+  // The fleet runs while the page is mounted, and answers watch tabs
+  // (/lab/live-agents/watch/:id) over the BroadcastChannel bridge.
   useEffect(() => {
     fleet.start();
-    return () => fleet.dispose();
+    const host = typeof BroadcastChannel === 'undefined' ? null : new BridgeHost(fleet);
+    return () => {
+      host?.dispose();
+      fleet.dispose();
+    };
   }, [fleet]);
   useEffect(() => fleet.configure(settings.fleet), [fleet, settings.fleet]);
 

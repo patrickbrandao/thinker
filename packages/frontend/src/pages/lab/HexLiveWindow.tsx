@@ -2,16 +2,16 @@
  * Lab only: a live session window in the "anoma-ly-hex" look (the reference's
  * OpenCode card): icon, title and mono path in the header, a status chip that
  * flashes green on activity, the live session views in the well and a footer
- * with only the final model and the reasoning effort.
+ * with only the final model and the reasoning effort. Header buttons: pin,
+ * short view, open in a new tab, close (each only when its handler is given).
  */
 import { useEffect, useRef, useState } from 'react';
 import {
   Bot,
   Braces,
+  ExternalLink,
   ListTree,
-  Maximize2,
   MessageSquare,
-  Minimize2,
   Pin,
   PinOff,
   RotateCw,
@@ -90,8 +90,9 @@ export default function HexLiveWindow({
   prefs,
   onPrefs,
   onClose,
-  pinned,
+  pinned = false,
   onPin,
+  onPopout,
   ended,
   iconSrc,
   closesInSec,
@@ -99,9 +100,13 @@ export default function HexLiveWindow({
   feed: LiveSessionFeed;
   prefs: LiveWindowPrefs;
   onPrefs: (patch: LiveWindowPrefs) => void;
-  onClose: () => void;
-  pinned: boolean;
-  onPin: () => void;
+  /** Close button (left out: no button). */
+  onClose?: () => void;
+  pinned?: boolean;
+  /** Pin button (left out: no button, e.g. the watch page). */
+  onPin?: () => void;
+  /** "Open in a new tab" button (left out: no button). */
+  onPopout?: () => void;
   ended: boolean;
   /** Harness platform icon; a neutral glyph without one. */
   iconSrc?: string | null;
@@ -113,7 +118,6 @@ export default function HexLiveWindow({
   const status = liveSessionStatus(state);
   const tab: LiveTab = prefs.tab ?? 'chat';
   const compact = prefs.mode === 'compact';
-  const maximized = !!prefs.maximized && !compact;
   const body = useRef<HTMLDivElement>(null);
   const [stick, setStick] = useState(true);
 
@@ -172,13 +176,7 @@ export default function HexLiveWindow({
       aria-label={t('liveSession.windowLabel', { title })}
       className={`lab-hex-win${glow ? ' lab-hex-win--glow' : ''}`}
     >
-      <div
-        className="lab-hex-win__head"
-        onDoubleClick={(e) => {
-          if ((e.target as HTMLElement).closest('button')) return;
-          if (!compact) onPrefs({ maximized: !maximized });
-        }}
-      >
+      <div className="lab-hex-win__head">
         <span className="lab-hex-win__icon">
           {iconSrc ? (
             <ThemedIcon src={iconSrc} size={18} className="platform-icon" />
@@ -192,46 +190,50 @@ export default function HexLiveWindow({
         <span className="lab-hex-win__path" title={path}>
           {path}
         </span>
-        <button
-          type="button"
-          className="lab-hex-win__btn"
-          title={pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
-          aria-label={pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
-          aria-pressed={pinned}
-          onClick={onPin}
-        >
-          {pinned ? <PinOff size={13} /> : <Pin size={13} />}
-        </button>
+        {onPin ? (
+          <button
+            type="button"
+            className="lab-hex-win__btn"
+            title={pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
+            aria-label={pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
+            aria-pressed={pinned}
+            onClick={onPin}
+          >
+            {pinned ? <PinOff size={13} /> : <Pin size={13} />}
+          </button>
+        ) : null}
         <button
           type="button"
           className="lab-hex-win__btn"
           title={compact ? t('liveSession.fullView') : t('liveSession.shortView')}
           aria-label={compact ? t('liveSession.fullView') : t('liveSession.shortView')}
           aria-pressed={compact}
-          onClick={() => onPrefs({ mode: compact ? 'normal' : 'compact', maximized: false })}
+          onClick={() => onPrefs({ mode: compact ? 'normal' : 'compact' })}
         >
           <Rows3 size={13} />
         </button>
-        {!compact && (
+        {onPopout ? (
           <button
             type="button"
             className="lab-hex-win__btn"
-            title={maximized ? t('liveSession.restoreSize') : t('liveSession.maximize')}
-            aria-label={maximized ? t('liveSession.restoreSize') : t('liveSession.maximize')}
-            onClick={() => onPrefs({ maximized: !maximized })}
+            title="Open in a new tab"
+            aria-label="Open in a new tab"
+            onClick={onPopout}
           >
-            {maximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            <ExternalLink size={13} />
           </button>
-        )}
-        <button
-          type="button"
-          className="lab-hex-win__btn"
-          title={t('liveSession.close')}
-          aria-label={t('liveSession.close')}
-          onClick={onClose}
-        >
-          <X size={14} />
-        </button>
+        ) : null}
+        {onClose ? (
+          <button
+            type="button"
+            className="lab-hex-win__btn"
+            title={t('liveSession.close')}
+            aria-label={t('liveSession.close')}
+            onClick={onClose}
+          >
+            <X size={14} />
+          </button>
+        ) : null}
       </div>
 
       <div className="lab-hex-win__row">

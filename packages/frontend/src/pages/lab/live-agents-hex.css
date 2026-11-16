@@ -424,3 +424,52 @@
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------- resize */
+
+.lab-resize {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+
+.lab-resize--e {
+  top: 12px;
+  right: -3px;
+  bottom: 16px;
+  width: 7px;
+  cursor: ew-resize;
+}
+
+.lab-resize--s {
+  left: 12px;
+  right: 16px;
+  bottom: -3px;
+  height: 7px;
+  cursor: ns-resize;
+}
+
+/* Visible grip in the bottom-right corner: two short diagonal lines. */
+.lab-resize--se {
+  right: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  color: var(--text-faint);
+  background: linear-gradient(
+    135deg,
+    transparent 0 52%,
+    currentColor 52% 60%,
+    transparent 60% 72%,
+    currentColor 72% 80%,
+    transparent 80%
+  );
+  border-bottom-right-radius: 12px;
+  opacity: 0.7;
+}
+
+.lab-resize--se:hover,
+.lab-wall-win:hover > .lab-resize--se {
+  opacity: 1;
+}

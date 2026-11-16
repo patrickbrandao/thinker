@@ -259,3 +259,51 @@ export function effortOf(body: unknown): string | null {
   }
   return null;
 }
+
+// ------------------------------------------------------------------ resize
+
+export interface Size {
+  w: number;
+  h: number;
+}
+
+/** Smallest size the user can shrink a window to. */
+export const MIN_WINDOW: Size = { w: 300, h: 220 };
+
+export type ResizeEdge = 'e' | 's' | 'se';
+
+const fit = (v: number, lo: number, hi: number) =>
+  // A viewport smaller than the minimum wins: the window still fits on screen.
+  Math.round(Math.max(Math.min(v, hi), Math.min(lo, hi)));
+
+/** Keeps a size between `min` and `max` (the viewport). */
+export function clampSize(size: Size, max: Size, min: Size = MIN_WINDOW): Size {
+  return { w: fit(size.w, min.w, max.w), h: fit(size.h, min.h, max.h) };
+}
+
+/** The size while dragging a resize handle `dx`/`dy` px from where it started. */
+export function resizeFrom(
+  start: Size,
+  edge: ResizeEdge,
+  dx: number,
+  dy: number,
+  max: Size,
+  min: Size = MIN_WINDOW,
+): Size {
+  return clampSize(
+    { w: edge === 's' ? start.w : start.w + dx, h: edge === 'e' ? start.h : start.h + dy },
+    max,
+    min,
+  );
+}
+
+/**
+ * A window's size: the one the user gave it (kept per window, clamped to the
+ * viewport), else the layout knob's size.
+ */
+export function windowSize(saved: { w?: number; h?: number }, fallback: Size, max: Size): Size {
+  return {
+    w: saved.w != null ? fit(saved.w, MIN_WINDOW.w, max.w) : Math.min(fallback.w, max.w),
+    h: saved.h != null ? fit(saved.h, MIN_WINDOW.h, max.h) : fallback.h,
+  };
+}

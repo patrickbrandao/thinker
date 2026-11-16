@@ -128,5 +128,9 @@ describe('Live agents lab: routing', () => {
       expect(before).toMatch(/import\.meta\.env\.DEV\s*\?\s*lazyReload\(\(\) => $/);
     }
     expect(src).toMatch(/\{LiveAgentsLab && \(\s*<Route\s+path="lab\/live-agents"/);
+    expect(imports.map((m) => m[1])).toContain('LiveAgentsWatch.jsx');
+    expect(src).toMatch(
+      /\{LiveAgentsWatch && \(\s*<Route\s+path="lab\/live-agents\/watch\/:sessionId"/,
+    );
   });
 });
