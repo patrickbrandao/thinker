@@ -195,6 +195,8 @@ export default function LiveAgentsWall({
   layout,
   timing,
   onStats,
+  hideHeader = false,
+  agentFilter,
 }: {
   /** Injected backend (the lab's fake fetch). */
   fetch: typeof fetch;
@@ -204,9 +206,14 @@ export default function LiveAgentsWall({
   layout: WallLayout;
   timing: WallTiming;
   onStats?: (stats: WallStats) => void;
+  /** Lab: drop the page header (the controls window shows title, counts and filter). */
+  hideHeader?: boolean;
+  /** Lab: harness filter controlled from outside ('' = all); overrides the header select. */
+  agentFilter?: string;
 }) {
   const [tiles, setTiles] = useState<WallTile[]>([]);
-  const [agent, setAgent] = useState('');
+  const [ownAgent, setAgent] = useState('');
+  const agent = agentFilter ?? ownAgent;
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -379,6 +386,11 @@ export default function LiveAgentsWall({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // An external filter (lab controls window) drops the other harnesses' tiles too.
+  useEffect(() => {
+    if (agentFilter) setTiles((prev) => prev.filter((tile) => tile.agentName === agentFilter));
+  }, [agentFilter]);
+
   const changeAgent = (value: string) => {
     setAgent(value);
     if (value) setTiles((prev) => prev.filter((tile) => tile.agentName === value));
@@ -424,28 +436,32 @@ export default function LiveAgentsWall({
 
   return (
     <section className="flex min-h-full flex-col bg-bg text-ink">
-      <header className="flex flex-wrap items-center gap-3 border-b border-line bg-elev px-4 py-3">
-        <h2 className="m-0 flex items-center gap-2 text-base font-semibold">
-          <LiveDot />
-          {t('sessions.wall.title')}
-        </h2>
-        <span className="text-sm text-muted" aria-live="polite">
-          {t('sessions.wall.count', { count: Math.max(runningTotal, shownRunning) })}
-        </span>
-        {waiting > 0 ? (
-          <span
-            className="text-sm text-muted"
-            title={t('sessions.wall.waitingHint', { max: budgetLabel })}
-          >
-            {t('sessions.wall.waiting', { count: waiting })}
+      {hideHeader ? null : (
+        <header className="flex flex-wrap items-center gap-3 border-b border-line bg-elev px-4 py-3">
+          <h2 className="m-0 flex items-center gap-2 text-base font-semibold">
+            <LiveDot />
+            {t('sessions.wall.title')}
+          </h2>
+          <span className="text-sm text-muted" aria-live="polite">
+            {t('sessions.wall.count', { count: Math.max(runningTotal, shownRunning) })}
           </span>
-        ) : null}
-        {failed ? <span className="text-sm text-warn">{t('sessions.wall.loadError')}</span> : null}
-        <span className="flex-1" />
-        <div className="w-full sm:w-52">
-          <Select value={agent} onChange={changeAgent} options={agentOptions} />
-        </div>
-      </header>
+          {waiting > 0 ? (
+            <span
+              className="text-sm text-muted"
+              title={t('sessions.wall.waitingHint', { max: budgetLabel })}
+            >
+              {t('sessions.wall.waiting', { count: waiting })}
+            </span>
+          ) : null}
+          {failed ? (
+            <span className="text-sm text-warn">{t('sessions.wall.loadError')}</span>
+          ) : null}
+          <span className="flex-1" />
+          <div className="w-full sm:w-52">
+            <Select value={agent} onChange={changeAgent} options={agentOptions} />
+          </div>
+        </header>
+      )}
 
       {loaded && tiles.length === 0 ? (
         <div className="empty m-auto">
