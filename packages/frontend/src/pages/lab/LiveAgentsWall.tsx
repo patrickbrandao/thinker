@@ -17,7 +17,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
-import { Pin, PinOff } from 'lucide-react';
+import { ExternalLink, Pin, PinOff } from 'lucide-react';
 import { platformIcon } from 'thinker-shared';
 import Select, { type SelectOption } from '../../components/Select.js';
 import { ThemedIcon } from '../../components/setup-ui.js';
@@ -29,14 +29,19 @@ import { t } from '../../i18n/index.js';
 import type { SessionSummary } from '../../services/api/sessions.js';
 import { useLiveFeed, type LiveSessionFeed } from '../../services/live-session-feed.js';
 import HexLiveWindow from './HexLiveWindow.js';
+import { watchPath } from './live-agents-bridge.js';
 import {
   AutoCloser,
   DEFAULT_AUTO_CLOSE,
   cascadePosition,
   freeSlot,
   lastItemKind,
+  resizeFrom,
+  windowSize,
   type AutoCloseStatus,
   type AutoCloseTimeouts,
+  type ResizeEdge,
+  type Size,
 } from './live-agents-hex.js';
 import './live-agents-hex.css';
 
@@ -343,12 +348,7 @@ export default function LiveAgentsWall({
     setTiles((prev) =>
       prev.map((tile) => ({
         ...tile,
-        prefs: {
-          ...tile.prefs,
-          tab: newPrefs.tab,
-          mode: newPrefs.mode ?? 'normal',
-          ...(newPrefs.mode === 'compact' ? { maximized: false } : {}),
-        },
+        prefs: { ...tile.prefs, tab: newPrefs.tab, mode: newPrefs.mode ?? 'normal' },
       })),
     );
   }, [newPrefs]);
@@ -408,30 +408,11 @@ export default function LiveAgentsWall({
 
   const onPrefs = useCallback((id: string, patch: LiveWindowPrefs) => {
     touchedAt.current.set(id, Date.now());
+    // No maximize in the lab (the official window still offers it): "open in a new tab" instead.
+    const clean = withoutMaximize(patch);
     setTiles((prev) =>
-      prev.map((tile) => {
-        if (tile.id !== id)
-          return patch.maximized && tile.prefs.maximized
-            ? { ...tile, prefs: { ...tile.prefs, maximized: false } }
-            : tile;
-        return { ...tile, prefs: { ...tile.prefs, ...patch } };
-      }),
+      prev.map((tile) => (tile.id === id ? { ...tile, prefs: { ...tile.prefs, ...clean } } : tile)),
     );
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      setTiles((prev) =>
-        prev.some((tile) => tile.prefs.maximized)
-          ? prev.map((tile) =>
-              tile.prefs.maximized ? { ...tile, prefs: { ...tile.prefs, maximized: false } } : tile,
-            )
-          : prev,
-      );
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // An external filter (lab controls window) drops the other harnesses' tiles too.
@@ -492,6 +473,8 @@ export default function LiveAgentsWall({
   }, [loaded]);
   const winW = Math.max(240, Math.min(layout.minTileWidth, area.w - 2 * CASCADE_GAP));
   const winH = layout.tileHeight;
+  /** Largest window: the wall's width and the viewport's height. */
+  const maxSize: Size = { w: area.w, h: area.h };
 
   // Cascade slot per window (a closed window frees its slot for the next one).
   const slots = useRef(new Map<string, number>());
@@ -524,21 +507,20 @@ export default function LiveAgentsWall({
       areaHeight: area.h,
     });
     const moved = tile.prefs.x != null && tile.prefs.y != null;
-    return { tile, x: moved ? tile.prefs.x! : auto.x, y: moved ? tile.prefs.y! : auto.y };
+    const size = windowSize(tile.prefs, { w: winW, h: winH }, maxSize);
+    return { tile, size, x: moved ? tile.prefs.x! : auto.x, y: moved ? tile.prefs.y! : auto.y };
   });
   const layerHeight = Math.max(
     area.h,
-    ...placed.map((p) => p.y + (layout.compact ? 160 : winH) + CASCADE_GAP),
+    ...placed.map((p) => p.y + (p.tile.prefs.mode === 'compact' ? 160 : p.size.h) + CASCADE_GAP),
   );
-  const layerStyle: CSSProperties = {
-    minHeight: layerHeight,
-    ['--lab-tile-h' as string]: `${winH}px`,
-  };
+  const layerStyle: CSSProperties = { minHeight: layerHeight };
 
   return (
     <section
       className={cx('flex min-h-full flex-col text-ink', theme === 'hex' ? 'lab-hex' : 'bg-bg')}
     >
+      <style>{hideMaximizeCss(`.${HIDE_MAXIMIZE}`)}</style>
       {hideHeader ? null : (
         <header className="flex flex-wrap items-center gap-3 border-b border-line bg-elev px-4 py-3">
           <h2 className="m-0 flex items-center gap-2 text-base font-semibold">
@@ -580,11 +562,13 @@ export default function LiveAgentsWall({
             // window component (it fixes them): overridden from here.
             '[&_[role=region]:not(.fixed):not(.h-auto)]:!h-[var(--lab-tile-h)]',
             '[&_[role=region]>div:first-child]:cursor-grab',
+            // The official window's maximize button: the lab opens a tab instead.
+            HIDE_MAXIMIZE,
             !layout.showReplayBar && '[&_[role=region]>div.border-t.bg-s2:last-child]:hidden',
           )}
           style={layerStyle}
         >
-          {placed.map(({ tile, x, y }) => {
+          {placed.map(({ tile, size, x, y }) => {
             const feed = feeds.current.get(tile.id);
             if (!feed) return null;
             const info = tile.agentName ? platformOf.get(tile.agentName) : undefined;
@@ -596,7 +580,8 @@ export default function LiveAgentsWall({
                 theme={theme}
                 x={x}
                 y={y}
-                width={winW}
+                size={size}
+                maxSize={maxSize}
                 z={stack.indexOf(tile.id) + 1}
                 layer={layer}
                 autoClose={autoClose}
@@ -608,6 +593,8 @@ export default function LiveAgentsWall({
                 onFront={() => toFront(tile.id)}
                 onTouch={() => touch(tile.id)}
                 onMove={(nx, ny) => onPrefs(tile.id, { x: nx, y: ny })}
+                onResize={(next) => onPrefs(tile.id, next)}
+                onPopout={() => window.open(watchPath(tile.id), '_blank')}
                 onPrefs={(patch) => onPrefs(tile.id, patch)}
                 onPin={() => patchTile(tile.id, (w) => ({ ...w, pinned: !w.pinned }))}
                 onClose={() => closeTile(tile.id)}
@@ -623,9 +610,29 @@ export default function LiveAgentsWall({
 
 const CASCADE_GAP = 12;
 
+/** Drops `maximized` from a prefs patch (the lab has no maximize). */
+export function withoutMaximize(patch: LiveWindowPrefs): LiveWindowPrefs {
+  if (!('maximized' in patch)) return patch;
+  const out = { ...patch };
+  delete out.maximized;
+  return out;
+}
+
+/**
+ * Hides the official window's maximize button (lab only). The button has no
+ * class of its own, so it is matched by its translated label.
+ */
+export function hideMaximizeCss(scope: string): string {
+  const label = JSON.stringify(t('liveSession.maximize'));
+  return `${scope} [role=region] button[aria-label=${label}]{display:none}`;
+}
+export const HIDE_MAXIMIZE = 'lab-no-maximize';
+
 /**
  * One window of the cascade: absolute position (cascade slot or where the user
- * dropped it), drag by the header, z-order, and the auto-close countdown.
+ * dropped it), size (layout knob or what the user resized it to), drag by the
+ * header, resize by the right edge, bottom edge and bottom-right grip, z-order,
+ * and the auto-close countdown.
  */
 function WallWindow({
   tile,
@@ -633,7 +640,8 @@ function WallWindow({
   theme,
   x,
   y,
-  width,
+  size,
+  maxSize,
   z,
   layer,
   autoClose,
@@ -641,8 +649,10 @@ function WallWindow({
   onFront,
   onTouch,
   onMove,
+  onResize,
   onPrefs,
   onPin,
+  onPopout,
   onClose,
   onAutoClose,
 }: {
@@ -651,7 +661,8 @@ function WallWindow({
   theme: WallTheme;
   x: number;
   y: number;
-  width: number;
+  size: Size;
+  maxSize: Size;
   z: number;
   layer: RefObject<HTMLDivElement | null>;
   autoClose: AutoCloseTimeouts;
@@ -659,17 +670,20 @@ function WallWindow({
   onFront: () => void;
   onTouch: () => void;
   onMove: (x: number, y: number) => void;
+  onResize: (size: Size) => void;
   onPrefs: (patch: LiveWindowPrefs) => void;
   onPin: () => void;
+  onPopout: () => void;
   onClose: () => void;
   onAutoClose: () => void;
 }) {
   useLiveFeed(feed);
   const ended = tile.endedAt != null;
   const compact = tile.prefs.mode === 'compact';
-  const maximized = !!tile.prefs.maximized && !compact;
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const [resizing, setResizing] = useState<Size | null>(null);
   const [hover, setHover] = useState(false);
+  const current = resizing ?? size;
 
   // ----------------------------------------------------------- auto-close
   const onAutoCloseRef = useRef(onAutoClose);
@@ -685,7 +699,7 @@ function WallWindow({
   );
   const kind = lastItemKind(feed.state);
   const activity = feed.state.lastEventId;
-  const paused = hover || drag != null || maximized;
+  const paused = hover || drag != null || resizing != null;
   const [count, setCount] = useState<AutoCloseStatus | null>(null);
   useEffect(() => {
     closer.current ??= new AutoCloser(() => onAutoCloseRef.current());
@@ -705,8 +719,8 @@ function WallWindow({
   // ----------------------------------------------------------------- drag
   const startDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    if (e.button !== 0 || maximized) return;
-    if (target.closest('button, input, select, textarea, a')) return;
+    if (e.button !== 0) return;
+    if (target.closest('button, input, select, textarea, a, .lab-resize')) return;
     if (!target.closest('.lab-hex-win__head, [role=region] > div:first-child')) return;
     const box = layer.current?.getBoundingClientRect();
     if (!box) return;
@@ -718,7 +732,7 @@ function WallWindow({
       const b = layer.current?.getBoundingClientRect() ?? box;
       last = {
         x: Math.round(
-          Math.min(Math.max(ev.clientX - b.left - dx, 0), Math.max(0, b.width - width)),
+          Math.min(Math.max(ev.clientX - b.left - dx, 0), Math.max(0, b.width - size.w)),
         ),
         y: Math.round(Math.max(ev.clientY - b.top - dy, 0)),
       };
@@ -736,18 +750,51 @@ function WallWindow({
     window.addEventListener('pointercancel', up);
   };
 
+  // --------------------------------------------------------------- resize
+  const startResize = (edge: ResizeEdge) => (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const start = size;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let last = start;
+    setResizing(start);
+    const move = (ev: PointerEvent) => {
+      last = resizeFrom(
+        start,
+        compact && edge === 'se' ? 'e' : edge,
+        ev.clientX - sx,
+        ev.clientY - sy,
+        maxSize,
+      );
+      setResizing(last);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      setResizing(null);
+      if (last.w !== start.w || last.h !== start.h)
+        // A compact window only changes its width: its full-view height stays.
+        onResize(compact ? { w: last.w, h: tile.prefs.h ?? start.h } : last);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+
   const at = drag ?? { x, y };
-  const style: CSSProperties =
-    maximized && theme === 'hex'
-      ? { position: 'fixed', inset: 8, zIndex: 1000 }
-      : {
-          position: 'absolute',
-          left: at.x,
-          top: at.y,
-          width,
-          zIndex: maximized ? 1000 : z,
-          ...(theme === 'hex' && !compact ? { height: 'var(--lab-tile-h)' } : {}),
-        };
+  const style: CSSProperties = {
+    position: 'absolute',
+    left: at.x,
+    top: at.y,
+    width: current.w,
+    zIndex: z,
+    // The Thinker window takes its height from this variable (see the layer CSS).
+    ['--lab-tile-h' as string]: `${current.h}px`,
+    ...(theme === 'hex' && !compact ? { height: current.h } : {}),
+  };
 
   const countdown =
     count && live ? (
@@ -763,9 +810,15 @@ function WallWindow({
       </div>
     ) : null;
 
+  const popoutLabel = 'Open in a new tab';
+
   return (
     <div
-      className={cx(ended && !tile.pinned && 'opacity-80', drag && 'select-none')}
+      className={cx(
+        'lab-wall-win',
+        ended && !tile.pinned && 'opacity-80',
+        (drag || resizing) && 'select-none',
+      )}
       style={style}
       title={
         closesInSec != null
@@ -791,6 +844,7 @@ function WallWindow({
           onClose={onClose}
           pinned={tile.pinned}
           onPin={onPin}
+          onPopout={onPopout}
           ended={ended}
           iconSrc={iconSrc}
           closesInSec={closesInSec}
@@ -829,11 +883,38 @@ function WallWindow({
               >
                 {tile.pinned ? <PinOff size={14} /> : <Pin size={14} />}
               </button>
+              <button
+                type="button"
+                title={popoutLabel}
+                aria-label={popoutLabel}
+                onClick={onPopout}
+                className="rounded p-1 text-muted hover:bg-s3 hover:text-ink"
+              >
+                <ExternalLink size={14} />
+              </button>
             </>
           }
         />
       )}
       {countdown}
+      <div
+        className="lab-resize lab-resize--e"
+        aria-hidden="true"
+        onPointerDown={startResize('e')}
+      />
+      {compact ? null : (
+        <div
+          className="lab-resize lab-resize--s"
+          aria-hidden="true"
+          onPointerDown={startResize('s')}
+        />
+      )}
+      <div
+        className="lab-resize lab-resize--se"
+        title="Resize"
+        aria-hidden="true"
+        onPointerDown={startResize('se')}
+      />
     </div>
   );
 }

@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyLiveState, type LiveAttempt, type LiveState } from 'thinker-shared';
 import {
   AutoCloser,
+  MIN_WINDOW,
   cascadePosition,
+  clampSize,
   effortOf,
   finalAttempt,
   freeSlot,
   lastItemKind,
+  resizeFrom,
+  windowSize,
   type AutoCloseInput,
 } from '../../../src/pages/lab/live-agents-hex';
 
@@ -229,5 +233,36 @@ describe('finalAttempt', () => {
     const a = attempt({ status: 'waiting', model: 'm1' });
     expect(finalAttempt(stateWith(a))?.model).toBe('m1');
     expect(finalAttempt(stateWith())).toBeNull();
+  });
+});
+
+// ------------------------------------------------------------------ resize
+
+describe('window resize', () => {
+  const viewport = { w: 1200, h: 800 };
+
+  it('clamps to the minimum and to the viewport', () => {
+    expect(clampSize({ w: 100, h: 50 }, viewport)).toEqual(MIN_WINDOW);
+    expect(clampSize({ w: 5000, h: 5000 }, viewport)).toEqual(viewport);
+    expect(clampSize({ w: 640.4, h: 480.6 }, viewport)).toEqual({ w: 640, h: 481 });
+    // A viewport smaller than the minimum wins.
+    expect(clampSize({ w: 400, h: 400 }, { w: 280, h: 200 })).toEqual({ w: 280, h: 200 });
+  });
+
+  it('moves only the dragged edges', () => {
+    const start = { w: 420, h: 360 };
+    expect(resizeFrom(start, 'se', 50, 40, viewport)).toEqual({ w: 470, h: 400 });
+    expect(resizeFrom(start, 'e', 50, 40, viewport)).toEqual({ w: 470, h: 360 });
+    expect(resizeFrom(start, 's', 50, 40, viewport)).toEqual({ w: 420, h: 400 });
+    expect(resizeFrom(start, 'se', -400, -400, viewport)).toEqual(MIN_WINDOW);
+  });
+
+  it('keeps a window its own size; others use the layout size', () => {
+    const layout = { w: 420, h: 360 };
+    expect(windowSize({}, layout, viewport)).toEqual(layout);
+    expect(windowSize({ w: 700, h: 500 }, layout, viewport)).toEqual({ w: 700, h: 500 });
+    // A saved size larger than a smaller viewport now is shown clamped.
+    expect(windowSize({ w: 700, h: 500 }, layout, { w: 600, h: 400 })).toEqual({ w: 600, h: 400 });
+    expect(windowSize({}, { w: 900, h: 360 }, { w: 600, h: 400 })).toEqual({ w: 600, h: 360 });
   });
 });

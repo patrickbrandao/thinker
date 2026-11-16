@@ -85,6 +85,9 @@ const LiveSessionLab = import.meta.env.DEV
 const LiveAgentsLab = import.meta.env.DEV
   ? lazyReload(() => import('./pages/lab/LiveAgentsLab.jsx'))
   : null;
+const LiveAgentsWatch = import.meta.env.DEV
+  ? lazyReload(() => import('./pages/lab/LiveAgentsWatch.jsx'))
+  : null;
 
 const Lazy = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<div className="page" aria-busy="true" />}>{children}</Suspense>
@@ -505,6 +508,16 @@ function AppRoutes() {
           element={
             <Lazy>
               <LiveAgentsLab />
+            </Lazy>
+          }
+        />
+      )}
+      {LiveAgentsWatch && (
+        <Route
+          path="lab/live-agents/watch/:sessionId"
+          element={
+            <Lazy>
+              <LiveAgentsWatch />
             </Lazy>
           }
         />
