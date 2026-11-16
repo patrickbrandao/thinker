@@ -58,8 +58,6 @@ export interface WallLayout {
   tileHeight: number;
   /** Tab a new tile opens on. */
   defaultTab: LiveTab;
-  /** New tiles open in the short view. */
-  compact: boolean;
   showReplayBar: boolean;
 }
 
@@ -76,7 +74,6 @@ export const DEFAULT_LAYOUT: WallLayout = {
   columns: 0,
   tileHeight: 360,
   defaultTab: 'chat',
-  compact: false,
   showReplayBar: true,
 };
 
@@ -262,8 +259,8 @@ export default function LiveAgentsWall({
   const fetchRef = useRef(fetchImpl);
   fetchRef.current = fetchImpl;
   const newPrefs = useMemo<LiveWindowPrefs>(
-    () => ({ tab: layout.defaultTab, ...(layout.compact ? { mode: 'compact' as const } : {}) }),
-    [layout.defaultTab, layout.compact],
+    () => ({ tab: layout.defaultTab }),
+    [layout.defaultTab],
   );
   const optsRef = useRef({ maxTiles, timing, newPrefs });
   optsRef.current = { maxTiles, timing, newPrefs };
@@ -348,7 +345,7 @@ export default function LiveAgentsWall({
     setTiles((prev) =>
       prev.map((tile) => ({
         ...tile,
-        prefs: { ...tile.prefs, tab: newPrefs.tab, mode: newPrefs.mode ?? 'normal' },
+        prefs: { ...tile.prefs, tab: newPrefs.tab },
       })),
     );
   }, [newPrefs]);
@@ -510,10 +507,7 @@ export default function LiveAgentsWall({
     const size = windowSize(tile.prefs, { w: winW, h: winH }, maxSize);
     return { tile, size, x: moved ? tile.prefs.x! : auto.x, y: moved ? tile.prefs.y! : auto.y };
   });
-  const layerHeight = Math.max(
-    area.h,
-    ...placed.map((p) => p.y + (p.tile.prefs.mode === 'compact' ? 160 : p.size.h) + CASCADE_GAP),
-  );
+  const layerHeight = Math.max(area.h, ...placed.map((p) => p.y + p.size.h + CASCADE_GAP));
   const layerStyle: CSSProperties = { minHeight: layerHeight };
 
   return (
@@ -610,21 +604,30 @@ export default function LiveAgentsWall({
 
 const CASCADE_GAP = 12;
 
-/** Drops `maximized` from a prefs patch (the lab has no maximize). */
+/**
+ * Drops `maximized` and `mode` from a prefs patch: the lab has no maximize
+ * and no short (compact) view, every window stays in the full view.
+ */
 export function withoutMaximize(patch: LiveWindowPrefs): LiveWindowPrefs {
-  if (!('maximized' in patch)) return patch;
+  if (!('maximized' in patch) && !('mode' in patch)) return patch;
   const out = { ...patch };
   delete out.maximized;
+  delete out.mode;
   return out;
 }
 
 /**
- * Hides the official window's maximize button (lab only). The button has no
- * class of its own, so it is matched by its translated label.
+ * Hides the official window's maximize and short-view buttons (lab only).
+ * The buttons have no class of their own, so they are matched by their
+ * translated labels.
  */
 export function hideMaximizeCss(scope: string): string {
-  const label = JSON.stringify(t('liveSession.maximize'));
-  return `${scope} [role=region] button[aria-label=${label}]{display:none}`;
+  return ['liveSession.maximize', 'liveSession.shortView', 'liveSession.fullView']
+    .map((key) => {
+      const label = JSON.stringify(t(key as 'liveSession.maximize'));
+      return `${scope} [role=region] button[aria-label=${label}]{display:none}`;
+    })
+    .join('\n');
 }
 export const HIDE_MAXIMIZE = 'lab-no-maximize';
 
@@ -679,7 +682,6 @@ function WallWindow({
 }) {
   useLiveFeed(feed);
   const ended = tile.endedAt != null;
-  const compact = tile.prefs.mode === 'compact';
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [resizing, setResizing] = useState<Size | null>(null);
   const [hover, setHover] = useState(false);
@@ -761,13 +763,7 @@ function WallWindow({
     let last = start;
     setResizing(start);
     const move = (ev: PointerEvent) => {
-      last = resizeFrom(
-        start,
-        compact && edge === 'se' ? 'e' : edge,
-        ev.clientX - sx,
-        ev.clientY - sy,
-        maxSize,
-      );
+      last = resizeFrom(start, edge, ev.clientX - sx, ev.clientY - sy, maxSize);
       setResizing(last);
     };
     const up = () => {
@@ -775,9 +771,7 @@ function WallWindow({
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
       setResizing(null);
-      if (last.w !== start.w || last.h !== start.h)
-        // A compact window only changes its width: its full-view height stays.
-        onResize(compact ? { w: last.w, h: tile.prefs.h ?? start.h } : last);
+      if (last.w !== start.w || last.h !== start.h) onResize(last);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -793,7 +787,7 @@ function WallWindow({
     zIndex: z,
     // The Thinker window takes its height from this variable (see the layer CSS).
     ['--lab-tile-h' as string]: `${current.h}px`,
-    ...(theme === 'hex' && !compact ? { height: current.h } : {}),
+    ...(theme === 'hex' ? { height: current.h } : {}),
   };
 
   const countdown =
@@ -902,13 +896,11 @@ function WallWindow({
         aria-hidden="true"
         onPointerDown={startResize('e')}
       />
-      {compact ? null : (
-        <div
-          className="lab-resize lab-resize--s"
-          aria-hidden="true"
-          onPointerDown={startResize('s')}
-        />
-      )}
+      <div
+        className="lab-resize lab-resize--s"
+        aria-hidden="true"
+        onPointerDown={startResize('s')}
+      />
       <div
         className="lab-resize lab-resize--se"
         title="Resize"
