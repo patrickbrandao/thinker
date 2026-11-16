@@ -1,9 +1,11 @@
 /**
  * Lab only: a live session window in the "anoma-ly-hex" look (the reference's
- * OpenCode card): icon, title and mono path in the header, a status chip that
- * flashes green on activity, the live session views in the well and a footer
- * with only the final model and the reasoning effort. Header buttons: pin,
- * short view, open in a new tab, close (each only when its handler is given).
+ * OpenCode card). Header: platform icon, title, mono path, the Chat, Details
+ * and Inspector tabs as icons, then pin, open in a new tab and close (each only
+ * when its handler is given). The well holds the live view. Footer: the live
+ * status at the left (plain grid glyph and text, no background, green text on
+ * activity) with "closes in Ns", and the final model and reasoning effort at
+ * the right. No short view, no text area.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -15,14 +17,12 @@ import {
   Pin,
   PinOff,
   RotateCw,
-  Rows3,
   X,
 } from 'lucide-react';
 import { liveSessionStatus, type LiveAttempt, type LiveSessionStatus } from 'thinker-shared';
 import { ThemedIcon } from '../../components/setup-ui.js';
 import {
   ChatView,
-  CompactView,
   DetailsView,
   InspectorView,
   ReplayClock,
@@ -117,7 +117,6 @@ export default function HexLiveWindow({
   const state = feed.state;
   const status = liveSessionStatus(state);
   const tab: LiveTab = prefs.tab ?? 'chat';
-  const compact = prefs.mode === 'compact';
   const body = useRef<HTMLDivElement>(null);
   const [stick, setStick] = useState(true);
 
@@ -190,6 +189,26 @@ export default function HexLiveWindow({
         <span className="lab-hex-win__path" title={path}>
           {path}
         </span>
+        <span className="lab-hex-win__tabs" role="tablist">
+          {TABS.map(({ key, Icon }) => {
+            const label = t(`liveSession.tab.${key}` as 'liveSession.tab.chat');
+            return (
+              <button
+                key={key}
+                type="button"
+                className="lab-hex-win__btn"
+                role="tab"
+                aria-selected={tab === key}
+                title={label}
+                aria-label={label}
+                onClick={() => onPrefs({ tab: key })}
+              >
+                <Icon size={13} />
+              </button>
+            );
+          })}
+        </span>
+        <span className="lab-hex-win__sep" aria-hidden="true" />
         {onPin ? (
           <button
             type="button"
@@ -202,16 +221,6 @@ export default function HexLiveWindow({
             {pinned ? <PinOff size={13} /> : <Pin size={13} />}
           </button>
         ) : null}
-        <button
-          type="button"
-          className="lab-hex-win__btn"
-          title={compact ? t('liveSession.fullView') : t('liveSession.shortView')}
-          aria-label={compact ? t('liveSession.fullView') : t('liveSession.shortView')}
-          aria-pressed={compact}
-          onClick={() => onPrefs({ mode: compact ? 'normal' : 'compact' })}
-        >
-          <Rows3 size={13} />
-        </button>
         {onPopout ? (
           <button
             type="button"
@@ -236,10 +245,36 @@ export default function HexLiveWindow({
         ) : null}
       </div>
 
-      <div className="lab-hex-win__row">
+      <div className="lab-hex-well">
+        <div
+          ref={body}
+          className={`lab-hex-well__scroll ${tab === 'inspector' ? 'space-y-2' : 'space-y-4'}`}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setStick(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
+          }}
+        >
+          <ReplayClock.Provider value={feed.live && !ended ? null : state.lastTs}>
+            {state.items.length === 0 ? (
+              <div className="py-12 text-center text-[12px] text-muted">
+                {feed.conn === 'connecting' ? t('liveSession.connecting') : t('liveSession.empty')}
+              </div>
+            ) : tab === 'chat' ? (
+              <ChatView state={state} opts={VIEW_OPTS} />
+            ) : tab === 'details' ? (
+              <DetailsView state={state} opts={VIEW_OPTS} />
+            ) : (
+              <InspectorView state={state} />
+            )}
+          </ReplayClock.Provider>
+        </div>
+      </div>
+
+      <div className="lab-hex-win__foot">
         <span
-          className={`lab-hex-chip${flash ? ' lab-hex-chip--flash' : ''}${feed.error ? ' lab-hex-chip--danger' : ''}`}
+          className={`lab-hex-status${flash ? ' lab-hex-status--flash' : ''}${feed.error ? ' lab-hex-status--danger' : ''}`}
           aria-live="polite"
+          title={chipText}
         >
           <i className="lab-hex-grid" aria-hidden="true">
             <b />
@@ -247,7 +282,7 @@ export default function HexLiveWindow({
             <b />
             <b />
           </i>
-          <span>{chipText}</span>
+          <span className="lab-hex-status__text">{chipText}</span>
         </span>
         {feed.error === 'too_many' ? (
           <button
@@ -263,64 +298,7 @@ export default function HexLiveWindow({
         {closesInSec != null ? (
           <span className="lab-hex-win__closes">closes in {closesInSec}s</span>
         ) : null}
-        <span className="lab-hex-win__tabs" role="tablist">
-          {!compact &&
-            TABS.map(({ key, Icon }) => {
-              const label = t(`liveSession.tab.${key}` as 'liveSession.tab.chat');
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className="lab-hex-win__btn"
-                  role="tab"
-                  aria-selected={tab === key}
-                  title={label}
-                  aria-label={label}
-                  onClick={() => onPrefs({ tab: key })}
-                >
-                  <Icon size={13} />
-                </button>
-              );
-            })}
-        </span>
-      </div>
-
-      {compact ? (
-        <div className="lab-hex-well" style={{ flex: 'none' }}>
-          <div className="lab-hex-well__scroll" style={{ padding: 0 }}>
-            <CompactView state={state} showThinking />
-          </div>
-        </div>
-      ) : (
-        <div className="lab-hex-well">
-          <div
-            ref={body}
-            className={`lab-hex-well__scroll ${tab === 'inspector' ? 'space-y-2' : 'space-y-4'}`}
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              setStick(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
-            }}
-          >
-            <ReplayClock.Provider value={feed.live && !ended ? null : state.lastTs}>
-              {state.items.length === 0 ? (
-                <div className="py-12 text-center text-[12px] text-muted">
-                  {feed.conn === 'connecting'
-                    ? t('liveSession.connecting')
-                    : t('liveSession.empty')}
-                </div>
-              ) : tab === 'chat' ? (
-                <ChatView state={state} opts={VIEW_OPTS} />
-              ) : tab === 'details' ? (
-                <DetailsView state={state} opts={VIEW_OPTS} />
-              ) : (
-                <InspectorView state={state} />
-              )}
-            </ReplayClock.Provider>
-          </div>
-        </div>
-      )}
-
-      <div className="lab-hex-win__foot">
+        <span className="lab-hex-win__foot-gap" />
         <span className="lab-hex-win__model" title={modelLabel(attempt)}>
           <span>{modelLabel(attempt)}</span>
           <Chevron />

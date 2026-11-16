@@ -110,7 +110,6 @@ export function loadSettings(): LabSettings {
       columns: num(l.columns, d.layout.columns),
       tileHeight: num(l.tileHeight, d.layout.tileHeight),
       defaultTab: TABS.includes(l.defaultTab) ? l.defaultTab : d.layout.defaultTab,
-      compact: typeof l.compact === 'boolean' ? l.compact : d.layout.compact,
       showReplayBar:
         typeof l.showReplayBar === 'boolean' ? l.showReplayBar : d.layout.showReplayBar,
     },
@@ -585,11 +584,6 @@ export default function LiveAgentsLab() {
             ]}
           />
         </div>
-        <Toggle
-          label="Compact windows"
-          checked={l.compact}
-          onChange={(v) => setLayout({ compact: v })}
-        />
         <Toggle
           label="Show replay bar (Thinker theme)"
           checked={l.showReplayBar}
