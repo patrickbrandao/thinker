@@ -7,7 +7,16 @@
  * `thinker.liveWindows` or the shell's window manager. Decisions taken here are
  * ported by hand to the official page, with its tests.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
 import { Pin, PinOff } from 'lucide-react';
 import { platformIcon } from 'thinker-shared';
 import Select, { type SelectOption } from '../../components/Select.js';
@@ -18,16 +27,29 @@ import { LiveDot } from '../../components/live-session/WatchLiveButton.js';
 import type { LiveTab, LiveWindowPrefs } from '../../components/live-session/live-windows-store.js';
 import { t } from '../../i18n/index.js';
 import type { SessionSummary } from '../../services/api/sessions.js';
-import type { LiveSessionFeed } from '../../services/live-session-feed.js';
+import { useLiveFeed, type LiveSessionFeed } from '../../services/live-session-feed.js';
+import HexLiveWindow from './HexLiveWindow.js';
+import {
+  AutoCloser,
+  DEFAULT_AUTO_CLOSE,
+  cascadePosition,
+  freeSlot,
+  lastItemKind,
+  type AutoCloseStatus,
+  type AutoCloseTimeouts,
+} from './live-agents-hex.js';
+import './live-agents-hex.css';
+
+export type WallTheme = 'thinker' | 'hex';
 
 const WALL_LIMIT = '100';
 
 export interface WallLayout {
-  /** Minimum tile width, px (auto-fill grid). */
+  /** Window width, px (the cascade windows; the name is kept from the grid). */
   minTileWidth: number;
-  /** Fixed column count; 0 fills the row with `minTileWidth` tiles. */
+  /** Unused by the cascade (kept so older saved settings load). */
   columns: number;
-  /** Tile height in the full view, px. */
+  /** Window height in the full view, px. */
   tileHeight: number;
   /** Tab a new tile opens on. */
   defaultTab: LiveTab;
@@ -38,8 +60,6 @@ export interface WallLayout {
 
 export interface WallTiming {
   pollMs: number;
-  /** How long an ended tile stays before it closes by itself. */
-  graceMs: number;
   /** A tile whose session was busy this recently keeps its slot. */
   settleMs: number;
   /** A tile the user scrolled, clicked or typed in this recently keeps its slot. */
@@ -47,9 +67,9 @@ export interface WallTiming {
 }
 
 export const DEFAULT_LAYOUT: WallLayout = {
-  minTileWidth: 440,
+  minTileWidth: 420,
   columns: 0,
-  tileHeight: 440,
+  tileHeight: 360,
   defaultTab: 'chat',
   compact: false,
   showReplayBar: true,
@@ -57,7 +77,6 @@ export const DEFAULT_LAYOUT: WallLayout = {
 
 export const DEFAULT_TIMING: WallTiming = {
   pollMs: 5_000,
-  graceMs: 60_000,
   settleMs: 10_000,
   touchMs: 30_000,
 };
@@ -197,6 +216,8 @@ export default function LiveAgentsWall({
   onStats,
   hideHeader = false,
   agentFilter,
+  theme = 'thinker',
+  autoClose = DEFAULT_AUTO_CLOSE,
 }: {
   /** Injected backend (the lab's fake fetch). */
   fetch: typeof fetch;
@@ -210,6 +231,10 @@ export default function LiveAgentsWall({
   hideHeader?: boolean;
   /** Lab: harness filter controlled from outside ('' = all); overrides the header select. */
   agentFilter?: string;
+  /** Window look: the dashboard's live window or the anoma-ly-hex card. */
+  theme?: WallTheme;
+  /** A window closes by itself this long after its session's last item. */
+  autoClose?: AutoCloseTimeouts;
 }) {
   const [tiles, setTiles] = useState<WallTile[]>([]);
   const [ownAgent, setAgent] = useState('');
@@ -219,6 +244,11 @@ export default function LiveAgentsWall({
   const [failed, setFailed] = useState(false);
   const [runningTotal, setRunningTotal] = useState(0);
   const dismissed = useRef(new Set<string>());
+  /** Auto-closed windows: session id -> its last_at then. New activity brings it back. */
+  const autoClosed = useRef(new Map<string, string>());
+  const lastSeen = useRef(new Map<string, WallSession>());
+  const [hiddenCount, setHiddenCount] = useState(0);
+  const pollNow = useRef<() => void>(() => undefined);
   const touchedAt = useRef(new Map<string, number>());
   const touch = useCallback((id: string) => touchedAt.current.set(id, Date.now()), []);
   const feeds = useRef(new Map<string, LiveSessionFeed>());
@@ -268,13 +298,21 @@ export default function LiveAgentsWall({
         const items = res.items ?? [];
         const ids = new Set(items.map((s) => s.id));
         for (const id of dismissed.current) if (!ids.has(id)) dismissed.current.delete(id);
+        lastSeen.current = new Map(items.map((s) => [s.id, s]));
+        for (const [id, at] of autoClosed.current) {
+          const s = lastSeen.current.get(id);
+          if (!s || s.in_flight > 0 || s.last_at !== at) autoClosed.current.delete(id);
+        }
+        const hidden = new Set([...dismissed.current, ...autoClosed.current.keys()]);
+        setHiddenCount(hidden.size);
         const o = optsRef.current;
         setTiles((prev) =>
           reconcileWall(prev, items, {
-            dismissed: dismissed.current,
+            dismissed: hidden,
             now: Date.now(),
             maxTiles: o.maxTiles,
-            graceMs: o.timing.graceMs,
+            // Ended windows close by the auto-close rule (last item decides), not a grace.
+            graceMs: Infinity,
             settleMs: o.timing.settleMs,
             touchMs: o.timing.touchMs,
             touchedAt: touchedAt.current,
@@ -291,13 +329,14 @@ export default function LiveAgentsWall({
       }
     };
     void poll();
+    pollNow.current = () => void poll();
     const timer = setInterval(() => void poll(), Math.max(250, timing.pollMs));
     return () => {
       alive = false;
       clearInterval(timer);
     };
     // A cap or timing change re-polls right away.
-  }, [agent, maxTiles, timing.pollMs, timing.graceMs, timing.settleMs, timing.touchMs]);
+  }, [agent, maxTiles, timing.pollMs, timing.settleMs, timing.touchMs]);
 
   // Layout knobs that live in the tile prefs apply to the open tiles too.
   useEffect(() => {
@@ -356,6 +395,15 @@ export default function LiveAgentsWall({
   const closeTile = useCallback((id: string) => {
     dismissed.current.add(id);
     setTiles((prev) => prev.filter((tile) => tile.id !== id));
+    // A waiting session takes the freed slot right away.
+    setTimeout(() => pollNow.current(), 0);
+  }, []);
+
+  const autoCloseTile = useCallback((id: string) => {
+    const s = lastSeen.current.get(id);
+    if (s) autoClosed.current.set(id, s.last_at);
+    setTiles((prev) => prev.filter((tile) => tile.id !== id));
+    setTimeout(() => pollNow.current(), 0);
   }, []);
 
   const onPrefs = useCallback((id: string, patch: LiveWindowPrefs) => {
@@ -419,23 +467,78 @@ export default function LiveAgentsWall({
 
   const shownRunning = tiles.filter((tile) => tile.endedAt == null).length;
   const endedTiles = tiles.length - shownRunning;
-  const waiting = Math.max(0, runningTotal - shownRunning - dismissed.current.size);
+  const waiting = Math.max(0, runningTotal - shownRunning - hiddenCount);
   const budgetLabel = Number.isFinite(maxTiles) ? maxTiles : '∞';
 
   useEffect(() => {
     onStats?.({ running: runningTotal, shown: shownRunning, waiting, ended: endedTiles });
   }, [onStats, runningTotal, shownRunning, waiting, endedTiles]);
 
-  const gridStyle: CSSProperties = {
-    gridTemplateColumns:
-      layout.columns > 0
-        ? `repeat(${layout.columns}, minmax(0, 1fr))`
-        : `repeat(auto-fill, minmax(min(100%, ${layout.minTileWidth}px), 1fr))`,
-    ['--lab-tile-h' as string]: `${layout.tileHeight}px`,
+  // ------------------------------------------------------------- cascade
+  const layer = useRef<HTMLDivElement>(null);
+  const [area, setArea] = useState({ w: 1200, h: 800 });
+  useEffect(() => {
+    const el = layer.current;
+    const measure = () =>
+      setArea({ w: el?.clientWidth || window.innerWidth, h: window.innerHeight });
+    measure();
+    window.addEventListener('resize', measure);
+    const ro = typeof ResizeObserver !== 'undefined' && el ? new ResizeObserver(measure) : null;
+    if (ro && el) ro.observe(el);
+    return () => {
+      window.removeEventListener('resize', measure);
+      ro?.disconnect();
+    };
+  }, [loaded]);
+  const winW = Math.max(240, Math.min(layout.minTileWidth, area.w - 2 * CASCADE_GAP));
+  const winH = layout.tileHeight;
+
+  // Cascade slot per window (a closed window frees its slot for the next one).
+  const slots = useRef(new Map<string, number>());
+  for (const id of [...slots.current.keys()])
+    if (!tiles.some((tile) => tile.id === id)) slots.current.delete(id);
+  for (const tile of tiles)
+    if (!slots.current.has(tile.id)) slots.current.set(tile.id, freeSlot(slots.current.values()));
+
+  // Z-order: last is in front; new windows open on top.
+  const [stack, setStack] = useState<string[]>([]);
+  useEffect(() => {
+    setStack((prev) => {
+      const ids = new Set(tiles.map((tile) => tile.id));
+      const kept = prev.filter((id) => ids.has(id));
+      const added = tiles.map((tile) => tile.id).filter((id) => !kept.includes(id));
+      return added.length || kept.length !== prev.length ? [...kept, ...added] : prev;
+    });
+  }, [tiles]);
+  const toFront = useCallback(
+    (id: string) =>
+      setStack((prev) => (prev.at(-1) === id ? prev : [...prev.filter((x) => x !== id), id])),
+    [],
+  );
+
+  const placed = tiles.map((tile) => {
+    const auto = cascadePosition(slots.current.get(tile.id) ?? 0, {
+      width: winW,
+      height: winH,
+      areaWidth: area.w,
+      areaHeight: area.h,
+    });
+    const moved = tile.prefs.x != null && tile.prefs.y != null;
+    return { tile, x: moved ? tile.prefs.x! : auto.x, y: moved ? tile.prefs.y! : auto.y };
+  });
+  const layerHeight = Math.max(
+    area.h,
+    ...placed.map((p) => p.y + (layout.compact ? 160 : winH) + CASCADE_GAP),
+  );
+  const layerStyle: CSSProperties = {
+    minHeight: layerHeight,
+    ['--lab-tile-h' as string]: `${winH}px`,
   };
 
   return (
-    <section className="flex min-h-full flex-col bg-bg text-ink">
+    <section
+      className={cx('flex min-h-full flex-col text-ink', theme === 'hex' ? 'lab-hex' : 'bg-bg')}
+    >
       {hideHeader ? null : (
         <header className="flex flex-wrap items-center gap-3 border-b border-line bg-elev px-4 py-3">
           <h2 className="m-0 flex items-center gap-2 text-base font-semibold">
@@ -470,67 +573,268 @@ export default function LiveAgentsWall({
         </div>
       ) : (
         <div
+          ref={layer}
           className={cx(
-            'grid items-start gap-3 p-3',
+            'relative flex-1',
             // Tile height and the replay bar are layout knobs over the official
             // window component (it fixes them): overridden from here.
             '[&_[role=region]:not(.fixed):not(.h-auto)]:!h-[var(--lab-tile-h)]',
+            '[&_[role=region]>div:first-child]:cursor-grab',
             !layout.showReplayBar && '[&_[role=region]>div.border-t.bg-s2:last-child]:hidden',
           )}
-          style={gridStyle}
+          style={layerStyle}
         >
-          {tiles.map((tile) => {
+          {placed.map(({ tile, x, y }) => {
             const feed = feeds.current.get(tile.id);
             if (!feed) return null;
-            const ended = tile.endedAt != null;
+            const info = tile.agentName ? platformOf.get(tile.agentName) : undefined;
             return (
-              <div
+              <WallWindow
                 key={tile.id}
-                className={cx(ended && !tile.pinned && 'opacity-70')}
-                onPointerDownCapture={() => touch(tile.id)}
-                onWheelCapture={() => touch(tile.id)}
-                onKeyDownCapture={() => touch(tile.id)}
-                onTouchMoveCapture={() => touch(tile.id)}
-              >
-                <LiveSessionWindow
-                  tile
-                  ended={ended}
-                  feed={feed}
-                  slot={0}
-                  z={0}
-                  prefs={tile.prefs}
-                  onPrefs={(p) => onPrefs(tile.id, p)}
-                  onFocus={noop}
-                  onClose={() => closeTile(tile.id)}
-                  titleExtra={
-                    <>
-                      {ended ? (
-                        <span className="rounded bg-s3 px-1.5 py-0.5 text-[11px] font-medium text-muted">
-                          {t('sessions.wall.finished')}
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        title={tile.pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
-                        aria-label={tile.pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
-                        aria-pressed={tile.pinned}
-                        onClick={() => patchTile(tile.id, (x) => ({ ...x, pinned: !x.pinned }))}
-                        className={cx(
-                          'rounded p-1 hover:bg-s3 hover:text-ink',
-                          tile.pinned ? 'bg-s3 text-ink' : 'text-muted',
-                        )}
-                      >
-                        {tile.pinned ? <PinOff size={14} /> : <Pin size={14} />}
-                      </button>
-                    </>
-                  }
-                />
-              </div>
+                tile={tile}
+                feed={feed}
+                theme={theme}
+                x={x}
+                y={y}
+                width={winW}
+                z={stack.indexOf(tile.id) + 1}
+                layer={layer}
+                autoClose={autoClose}
+                iconSrc={
+                  info?.agent_platform
+                    ? (platformIcon(info.agent_platform, info.agent_category ?? null) ?? null)
+                    : null
+                }
+                onFront={() => toFront(tile.id)}
+                onTouch={() => touch(tile.id)}
+                onMove={(nx, ny) => onPrefs(tile.id, { x: nx, y: ny })}
+                onPrefs={(patch) => onPrefs(tile.id, patch)}
+                onPin={() => patchTile(tile.id, (w) => ({ ...w, pinned: !w.pinned }))}
+                onClose={() => closeTile(tile.id)}
+                onAutoClose={() => autoCloseTile(tile.id)}
+              />
             );
           })}
         </div>
       )}
     </section>
+  );
+}
+
+const CASCADE_GAP = 12;
+
+/**
+ * One window of the cascade: absolute position (cascade slot or where the user
+ * dropped it), drag by the header, z-order, and the auto-close countdown.
+ */
+function WallWindow({
+  tile,
+  feed,
+  theme,
+  x,
+  y,
+  width,
+  z,
+  layer,
+  autoClose,
+  iconSrc,
+  onFront,
+  onTouch,
+  onMove,
+  onPrefs,
+  onPin,
+  onClose,
+  onAutoClose,
+}: {
+  tile: WallTile;
+  feed: LiveSessionFeed;
+  theme: WallTheme;
+  x: number;
+  y: number;
+  width: number;
+  z: number;
+  layer: RefObject<HTMLDivElement | null>;
+  autoClose: AutoCloseTimeouts;
+  iconSrc: string | null;
+  onFront: () => void;
+  onTouch: () => void;
+  onMove: (x: number, y: number) => void;
+  onPrefs: (patch: LiveWindowPrefs) => void;
+  onPin: () => void;
+  onClose: () => void;
+  onAutoClose: () => void;
+}) {
+  useLiveFeed(feed);
+  const ended = tile.endedAt != null;
+  const compact = tile.prefs.mode === 'compact';
+  const maximized = !!tile.prefs.maximized && !compact;
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const [hover, setHover] = useState(false);
+
+  // ----------------------------------------------------------- auto-close
+  const onAutoCloseRef = useRef(onAutoClose);
+  onAutoCloseRef.current = onAutoClose;
+  const closer = useRef<AutoCloser | null>(null);
+  // Created in the effect (StrictMode runs the cleanup once and mounts again).
+  useEffect(
+    () => () => {
+      closer.current?.dispose();
+      closer.current = null;
+    },
+    [],
+  );
+  const kind = lastItemKind(feed.state);
+  const activity = feed.state.lastEventId;
+  const paused = hover || drag != null || maximized;
+  const [count, setCount] = useState<AutoCloseStatus | null>(null);
+  useEffect(() => {
+    closer.current ??= new AutoCloser(() => onAutoCloseRef.current());
+    setCount(
+      closer.current.update({ kind, activity, pinned: tile.pinned, ended, paused }, autoClose),
+    );
+  }, [kind, activity, tile.pinned, ended, paused, autoClose]);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!count || count.paused) return;
+    const timer = setInterval(() => setTick((n) => n + 1), 500);
+    return () => clearInterval(timer);
+  }, [count]);
+  const live = closer.current?.status() ?? null;
+  const closesInSec = live ? Math.max(0, Math.ceil(live.remainingMs / 1000)) : null;
+
+  // ----------------------------------------------------------------- drag
+  const startDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (e.button !== 0 || maximized) return;
+    if (target.closest('button, input, select, textarea, a')) return;
+    if (!target.closest('.lab-hex-win__head, [role=region] > div:first-child')) return;
+    const box = layer.current?.getBoundingClientRect();
+    if (!box) return;
+    e.preventDefault();
+    const dx = e.clientX - (box.left + x);
+    const dy = e.clientY - (box.top + y);
+    let last = { x, y };
+    const move = (ev: PointerEvent) => {
+      const b = layer.current?.getBoundingClientRect() ?? box;
+      last = {
+        x: Math.round(
+          Math.min(Math.max(ev.clientX - b.left - dx, 0), Math.max(0, b.width - width)),
+        ),
+        y: Math.round(Math.max(ev.clientY - b.top - dy, 0)),
+      };
+      setDrag(last);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      setDrag(null);
+      if (last.x !== x || last.y !== y) onMove(last.x, last.y);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+
+  const at = drag ?? { x, y };
+  const style: CSSProperties =
+    maximized && theme === 'hex'
+      ? { position: 'fixed', inset: 8, zIndex: 1000 }
+      : {
+          position: 'absolute',
+          left: at.x,
+          top: at.y,
+          width,
+          zIndex: maximized ? 1000 : z,
+          ...(theme === 'hex' && !compact ? { height: 'var(--lab-tile-h)' } : {}),
+        };
+
+  const countdown =
+    count && live ? (
+      <div className="lab-countdown" aria-hidden="true">
+        <i
+          key={`${activity}:${count.totalMs}:${count.paused}`}
+          style={{
+            transform: `scaleX(${count.remainingMs / Math.max(1, count.totalMs)})`,
+            animationDuration: `${count.remainingMs}ms`,
+            animationPlayState: count.paused ? 'paused' : 'running',
+          }}
+        />
+      </div>
+    ) : null;
+
+  return (
+    <div
+      className={cx(ended && !tile.pinned && 'opacity-80', drag && 'select-none')}
+      style={style}
+      title={
+        closesInSec != null
+          ? `Closes by itself in ${closesInSec}s (${kind === 'answer' ? 'assistant answered' : 'waiting on a tool call'}); hover to pause, pin to keep`
+          : undefined
+      }
+      onPointerDownCapture={() => {
+        onFront();
+        onTouch();
+      }}
+      onPointerDown={startDrag}
+      onPointerEnter={() => setHover(true)}
+      onPointerLeave={() => setHover(false)}
+      onWheelCapture={onTouch}
+      onKeyDownCapture={onTouch}
+      onTouchMoveCapture={onTouch}
+    >
+      {theme === 'hex' ? (
+        <HexLiveWindow
+          feed={feed}
+          prefs={tile.prefs}
+          onPrefs={onPrefs}
+          onClose={onClose}
+          pinned={tile.pinned}
+          onPin={onPin}
+          ended={ended}
+          iconSrc={iconSrc}
+          closesInSec={closesInSec}
+        />
+      ) : (
+        <LiveSessionWindow
+          tile
+          ended={ended}
+          feed={feed}
+          slot={0}
+          z={0}
+          prefs={tile.prefs}
+          onPrefs={onPrefs}
+          onFocus={noop}
+          onClose={onClose}
+          titleExtra={
+            <>
+              {closesInSec != null ? (
+                <span className="font-mono text-[11px] text-faint">{closesInSec}s</span>
+              ) : null}
+              {ended ? (
+                <span className="rounded bg-s3 px-1.5 py-0.5 text-[11px] font-medium text-muted">
+                  {t('sessions.wall.finished')}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                title={tile.pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
+                aria-label={tile.pinned ? t('sessions.wall.unpin') : t('sessions.wall.pin')}
+                aria-pressed={tile.pinned}
+                onClick={onPin}
+                className={cx(
+                  'rounded p-1 hover:bg-s3 hover:text-ink',
+                  tile.pinned ? 'bg-s3 text-ink' : 'text-muted',
+                )}
+              >
+                {tile.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+              </button>
+            </>
+          }
+        />
+      )}
+      {countdown}
+    </div>
   );
 }
 
