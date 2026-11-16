@@ -511,7 +511,20 @@ export function ChatView({ state, opts }: { state: LiveState; opts: ViewOpts }) 
   };
   for (const it of state.items) {
     if (it.kind === 'attempt') group.push(it);
-    else if (it.role === 'user') {
+    else if (it.role === 'system') {
+      flush(`a${it.seq}`);
+      turns.push(
+        <Collapsible
+          key={`s${it.seq}`}
+          icon={<ScrollText size={14} className="shrink-0 text-muted" />}
+          title={t('liveSession.details.systemPrompt')}
+          meta={t('liveSession.chars', { n: fmtInt(it.text.length) })}
+          defaultOpen={false}
+        >
+          <div className="whitespace-pre-wrap font-mono text-[12px] text-dim">{it.text}</div>
+        </Collapsible>,
+      );
+    } else if (it.role === 'user') {
       flush(`a${it.seq}`);
       turns.push(
         <div key={`u${it.seq}`} className="flex justify-end">

@@ -62,7 +62,7 @@
   --hx-panel-shadow: 0 6px 15px rgba(0, 0, 0, 0.7);
   --hx-panel-chip: #1b1b1e;
   --hx-panel-chip-line: rgba(255, 255, 255, 0.08);
-  --hx-panel-well: #1a1a1d;
+  --hx-panel-well: #000;
   --hx-panel-well-line: rgba(255, 255, 255, 0.07);
   --hx-panel-well-focus: rgba(255, 255, 255, 0.18);
   --hx-panel-grid: #9a9aa0;
@@ -452,4 +452,9 @@
 .lab-resize--se:hover,
 .lab-wall-win:hover > .lab-resize--se {
   opacity: 1;
+}
+
+/* Dark theme: the user's prompt bubble in the Chat view. */
+.dark .lab-hex-well .bg-accent.rounded-br-md {
+  background: rgb(20, 77, 55);
 }
