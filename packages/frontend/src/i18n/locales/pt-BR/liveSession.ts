@@ -34,6 +34,12 @@ const ptBR: Catalog<typeof en> = {
     failed: 'Falhou',
     waitingRequest: 'Aguardando requisição',
   },
+  hex: {
+    toolCalls: '{{ n }} chamadas de ferramenta',
+    popout: 'Abrir em nova guia',
+    closesIn: 'fecha em {{ n }}s',
+    effort: 'Esforço de raciocínio',
+  },
   totals: {
     requests: '{{ n }} req.',
     tokens: '{{ input }} entrada / {{ output }} saída',

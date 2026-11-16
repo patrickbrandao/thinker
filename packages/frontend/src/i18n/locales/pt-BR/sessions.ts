@@ -36,6 +36,19 @@ const ptBR: Catalog<typeof en> = {
     pin: 'Manter este quadro aberto',
     unpin: 'Deixar este quadro fechar quando a sessão terminar',
     loadError: 'Não foi possível carregar as sessões em execução. Tentando de novo…',
+    allProviders: 'Todos os provedores',
+    prefs: {
+      open: 'Preferências',
+      title: 'Preferências de Agentes ao vivo',
+      winW: 'Largura da janela',
+      winH: 'Altura da janela',
+      defaultTab: 'Aba inicial',
+      closeAfterAnswerSec: 'Fechar após resposta',
+      closeAfterToolSec: 'Fechar após tool call',
+      autoCloseHint:
+        'O último item da sessão decide: uma resposta do assistente ou uma tool call. Nova atividade reinicia a contagem, passar o mouse pausa, janelas fixadas ficam. 0 nunca fecha.',
+      reset: 'Restaurar padrões',
+    },
   },
   chart: {
     showing: 'Mostrando as {{ shown }} sessões mais ativas de {{ total }}.',

@@ -1,6 +1,6 @@
 /**
- * Lab only: a live session window in the "anoma-ly-hex" look (the reference's
- * OpenCode card). Header: platform icon, title, mono path, the Chat, Details
+ * A live session window in the "anoma-ly-hex" look (an OpenCode-style card),
+ * used by the Live agents wall and its lab. Header: platform icon, title, mono path, the Chat, Details
  * and Inspector tabs as icons, then pin, open in a new tab and close (each only
  * when its handler is given). The well holds the live view. Footer: the live
  * status at the left (plain grid glyph and text, no background, green text on
@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { liveSessionStatus, type LiveAttempt, type LiveSessionStatus } from 'thinker-shared';
-import { ThemedIcon } from '../../components/setup-ui.js';
+import { ThemedIcon } from '../setup-ui.js';
 import {
   ChatView,
   DetailsView,
@@ -28,13 +28,13 @@ import {
   ReplayClock,
   fmtInt,
   type ViewOpts,
-} from '../../components/live-session/LiveSessionViews.js';
-import type { LiveTab, LiveWindowPrefs } from '../../components/live-session/live-windows-store.js';
+} from './LiveSessionViews.js';
+import type { LiveTab, LiveWindowPrefs } from './live-windows-store.js';
 import { t } from '../../i18n/index.js';
 import { PROVIDERS } from '../../services/providers.js';
 import { useLiveFeed, type LiveSessionFeed } from '../../services/live-session-feed.js';
-import { shortId } from '../sessions/session-format.js';
-import { effortOf, finalAttempt } from './live-agents-hex.js';
+import { shortId } from '../../pages/sessions/session-format.js';
+import { effortOf, finalAttempt } from './hex-live.js';
 
 const STATUS_KEY: Record<LiveSessionStatus, string> = {
   idle: 'idle',
@@ -159,7 +159,7 @@ export default function HexLiveWindow({
   );
   const count = [
     t('liveSession.totals.requests', { n: fmtInt(state.totals.requests) }),
-    tools ? `${fmtInt(tools)} ${tools === 1 ? 'tool call' : 'tool calls'}` : null,
+    tools ? t('liveSession.hex.toolCalls', { n: fmtInt(tools) }) : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -225,8 +225,8 @@ export default function HexLiveWindow({
           <button
             type="button"
             className="lab-hex-win__btn"
-            title="Open in a new tab"
-            aria-label="Open in a new tab"
+            title={t('liveSession.hex.popout')}
+            aria-label={t('liveSession.hex.popout')}
             onClick={onPopout}
           >
             <ExternalLink size={13} />
@@ -296,14 +296,16 @@ export default function HexLiveWindow({
           </button>
         ) : null}
         {closesInSec != null ? (
-          <span className="lab-hex-win__closes">closes in {closesInSec}s</span>
+          <span className="lab-hex-win__closes">
+            {t('liveSession.hex.closesIn', { n: closesInSec })}
+          </span>
         ) : null}
         <span className="lab-hex-win__foot-gap" />
         <span className="lab-hex-win__model" title={modelLabel(attempt)}>
           <span>{modelLabel(attempt)}</span>
           <Chevron />
         </span>
-        <span className="lab-hex-win__effort" title="Reasoning effort">
+        <span className="lab-hex-win__effort" title={t('liveSession.hex.effort')}>
           {effort}
           <Chevron />
         </span>

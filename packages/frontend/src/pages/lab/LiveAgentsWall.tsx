@@ -28,7 +28,7 @@ import type { LiveTab, LiveWindowPrefs } from '../../components/live-session/liv
 import { t } from '../../i18n/index.js';
 import type { SessionSummary } from '../../services/api/sessions.js';
 import { useLiveFeed, type LiveSessionFeed } from '../../services/live-session-feed.js';
-import HexLiveWindow from './HexLiveWindow.js';
+import HexLiveWindow from '../../components/live-session/HexLiveWindow.js';
 import { watchPath } from './live-agents-bridge.js';
 import {
   AutoCloser,
@@ -42,8 +42,8 @@ import {
   type AutoCloseTimeouts,
   type ResizeEdge,
   type Size,
-} from './live-agents-hex.js';
-import './live-agents-hex.css';
+} from '../../components/live-session/hex-live.js';
+import '../../components/live-session/hex-live.css';
 
 export type WallTheme = 'thinker' | 'hex';
 

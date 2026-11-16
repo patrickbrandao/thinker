@@ -34,6 +34,19 @@ export default {
     pin: 'Keep this tile open',
     unpin: 'Let this tile close when the session ends',
     loadError: 'Could not load the running sessions. Retrying…',
+    allProviders: 'All providers',
+    prefs: {
+      open: 'Preferences',
+      title: 'Live agents preferences',
+      winW: 'Window width',
+      winH: 'Window height',
+      defaultTab: 'Default tab',
+      closeAfterAnswerSec: 'Close after assistant',
+      closeAfterToolSec: 'Close after tool call',
+      autoCloseHint:
+        "The session's last item decides: an assistant answer or a tool call. New activity restarts the countdown, hovering pauses it, pinned windows stay. 0 never closes.",
+      reset: 'Restore defaults',
+    },
   },
   chart: {
     showing: 'Showing the {{ shown }} most active of {{ total }} sessions.',

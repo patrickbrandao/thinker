@@ -1,5 +1,5 @@
 /**
- * Lab only: pure logic of the cascade wall (window placement, auto-close and
+ * Pure logic of the cascade wall (Live agents page and its lab) (window placement, auto-close and
  * the footer's model / effort). Kept free of React so it is unit-tested and
  * easy to port to the official page.
  */
@@ -14,43 +14,35 @@ export interface CascadeOptions {
   /** Area the windows live in (the wall's width and the viewport height). */
   areaWidth: number;
   areaHeight: number;
-  /** Offset between consecutive windows, px. */
-  step?: number;
   /** Gap to the area edges, px. */
   margin?: number;
 }
 
-export const CASCADE_STEP = 28;
 export const CASCADE_MARGIN = 12;
 
 /**
  * Where the window in cascade slot `slot` opens. The cascade starts below a
  * free band as tall as one window (so the user can drag the window they care
- * about up into it); each window is offset `step` px right and down from the
- * previous one. A run that would leave the area wraps back to the top of the
- * cascade, shifted right by half a window (and back to the left edge, nudged
- * down half a step, once the runs fill the width).
+ * about up into it). Windows sit side by side, `margin` apart, each one 10% of
+ * a window height lower than the previous; a window that would leave the area
+ * on the right goes back to the left edge, on a new row one window height
+ * (plus `margin`) below the previous row. Rows past the viewport scroll.
  */
 export function cascadePosition(slot: number, o: CascadeOptions): { x: number; y: number } {
-  const step = o.step ?? CASCADE_STEP;
   const margin = o.margin ?? CASCADE_MARGIN;
   const top = margin + o.height + margin;
-  const nudge = Math.round(step / 2);
-  const fitY = Math.floor((o.areaHeight - margin - top - o.height - nudge) / step) + 1;
-  const fitX = Math.floor((o.areaWidth - 2 * margin - o.width) / step) + 1;
-  const perRun = Math.max(1, Math.min(fitY, fitX));
-  const run = Math.floor(Math.max(0, slot) / perRun);
-  const k = Math.max(0, slot) % perRun;
-  const spanX = o.areaWidth - 2 * margin - o.width - (perRun - 1) * step - nudge;
-  const shift = Math.round(o.width / 2) + step;
-  const runsPerRow = spanX > 0 ? Math.floor(spanX / shift) + 1 : 1;
-  const col = run % runsPerRow;
-  const odd = Math.floor(run / runsPerRow) % 2;
+  const perRow = Math.max(1, Math.floor((o.areaWidth - margin) / (o.width + margin)));
+  const n = Math.max(0, slot);
+  const row = Math.floor(n / perRow);
+  const col = n % perRow;
   return {
-    x: margin + col * shift + k * step + odd * nudge,
-    y: top + k * step + odd * nudge,
+    x: margin + col * (o.width + margin),
+    y: top + row * (o.height + margin) + Math.round(col * o.height * CASCADE_DROP),
   };
 }
+
+/** How much lower each window sits than the previous one in its row (share of its height). */
+export const CASCADE_DROP = 0.1;
 
 /** Smallest slot not taken (closed windows free theirs for the next one). */
 export function freeSlot(taken: Iterable<number>): number {

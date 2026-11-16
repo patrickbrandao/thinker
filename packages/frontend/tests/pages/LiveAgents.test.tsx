@@ -11,6 +11,8 @@ vi.mock('../../src/services/api', () => ({
 }));
 
 import LiveAgents, {
+  DEFAULT_WALL_PREFS,
+  readWallPrefs,
   reconcileWall,
   WALL_GRACE_MS,
   WALL_POLL_MS,
@@ -76,7 +78,7 @@ describe('LiveAgents wall', () => {
     await tick(WALL_POLL_MS);
     expect(tile('s3')).toBeTruthy();
     expect(tile('s1')).toBeTruthy();
-    expect(screen.getByText('Ended')).toBeTruthy();
+    expect(screen.getByText(/^Ended ·/)).toBeTruthy();
     // The ended tile closed its connection.
     expect(feeds.get('s1')!.conn).toBe('closed');
     expect(within(tile('s1')!).queryByText(/Connection lost/)).toBeNull();
@@ -236,5 +238,31 @@ describe('reconcileWall', () => {
       maxTiles: 1,
     });
     expect(ids(next)).toEqual(['a']);
+  });
+});
+
+describe('readWallPrefs', () => {
+  it('falls back to the defaults on missing or broken data', () => {
+    expect(readWallPrefs(null)).toEqual(DEFAULT_WALL_PREFS);
+    expect(readWallPrefs('{bad')).toEqual(DEFAULT_WALL_PREFS);
+  });
+
+  it('keeps valid fields and clamps or drops the rest', () => {
+    const p = readWallPrefs(
+      JSON.stringify({
+        winW: 99999,
+        winH: 300,
+        defaultTab: 'inspector',
+        closeAfterAnswerSec: 0,
+        closeAfterToolSec: 'x',
+      }),
+    );
+    expect(p).toEqual({
+      winW: 1200,
+      winH: 300,
+      defaultTab: 'inspector',
+      closeAfterAnswerSec: 0,
+      closeAfterToolSec: DEFAULT_WALL_PREFS.closeAfterToolSec,
+    });
   });
 });

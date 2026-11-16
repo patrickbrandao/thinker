@@ -35,7 +35,10 @@ import LiveAgentsWall, {
   type WallTheme,
   type WallTiming,
 } from './LiveAgentsWall.js';
-import { DEFAULT_AUTO_CLOSE, type AutoCloseTimeouts } from './live-agents-hex.js';
+import {
+  DEFAULT_AUTO_CLOSE,
+  type AutoCloseTimeouts,
+} from '../../components/live-session/hex-live.js';
 
 export type CapMode = 'http1' | 'http2' | 'custom' | 'unlimited';
 

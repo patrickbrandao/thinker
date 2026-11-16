@@ -13,7 +13,7 @@ import { cx } from '../../components/ui.js';
 import LiveSessionWindow from '../../components/live-session/LiveSessionWindow.js';
 import type { LiveTab, LiveWindowPrefs } from '../../components/live-session/live-windows-store.js';
 import { LiveSessionFeed, useLiveFeed } from '../../services/live-session-feed.js';
-import HexLiveWindow from './HexLiveWindow.js';
+import HexLiveWindow from '../../components/live-session/HexLiveWindow.js';
 import { BridgeClient, loadPageVia } from './live-agents-bridge.js';
 import { LAB_SETTINGS_KEY, loadSettings } from './LiveAgentsLab.js';
 import {
@@ -22,7 +22,7 @@ import {
   withoutMaximize,
   type WallTheme,
 } from './LiveAgentsWall.js';
-import './live-agents-hex.css';
+import '../../components/live-session/hex-live.css';
 
 const LAB_PATH = '/lab/live-agents';
 

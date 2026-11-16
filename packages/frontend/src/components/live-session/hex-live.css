@@ -458,3 +458,10 @@
 .dark .lab-hex-well .bg-accent.rounded-br-md {
   background: rgb(20, 77, 55);
 }
+
+/* Live agents wall: dot grid like the Topology canvas (24px, 1px dots). */
+.live-wall {
+  background-color: var(--hx-stage);
+  background-image: radial-gradient(circle, var(--border-strong) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
