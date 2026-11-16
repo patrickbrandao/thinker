@@ -31,8 +31,10 @@ import LiveAgentsWall, {
   DEFAULT_TIMING,
   type WallLayout,
   type WallStats,
+  type WallTheme,
   type WallTiming,
 } from './LiveAgentsWall.js';
+import { DEFAULT_AUTO_CLOSE, type AutoCloseTimeouts } from './live-agents-hex.js';
 
 export type CapMode = 'http1' | 'http2' | 'custom' | 'unlimited';
 
@@ -40,8 +42,12 @@ export interface LabSettings {
   fleet: FleetConfig;
   cap: { mode: CapMode; custom: number };
   layout: WallLayout;
+  /** Window look. */
+  theme: WallTheme;
   /** Seconds (the wall takes ms). */
-  timing: { pollSec: number; graceSec: number; settleSec: number; touchSec: number };
+  timing: { pollSec: number; settleSec: number; touchSec: number };
+  /** Auto-close after the session's last item, seconds. */
+  autoClose: { answerSec: number; toolSec: number };
 }
 
 export const LAB_SETTINGS_KEY = 'thinker.lab.liveAgents.settings';
@@ -53,11 +59,15 @@ export const DEFAULT_SETTINGS: LabSettings = {
   fleet: DEFAULT_FLEET,
   cap: { mode: 'http1', custom: 8 },
   layout: DEFAULT_LAYOUT,
+  theme: 'hex',
   timing: {
     pollSec: DEFAULT_TIMING.pollMs / 1000,
-    graceSec: DEFAULT_TIMING.graceMs / 1000,
     settleSec: DEFAULT_TIMING.settleMs / 1000,
     touchSec: DEFAULT_TIMING.touchMs / 1000,
+  },
+  autoClose: {
+    answerSec: DEFAULT_AUTO_CLOSE.answerMs / 1000,
+    toolSec: DEFAULT_AUTO_CLOSE.toolMs / 1000,
   },
 };
 
@@ -71,6 +81,7 @@ export function capTiles(cap: LabSettings['cap']): number {
 
 const TABS: LiveTab[] = ['chat', 'details', 'inspector'];
 const CAPS: CapMode[] = ['http1', 'http2', 'custom', 'unlimited'];
+const THEMES: WallTheme[] = ['thinker', 'hex'];
 
 const num = (v: unknown, fallback: number) =>
   typeof v === 'number' && Number.isFinite(v) ? v : fallback;
@@ -86,6 +97,7 @@ export function loadSettings(): LabSettings {
   const l = { ...d.layout, ...(raw.layout ?? {}) };
   const tm = { ...d.timing, ...(raw.timing ?? {}) };
   const cap = { ...d.cap, ...(raw.cap ?? {}) };
+  const ac = { ...d.autoClose, ...(raw.autoClose ?? {}) };
   return {
     fleet: cleanFleetConfig(raw.fleet),
     cap: {
@@ -101,9 +113,13 @@ export function loadSettings(): LabSettings {
       showReplayBar:
         typeof l.showReplayBar === 'boolean' ? l.showReplayBar : d.layout.showReplayBar,
     },
+    theme: THEMES.includes(raw.theme as WallTheme) ? (raw.theme as WallTheme) : d.theme,
+    autoClose: {
+      answerSec: num(ac.answerSec, d.autoClose.answerSec),
+      toolSec: num(ac.toolSec, d.autoClose.toolSec),
+    },
     timing: {
       pollSec: num(tm.pollSec, d.timing.pollSec),
-      graceSec: num(tm.graceSec, d.timing.graceSec),
       settleSec: num(tm.settleSec, d.timing.settleSec),
       touchSec: num(tm.touchSec, d.timing.touchSec),
     },
@@ -336,13 +352,21 @@ export default function LiveAgentsLab() {
   const timing = useMemo<WallTiming>(
     () => ({
       pollMs: settings.timing.pollSec * 1000,
-      graceMs: settings.timing.graceSec * 1000,
       settleMs: settings.timing.settleSec * 1000,
       touchMs: settings.timing.touchSec * 1000,
     }),
     [settings.timing],
   );
   const maxTiles = capTiles(settings.cap);
+  const autoClose = useMemo<AutoCloseTimeouts>(
+    () => ({
+      answerMs: settings.autoClose.answerSec * 1000,
+      toolMs: settings.autoClose.toolSec * 1000,
+    }),
+    [settings.autoClose],
+  );
+  const setAutoClose = (patch: Partial<LabSettings['autoClose']>) =>
+    setSettings((s) => ({ ...s, autoClose: { ...s.autoClose, ...patch } }));
 
   const reset = () => {
     fleet.reset();
@@ -479,7 +503,7 @@ export default function LiveAgentsLab() {
         />
         {settings.cap.mode === 'custom' ? (
           <NumberRow
-            label="Tiles at once"
+            label="Windows at once"
             value={settings.cap.custom}
             min={1}
             max={40}
@@ -495,9 +519,9 @@ export default function LiveAgentsLab() {
       <Section title="Live counters">
         <div className="grid grid-cols-3 gap-2">
           <Counter label="running" value={fleetStats.running} />
-          <Counter label="tiles live" value={wallStats.shown} />
+          <Counter label="windows live" value={wallStats.shown} />
           <Counter label="waiting" value={wallStats.waiting} />
-          <Counter label="ended tiles" value={wallStats.ended} />
+          <Counter label="ended windows" value={wallStats.ended} />
           <Counter label="sessions ended" value={fleetStats.ended} />
           <Counter label="SSE open" value={fleetStats.liveConnections} />
         </div>
@@ -509,8 +533,20 @@ export default function LiveAgentsLab() {
       </Section>
 
       <Section title="Layout">
+        <div className="flex items-center gap-2 text-[12px] text-dim">
+          <span className="w-36 shrink-0">Theme</span>
+          <Segmented
+            label="Theme"
+            value={settings.theme}
+            onChange={(theme) => setSettings((s) => ({ ...s, theme }))}
+            options={[
+              { value: 'thinker', label: 'Thinker' },
+              { value: 'hex', label: 'anoma-ly-hex' },
+            ]}
+          />
+        </div>
         <NumberRow
-          label="Tile min width"
+          label="Window width"
           value={l.minTileWidth}
           min={240}
           max={900}
@@ -518,16 +554,11 @@ export default function LiveAgentsLab() {
           suffix="px"
           onChange={(v) => setLayout({ minTileWidth: v })}
         />
+        <div className="-mt-1 pl-36 text-[11px] text-faint">
+          Windows cascade (+28 px) below a free band as tall as one window
+        </div>
         <NumberRow
-          label="Columns"
-          value={l.columns}
-          min={0}
-          max={8}
-          onChange={(v) => setLayout({ columns: v })}
-        />
-        <div className="-mt-1 pl-36 text-[11px] text-faint">0 fills rows by min width</div>
-        <NumberRow
-          label="Tile height"
+          label="Window height"
           value={l.tileHeight}
           min={200}
           max={1000}
@@ -549,15 +580,38 @@ export default function LiveAgentsLab() {
           />
         </div>
         <Toggle
-          label="Compact tiles"
+          label="Compact windows"
           checked={l.compact}
           onChange={(v) => setLayout({ compact: v })}
         />
         <Toggle
-          label="Show replay bar"
+          label="Show replay bar (Thinker theme)"
           checked={l.showReplayBar}
           onChange={(v) => setLayout({ showReplayBar: v })}
         />
+      </Section>
+
+      <Section title="Auto-close">
+        <NumberRow
+          label="Close after assistant"
+          value={settings.autoClose.answerSec}
+          min={1}
+          max={300}
+          suffix="s"
+          onChange={(v) => setAutoClose({ answerSec: v })}
+        />
+        <NumberRow
+          label="Close after tool call"
+          value={settings.autoClose.toolSec}
+          min={1}
+          max={600}
+          suffix="s"
+          onChange={(v) => setAutoClose({ toolSec: v })}
+        />
+        <div className="text-[11px] text-faint">
+          The session&apos;s last item decides: an assistant answer or a tool call. New activity
+          resets it, hovering pauses it, pinned windows stay. Also applies after the session ends.
+        </div>
       </Section>
 
       <Section title="Wall timing">
@@ -568,14 +622,6 @@ export default function LiveAgentsLab() {
           max={30}
           suffix="s"
           onChange={(v) => setTiming({ pollSec: v })}
-        />
-        <NumberRow
-          label="Grace period"
-          value={tm.graceSec}
-          min={0}
-          max={300}
-          suffix="s"
-          onChange={(v) => setTiming({ graceSec: v })}
         />
         <NumberRow
           label="Settle"
@@ -598,7 +644,7 @@ export default function LiveAgentsLab() {
           className="btn btn-ghost btn-sm"
           onClick={() => setSettings({ ...DEFAULT_SETTINGS })}
         >
-          Restore defaults (official values)
+          Restore defaults
         </button>
       </Section>
 
@@ -661,6 +707,8 @@ export default function LiveAgentsLab() {
         onStats={setWallStats}
         hideHeader
         agentFilter={agentFilter}
+        theme={settings.theme}
+        autoClose={autoClose}
       />
       <ControlsWindow
         open={panel}

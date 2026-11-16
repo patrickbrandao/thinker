@@ -1,0 +1,426 @@
+/*
+ * Lab only: the "anoma-ly-hex" theme of the Live agents lab wall.
+ *
+ * Tokens translated from the hex-ui reference (tokens.css, where each color is
+ * light-dark(light, dark)): light values under .lab-hex, dark values under
+ * .dark .lab-hex (the dashboard's theme class on <html>). Like
+ * src/styles/tokens.css this is a token file, so it is the one place with raw
+ * colors. Inside the wall the dashboard tokens are remapped to the hex palette,
+ * so the shared live-session views (Chat, Details, Inspector) take the theme
+ * without changes. The font stays the dashboard's (DM Sans, self-hosted).
+ */
+.lab-hex {
+  --hx-font: var(--font-sans);
+  --hx-mono: var(--font-mono);
+
+  --hx-stage: #f5f5f2;
+  --hx-panel: #fcfcfb;
+  --hx-panel-ring: rgba(0, 0, 0, 0.1);
+  --hx-panel-shadow: 0 6px 15px rgba(24, 24, 32, 0.15);
+  --hx-panel-chip: #f0f0ee;
+  --hx-panel-chip-line: rgba(0, 0, 0, 0.08);
+  --hx-panel-well: #f3f3f1;
+  --hx-panel-well-line: rgba(0, 0, 0, 0.08);
+  --hx-panel-well-focus: rgba(0, 0, 0, 0.28);
+  --hx-panel-grid: #8a8a93;
+  --hx-panel-status: #6b6b74;
+  --hx-panel-glow: rgb(22, 163, 74);
+  --hx-text: #18181b;
+  --hx-text-body: #3f3f46;
+  --hx-text-soft: #52525b;
+  --hx-text-muted: #6b6b74;
+  --hx-text-faint: #85858e;
+  --hx-text-ghost: #9a9aa3;
+  --hx-mint: #15803d;
+  --hx-mint-text: #14693a;
+  --hx-action: rgba(0, 0, 0, 0.05);
+
+  /* Dashboard tokens, remapped for the views inside the windows. */
+  --bg: var(--hx-stage);
+  --bg-elev: var(--hx-panel);
+  --bg-sunken: #ececea;
+  --surface-2: var(--hx-panel-chip);
+  --surface-3: #e8e8e5;
+  --surface-4: #deded9;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --text: var(--hx-text);
+  --text-dim: var(--hx-text-body);
+  --text-muted: var(--hx-text-muted);
+  --text-faint: var(--hx-text-faint);
+  --ok: var(--hx-mint);
+  --ok-tint: rgba(22, 163, 74, 0.1);
+
+  background: var(--hx-stage);
+  color: var(--hx-text);
+}
+
+.dark .lab-hex {
+  --hx-stage: #070707;
+  --hx-panel: #0c0c0e;
+  --hx-panel-ring: rgba(255, 255, 255, 0.08);
+  --hx-panel-shadow: 0 6px 15px rgba(0, 0, 0, 0.7);
+  --hx-panel-chip: #1b1b1e;
+  --hx-panel-chip-line: rgba(255, 255, 255, 0.08);
+  --hx-panel-well: #1a1a1d;
+  --hx-panel-well-line: rgba(255, 255, 255, 0.07);
+  --hx-panel-well-focus: rgba(255, 255, 255, 0.18);
+  --hx-panel-grid: #9a9aa0;
+  --hx-panel-status: #9a9aa0;
+  --hx-panel-glow: rgb(80, 220, 140);
+  --hx-text: #ededed;
+  --hx-text-body: #c4c4c9;
+  --hx-text-soft: #a0a0a6;
+  --hx-text-muted: #8e8e94;
+  --hx-text-faint: #6a6a70;
+  --hx-text-ghost: #5e5e64;
+  --hx-mint: #7fe0a8;
+  --hx-mint-text: #c9f5da;
+  --hx-action: rgba(255, 255, 255, 0.06);
+
+  --bg-sunken: #050505;
+  --surface-3: #232327;
+  --surface-4: #2c2c31;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --ok-tint: rgba(80, 220, 140, 0.12);
+}
+
+/* ------------------------------------------------------------------ window */
+
+.lab-hex-win {
+  --hx-ring: var(--hx-panel-ring);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  background: var(--hx-panel);
+  box-shadow: var(--hx-panel-shadow);
+  color: var(--hx-text);
+  font-family: var(--hx-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: box-shadow 0.9s ease-out;
+}
+
+/* 1px ring drawn over the content, like the reference Surface. */
+.lab-hex-win::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  border: 1px solid var(--hx-ring);
+  border-radius: inherit;
+  pointer-events: none;
+  transition: border-color 0.9s ease-out;
+}
+
+.lab-hex-win--glow {
+  --hx-ring: color-mix(in srgb, var(--hx-panel-glow) 62%, transparent);
+  box-shadow:
+    var(--hx-panel-shadow),
+    0 0 0 3px color-mix(in srgb, var(--hx-panel-glow) 14%, transparent);
+  transition: none;
+}
+
+.lab-hex-win--glow::before {
+  transition: none;
+}
+
+.lab-hex-win__head {
+  display: flex;
+  height: 36px;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 14px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.lab-hex-win__head:active {
+  cursor: grabbing;
+}
+
+.lab-hex-win__title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hx-text);
+}
+
+.lab-hex-win__path {
+  min-width: 60px;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--hx-mono);
+  font-size: 11px;
+  color: var(--hx-text-ghost);
+}
+
+.lab-hex-win__btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--hx-text-faint);
+}
+
+.lab-hex-win__btn:hover,
+.lab-hex-win__btn[aria-pressed='true'] {
+  background: var(--hx-action);
+  color: var(--hx-text);
+}
+
+.lab-hex-win__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4.7px;
+  overflow: hidden;
+  background: var(--hx-panel-chip);
+  color: var(--hx-text-muted);
+}
+
+.lab-hex-win__row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 8px;
+}
+
+/* The status chip (the reference's subagents pill). */
+.lab-hex-chip {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  height: 22px;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 10px 0 24px;
+  border-radius: 11px;
+  background: var(--hx-panel-chip);
+  color: var(--hx-text-body);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 0.6s ease-out,
+    color 0.6s ease-out;
+}
+
+.lab-hex-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lab-hex-chip::after {
+  content: '';
+  position: absolute;
+  inset: -0.5px;
+  box-sizing: border-box;
+  border: 1px solid var(--hx-panel-chip-line);
+  border-radius: 11.5px;
+  pointer-events: none;
+}
+
+.lab-hex-chip--flash {
+  background: color-mix(in srgb, var(--hx-panel-glow) 30%, var(--hx-panel-chip));
+  color: var(--hx-mint-text);
+  transition: none;
+}
+
+.lab-hex-chip--danger {
+  color: var(--danger);
+}
+
+/* 2×2 grid glyph. */
+.lab-hex-grid {
+  position: absolute;
+  left: 9px;
+  top: 6.75px;
+  width: 8.5px;
+  height: 8.5px;
+  color: var(--hx-panel-grid);
+  transition: color 0.6s ease-out;
+}
+
+.lab-hex-chip--flash .lab-hex-grid {
+  color: var(--hx-mint);
+  transition: none;
+}
+
+.lab-hex-grid b {
+  position: absolute;
+  width: 3.5px;
+  height: 3.5px;
+  background: currentColor;
+}
+
+.lab-hex-grid b:nth-child(2) {
+  left: 5px;
+}
+
+.lab-hex-grid b:nth-child(3) {
+  top: 5px;
+}
+
+.lab-hex-grid b:nth-child(4) {
+  left: 5px;
+  top: 5px;
+}
+
+.lab-hex-win__tabs {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.lab-hex-win__closes + .lab-hex-win__tabs {
+  margin-left: 0;
+}
+
+.lab-hex-win__btn[aria-selected='true'] {
+  background: var(--hx-action);
+  color: var(--hx-text);
+}
+
+.lab-hex-win__closes {
+  margin-left: auto;
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--hx-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The well (the reference's editor) holds the live session views. */
+.lab-hex-well {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  margin: 0 10px;
+  border-radius: 14px;
+  background: var(--hx-panel-well);
+}
+
+.lab-hex-well::before {
+  content: '';
+  position: absolute;
+  inset: -0.5px;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 1px solid var(--hx-panel-well-line);
+  border-radius: 14.5px;
+  pointer-events: none;
+}
+
+.lab-hex-well:focus-within::before {
+  border-color: var(--hx-panel-well-focus);
+}
+
+.lab-hex-well__scroll {
+  height: 100%;
+  overflow-y: auto;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.lab-hex-win__foot {
+  display: flex;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px 0 22px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.lab-hex-win__model {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: var(--hx-text-muted);
+}
+
+.lab-hex-win__model > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lab-hex-win__effort {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  color: var(--hx-text-faint);
+}
+
+.lab-hex-chevron {
+  flex: none;
+  overflow: visible;
+}
+
+/* ------------------------------------------------------------- countdown */
+
+.lab-countdown {
+  position: absolute;
+  bottom: 1px;
+  left: 16px;
+  right: 16px;
+  z-index: 3;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.lab-countdown > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hx-text-faint, var(--text-faint));
+  opacity: 0.55;
+  transform-origin: left center;
+  animation-name: lab-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes lab-countdown {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-hex-win,
+  .lab-hex-win::before,
+  .lab-hex-chip,
+  .lab-hex-grid {
+    transition: none;
+  }
+}
