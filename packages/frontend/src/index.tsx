@@ -82,6 +82,9 @@ const LiveAgents = lazyReload(() => import('./pages/LiveAgents.jsx'));
 const LiveSessionLab = import.meta.env.DEV
   ? lazyReload(() => import('./pages/lab/LiveSessionLab.jsx'))
   : null;
+const LiveAgentsLab = import.meta.env.DEV
+  ? lazyReload(() => import('./pages/lab/LiveAgentsLab.jsx'))
+  : null;
 
 const Lazy = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<div className="page" aria-busy="true" />}>{children}</Suspense>
@@ -492,6 +495,16 @@ function AppRoutes() {
           element={
             <Lazy>
               <LiveSessionLab />
+            </Lazy>
+          }
+        />
+      )}
+      {LiveAgentsLab && (
+        <Route
+          path="lab/live-agents"
+          element={
+            <Lazy>
+              <LiveAgentsLab />
             </Lazy>
           }
         />

@@ -36,6 +36,24 @@ O laboratório é uma tela de desenvolvimento, **não faz parte do produto**:
 
 Ao implementar, o protocolo e o redutor do laboratório são o ponto de partida; mudanças de comportamento da janela devem ser provadas primeiro no laboratório. Quando o produto divergir do laboratório, atualize o laboratório ou registre a diferença em [Diferenças entre o laboratório e esta especificação](#diferenças-entre-o-laboratório-e-esta-especificação).
 
+### Laboratório de Agentes ao vivo
+
+Segundo laboratório, também só em desenvolvimento: `/lab/live-agents` (por exemplo `http://localhost:3020/lab/live-agents`, sem backend e sem login). Serve para **customizar a página Agentes ao vivo** (`/sessions/live`) com dados simulados e só depois portar as decisões para a página oficial.
+
+- `live-agents-sim.ts`: o backend falso no navegador. Uma frota de agentes simulados (nomes e modelos sorteados) abre sessões sem parar, cada uma tocando um cenário de `live-session-sim.ts` pelo `SimServer`, e reemite os eventos no formato oficial (`LiveEvent` de `thinker-shared`, com `upstream` convertido para `anthropic_messages`, `openai_responses`, `openai_chat_completions`). Expõe um `fetch` falso (`GET /api/v1/sessions?running=true`, `/api/v1/agents`, `/api/v1/sessions/:id/events` e a sonda da URL ao vivo, que responde 404 ou 429) e uma classe `EventSource` falsa para `/api/v1/sessions/:id/live` (snapshot primeiro, depois os eventos; com `lastEventId` reenvia só o que faltou; acima de 20 conexões recusa, como o limite por organização). Os dois são injetados no `LiveSessionFeed` oficial, então a janela e as views rodam sem modificação.
+- `LiveAgentsWall.tsx`: **cópia editável** da página oficial (`src/pages/LiveAgents.tsx`), com o mesmo `reconcileWall` e os tempos e o layout como parâmetros. Recebe os dados por injeção: nunca chama a API real, nem usa `thinker.liveWindows` ou o gerenciador de janelas do shell. É aqui que layout e comportamento mudam.
+- `LiveAgentsLab.tsx`: a página com o painel de controle (lateral; gaveta no celular):
+  - **Simulação:** número de agentes (1 a 40), intervalo entre sessões de cada agente, turnos (requisições) por sessão (0 toca o cenário como está), velocidade, janela "em execução" depois do fim da sessão (a API usa 5 min), pausar, retomar, reiniciar e abrir uma sessão na hora.
+  - **Falhas:** % de requisições com 429 seguido de fallback e % com stream cortado no meio (502) seguido de fallback.
+  - **Limite de conexões:** HTTP/1.1 (3), HTTP/2 (16), personalizado (N) ou sem limite.
+  - **Contadores ao vivo:** em execução, quadros ao vivo, aguardando, quadros encerrados, sessões encerradas e conexões SSE abertas.
+  - **Layout:** largura mínima do quadro ou número fixo de colunas, altura do quadro, aba padrão (Chat, Detalhes, Inspetor), quadros compactos, barra de replay visível ou não.
+  - **Tempos do mural:** intervalo de polling, carência dos quadros encerrados, estabilização (settle) e proteção de interação.
+  - **Decisões:** notas livres e o botão "Copy current settings as JSON".
+  - Os controles ficam no `localStorage` em `thinker.lab.liveAgents.settings` e as notas em `thinker.lab.liveAgents.notes`; "Restore defaults" volta aos valores da página oficial.
+
+**Regra de portabilidade:** o laboratório não muda o produto. Uma decisão tomada nele (anotada em Decisões, com o JSON das configurações) é portada **à mão** para `src/pages/LiveAgents.tsx`, com os testes em `tests/pages/LiveAgents.test.tsx` atualizados. Altura do quadro e barra de replay são sobrepostas por CSS no laboratório; no produto viram propriedades do `LiveSessionWindow`.
+
 ## Experiência
 
 ### Onde abre
