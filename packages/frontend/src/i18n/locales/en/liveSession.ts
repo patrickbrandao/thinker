@@ -32,6 +32,12 @@ export default {
     failed: 'Failed',
     waitingRequest: 'Waiting for request',
   },
+  hex: {
+    toolCalls: '{{ n }} tool calls',
+    popout: 'Open in a new tab',
+    closesIn: 'closes in {{ n }}s',
+    effort: 'Reasoning effort',
+  },
   totals: {
     requests: '{{ n }} req',
     tokens: '{{ input }} in / {{ output }} out',

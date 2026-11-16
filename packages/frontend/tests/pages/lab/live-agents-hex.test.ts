@@ -12,39 +12,26 @@ import {
   resizeFrom,
   windowSize,
   type AutoCloseInput,
-} from '../../../src/pages/lab/live-agents-hex';
+} from '../../../src/components/live-session/hex-live';
 
 describe('cascadePosition', () => {
-  const o = { width: 400, height: 300, areaWidth: 1400, areaHeight: 1000, step: 28, margin: 12 };
+  const o = { width: 400, height: 300, areaWidth: 1400, areaHeight: 1000, margin: 12 };
 
-  it('starts below a free band as tall as one window and steps +28 px', () => {
+  it('places windows side by side below a free band, each 10% lower', () => {
     const top = 12 + 300 + 12;
     expect(cascadePosition(0, o)).toEqual({ x: 12, y: top });
-    expect(cascadePosition(1, o)).toEqual({ x: 40, y: top + 28 });
-    expect(cascadePosition(2, o)).toEqual({ x: 68, y: top + 56 });
+    expect(cascadePosition(1, o)).toEqual({ x: 424, y: top + 30 });
+    expect(cascadePosition(2, o)).toEqual({ x: 836, y: top + 60 });
   });
 
-  it('never places a window in the reserved band', () => {
-    for (let slot = 0; slot < 60; slot++)
-      expect(cascadePosition(slot, o).y).toBeGreaterThanOrEqual(324);
-  });
-
-  it('wraps back to the top of the cascade before leaving the viewport', () => {
-    // (1000 - 12 - 324 - 300 - 14) / 28 = 12 steps -> 13 windows per run.
-    const last = cascadePosition(12, o);
-    expect(last.y + o.height).toBeLessThanOrEqual(o.areaHeight - 12);
-    const wrapped = cascadePosition(13, o);
-    expect(wrapped.y).toBe(324);
-    expect(wrapped.x).toBeGreaterThan(cascadePosition(0, o).x);
-    for (let slot = 0; slot < 80; slot++) {
+  it('goes back to the left edge on a new row instead of leaving the area', () => {
+    // (1400 - 12) / 412 = 3 windows per row.
+    expect(cascadePosition(3, o)).toEqual({ x: 12, y: 324 + 312 });
+    for (let slot = 0; slot < 30; slot++) {
       const p = cascadePosition(slot, o);
       expect(p.x + o.width).toBeLessThanOrEqual(o.areaWidth);
-      expect(p.y + o.height).toBeLessThanOrEqual(o.areaHeight);
+      expect(p.y).toBeGreaterThanOrEqual(324);
     }
-  });
-
-  it('keeps the band even when the viewport is too short (the wall scrolls)', () => {
-    expect(cascadePosition(3, { ...o, areaHeight: 400 }).y).toBe(324);
   });
 
   it('reuses the first free slot', () => {
