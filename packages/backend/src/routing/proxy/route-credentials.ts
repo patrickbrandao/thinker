@@ -25,6 +25,10 @@ import type { ForwardResult } from './provider-client';
 import { runWithOutboundScope, type OutboundScope } from '../../common/outbound/outbound-proxy';
 import type { ProxyEgressService } from '../../proxy-servers/proxy-egress.service';
 import type { ProviderAttemptRef, StartProviderAttempt } from './proxy-types';
+import {
+  runWithProviderUrls,
+  type ProviderUrlConnection,
+} from '../provider-urls/provider-url-scope';
 
 /** Why a route could not produce a usable provider apiKey. */
 export type CredentialFailureReason = Extract<
@@ -54,6 +58,8 @@ export type ResolvedRouteCredentials =
       providerBaseUrl?: string | null;
       /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
       providerBaseUrlAllowsPrivate?: boolean;
+      /** The selected connection's URL overrides (`tenant_providers.url_overrides`, ADR 0012). */
+      providerUrlOverrides?: Record<string, string> | null;
       tenantProviderId: string | null;
       /**
        * Label of the `tenant_providers` row that was actually selected — the
@@ -256,21 +262,32 @@ export async function resolveRouteCredentials(
 
   // OAuth refreshes go out through the same chain as the inference call.
   const egressScope = await deps.egress?.scopeForConnection(tenantId, provider, tenantProviderId);
+  // ...and to the connection's own OAuth URLs (ADR 0012).
+  const urls: ProviderUrlConnection = {
+    provider,
+    authType: authType ?? 'api_key',
+    region: key.region,
+    urlOverrides: key.urlOverrides ?? null,
+    baseUrl: key.baseUrl ?? null,
+    allowPrivate: key.baseUrlAllowsPrivate !== false,
+  };
   const unwrapped = await runWithOutboundScope(egressScope, () =>
-    resolveApiKey(
-      provider,
-      apiKey,
-      authType,
-      agentId,
-      tenantId,
-      oauth.openaiOauth,
-      oauth.minimaxOauth,
-      oauth.anthropicOauth,
-      oauth.geminiOauth,
-      oauth.kiroOauth,
-      oauth.xaiOauth,
-      providerKeyLabel,
-      oauth.opencodeOauth,
+    runWithProviderUrls(urls, () =>
+      resolveApiKey(
+        provider,
+        apiKey,
+        authType,
+        agentId,
+        tenantId,
+        oauth.openaiOauth,
+        oauth.minimaxOauth,
+        oauth.anthropicOauth,
+        oauth.geminiOauth,
+        oauth.kiroOauth,
+        oauth.xaiOauth,
+        providerKeyLabel,
+        oauth.opencodeOauth,
+      ),
     ),
   );
 
@@ -306,6 +323,7 @@ export async function resolveRouteCredentials(
     providerRegion: key.region,
     providerBaseUrl: key.baseUrl ?? null,
     providerBaseUrlAllowsPrivate: key.baseUrlAllowsPrivate !== false,
+    providerUrlOverrides: key.urlOverrides ?? null,
     tenantProviderId,
     // The selected row's own label, not `args.providerKeyLabel`: selection may
     // have fallen back to the default key when the pin matched nothing.

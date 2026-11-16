@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { FlaskConical, Trash2 } from 'lucide-react';
+import { FlaskConical, Network, Trash2 } from 'lucide-react';
 import ErrorState from '../components/ErrorState.js';
 import LogRetentionSelect from '../components/LogRetentionSelect.js';
 import {
@@ -11,7 +11,18 @@ import {
 } from '../components/proxy/ProxyParts.js';
 import ProxyLogsTab from '../components/proxy/ProxyLogsTab.js';
 import ProxyStatsTab from '../components/proxy/ProxyStatsTab.js';
-import { Badge, Button, Field, Modal, Panel, Skel, Switch, Tabs } from '../components/ui.js';
+import {
+  Badge,
+  Button,
+  Field,
+  FloatingWindow,
+  Modal,
+  Panel,
+  Skel,
+  Switch,
+  Tabs,
+  WindowFooter,
+} from '../components/ui.js';
 import { ApiError } from '../services/api/core.js';
 import {
   createProxy,
@@ -238,14 +249,49 @@ export default function ProxyServer() {
   );
 }
 
+/**
+ * Add a proxy server in a floating window over the proxy list, so the list
+ * stays in place; the window closes once the proxy is created.
+ */
+export function NewProxyWindow({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (p: ProxyDetail) => void;
+}) {
+  return (
+    <FloatingWindow
+      open
+      title={t('proxies.form.createTitle')}
+      icon={<Network aria-hidden="true" className="size-4" />}
+      onClose={onClose}
+      className="floating-window--wide"
+    >
+      <SettingsTab
+        proxy={null}
+        embedded
+        onSaved={onCreated}
+        onDeleted={onClose}
+        onCancel={onClose}
+      />
+    </FloatingWindow>
+  );
+}
+
 function SettingsTab({
   proxy,
   onSaved,
   onDeleted,
+  embedded = false,
+  onCancel,
 }: {
   proxy: ProxyDetail | null;
   onSaved: (p: ProxyDetail) => void;
   onDeleted: () => void;
+  /** Bare form, without the panel and side column (the new-proxy window). */
+  embedded?: boolean;
+  onCancel?: () => void;
 }) {
   const [form, setForm] = useState<Form>(() => formOf(proxy));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -277,193 +323,197 @@ function SettingsTab({
 
   const remaining = proxy ? debugRemaining(proxy) : null;
 
-  return (
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-      <Panel title={t('proxies.form.title')} bodyClassName="flex flex-col gap-4">
-        <Field label={t('proxies.form.name')} htmlFor="proxy-name" error={errors.name}>
-          <input
-            id="proxy-name"
+  const fields = (
+    <>
+      <Field label={t('proxies.form.name')} htmlFor="proxy-name" error={errors.name}>
+        <input
+          id="proxy-name"
+          className="field"
+          maxLength={100}
+          value={form.name}
+          onChange={(e) => patch('name', e.currentTarget.value)}
+        />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-[120px_minmax(0,1fr)_120px]">
+        <Field label={t('proxies.form.scheme')} htmlFor="proxy-scheme">
+          <select
+            id="proxy-scheme"
             className="field"
-            maxLength={100}
-            value={form.name}
-            onChange={(e) => patch('name', e.currentTarget.value)}
+            value={form.scheme}
+            onChange={(e) => patch('scheme', e.currentTarget.value as ProxyScheme)}
+          >
+            {/* i18n-ignore */}
+            <option value="http">http</option>
+            {/* i18n-ignore */}
+            <option value="https">https</option>
+          </select>
+        </Field>
+        <Field label={t('proxies.form.host')} htmlFor="proxy-host" error={errors.host}>
+          <input
+            id="proxy-host"
+            className="field font-mono"
+            autoComplete="off"
+            spellCheck={false}
+            value={form.host}
+            onChange={(e) => patch('host', e.currentTarget.value)}
           />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-[120px_minmax(0,1fr)_120px]">
-          <Field label={t('proxies.form.scheme')} htmlFor="proxy-scheme">
-            <select
-              id="proxy-scheme"
-              className="field"
-              value={form.scheme}
-              onChange={(e) => patch('scheme', e.currentTarget.value as ProxyScheme)}
-            >
-              {/* i18n-ignore */}
-              <option value="http">http</option>
-              {/* i18n-ignore */}
-              <option value="https">https</option>
-            </select>
-          </Field>
-          <Field label={t('proxies.form.host')} htmlFor="proxy-host" error={errors.host}>
-            <input
-              id="proxy-host"
-              className="field font-mono"
-              autoComplete="off"
-              spellCheck={false}
-              value={form.host}
-              onChange={(e) => patch('host', e.currentTarget.value)}
-            />
-          </Field>
-          <Field label={t('proxies.form.port')} htmlFor="proxy-port" error={errors.port}>
-            <input
-              id="proxy-port"
-              className="field font-mono"
-              type="number"
-              min={1}
-              max={65535}
-              value={form.port}
-              onChange={(e) => patch('port', e.currentTarget.value)}
-            />
-          </Field>
-        </div>
-        <p className="hint m-0">{t('proxies.form.schemeHint')}</p>
+        <Field label={t('proxies.form.port')} htmlFor="proxy-port" error={errors.port}>
+          <input
+            id="proxy-port"
+            className="field font-mono"
+            type="number"
+            min={1}
+            max={65535}
+            value={form.port}
+            onChange={(e) => patch('port', e.currentTarget.value)}
+          />
+        </Field>
+      </div>
+      <p className="hint m-0">{t('proxies.form.schemeHint')}</p>
 
-        <div>
-          <span className="label">{t('proxies.form.auth')}</span>
-          <div className="segmented w-fit" role="radiogroup" aria-label={t('proxies.form.auth')}>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={!form.auth}
-              aria-pressed={!form.auth}
-              onClick={() => patch('auth', false)}
-            >
-              {t('proxies.form.authNone')}
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={form.auth}
-              aria-pressed={form.auth}
-              onClick={() => patch('auth', true)}
-            >
-              {t('proxies.form.authBasic')}
-            </button>
-          </div>
+      <div>
+        <span className="label">{t('proxies.form.auth')}</span>
+        <div className="segmented w-fit" role="radiogroup" aria-label={t('proxies.form.auth')}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!form.auth}
+            aria-pressed={!form.auth}
+            onClick={() => patch('auth', false)}
+          >
+            {t('proxies.form.authNone')}
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={form.auth}
+            aria-pressed={form.auth}
+            onClick={() => patch('auth', true)}
+          >
+            {t('proxies.form.authBasic')}
+          </button>
         </div>
-        {form.auth ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label={t('proxies.form.username')}
-              htmlFor="proxy-username"
-              error={errors.username}
-            >
-              <input
-                id="proxy-username"
-                className="field"
-                autoComplete="off"
-                value={form.username}
-                onChange={(e) => patch('username', e.currentTarget.value)}
-              />
-            </Field>
-            <Field
-              label={t('proxies.form.password')}
-              htmlFor="proxy-password"
-              error={errors.password}
-              hint={proxy?.has_password ? t('proxies.form.passwordKeep') : undefined}
-            >
-              <input
-                id="proxy-password"
-                className="field"
-                type="password"
-                autoComplete="new-password"
-                value={form.password}
-                onChange={(e) => patch('password', e.currentTarget.value)}
-              />
-            </Field>
-          </div>
-        ) : null}
-
+      </div>
+      {form.auth ? (
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
-            label={t('proxies.form.timeout')}
-            htmlFor="proxy-timeout"
-            error={errors.timeout}
-            hint={t('proxies.form.timeoutHint')}
+            label={t('proxies.form.username')}
+            htmlFor="proxy-username"
+            error={errors.username}
           >
             <input
-              id="proxy-timeout"
-              className="field font-mono"
-              type="number"
-              min={1}
-              value={form.connect_timeout_ms}
-              onChange={(e) => patch('connect_timeout_ms', e.currentTarget.value)}
+              id="proxy-username"
+              className="field"
+              autoComplete="off"
+              value={form.username}
+              onChange={(e) => patch('username', e.currentTarget.value)}
             />
           </Field>
-          <div>
-            <span className="label">{t('proxies.form.enabled')}</span>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={form.enabled}
-                label={t('proxies.form.enabled')}
-                onChange={(v) => patch('enabled', v)}
-              />
-              <span className="text-sm text-dim">
-                {form.enabled ? t('common.enabled') : t('common.disabled')}
-              </span>
-            </div>
-            <p className="hint">{t('proxies.form.enabledHint')}</p>
-          </div>
-        </div>
-
-        <div>
-          <span className="label">{t('proxies.form.debug')}</span>
-          <div className="flex flex-wrap items-center gap-3">
-            <Switch
-              checked={form.debug}
-              label={t('proxies.form.debug')}
-              onChange={(v) => {
-                patch('debug', v);
-                if (v && !proxy?.debug_enabled) patch('debugDuration', '24h');
-              }}
+          <Field
+            label={t('proxies.form.password')}
+            htmlFor="proxy-password"
+            error={errors.password}
+            hint={proxy?.has_password ? t('proxies.form.passwordKeep') : undefined}
+          >
+            <input
+              id="proxy-password"
+              className="field"
+              type="password"
+              autoComplete="new-password"
+              value={form.password}
+              onChange={(e) => patch('password', e.currentTarget.value)}
             />
-            {form.debug ? (
-              <select
-                className="field w-auto min-w-[160px]"
-                aria-label={t('proxies.form.debugDuration')}
-                value={form.debugDuration}
-                onChange={(e) =>
-                  patch('debugDuration', e.currentTarget.value as Form['debugDuration'])
-                }
-              >
-                {proxy?.debug_enabled ? (
-                  <option value="keep">{t('proxies.form.debugKeep')}</option>
-                ) : null}
-                {DEBUG_DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {t(`proxies.form.debugDurations.${d}`)}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            {remaining ? <span className="text-sm text-dim">{remaining}</span> : null}
-          </div>
-          <p className="hint">{t('proxies.form.debugHint')}</p>
+          </Field>
         </div>
+      ) : null}
 
-        <div>
-          <span className="label">{t('proxies.form.retention')}</span>
-          <LogRetentionSelect
-            idPrefix="proxy-retention"
-            value={form.log_retention_days}
-            globalDays={null}
-            onChange={(days) => patch('log_retention_days', days)}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label={t('proxies.form.timeout')}
+          htmlFor="proxy-timeout"
+          error={errors.timeout}
+          hint={t('proxies.form.timeoutHint')}
+        >
+          <input
+            id="proxy-timeout"
+            className="field font-mono"
+            type="number"
+            min={1}
+            value={form.connect_timeout_ms}
+            onChange={(e) => patch('connect_timeout_ms', e.currentTarget.value)}
           />
-          <p className="hint">{t('proxies.form.retentionHint')}</p>
+        </Field>
+        <div>
+          <span className="label">{t('proxies.form.enabled')}</span>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={form.enabled}
+              label={t('proxies.form.enabled')}
+              onChange={(v) => patch('enabled', v)}
+            />
+            <span className="text-sm text-dim">
+              {form.enabled ? t('common.enabled') : t('common.disabled')}
+            </span>
+          </div>
+          <p className="hint">{t('proxies.form.enabledHint')}</p>
         </div>
+      </div>
 
+      <div>
+        <span className="label">{t('proxies.form.debug')}</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <Switch
+            checked={form.debug}
+            label={t('proxies.form.debug')}
+            onChange={(v) => {
+              patch('debug', v);
+              if (v && !proxy?.debug_enabled) patch('debugDuration', '24h');
+            }}
+          />
+          {form.debug ? (
+            <select
+              className="field w-auto min-w-[160px]"
+              aria-label={t('proxies.form.debugDuration')}
+              value={form.debugDuration}
+              onChange={(e) =>
+                patch('debugDuration', e.currentTarget.value as Form['debugDuration'])
+              }
+            >
+              {proxy?.debug_enabled ? (
+                <option value="keep">{t('proxies.form.debugKeep')}</option>
+              ) : null}
+              {DEBUG_DURATIONS.map((d) => (
+                <option key={d} value={d}>
+                  {t(`proxies.form.debugDurations.${d}`)}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          {remaining ? <span className="text-sm text-dim">{remaining}</span> : null}
+        </div>
+        <p className="hint">{t('proxies.form.debugHint')}</p>
+      </div>
+
+      <div>
+        <span className="label">{t('proxies.form.retention')}</span>
+        <LogRetentionSelect
+          idPrefix="proxy-retention"
+          value={form.log_retention_days}
+          globalDays={null}
+          onChange={(days) => patch('log_retention_days', days)}
+        />
+        <p className="hint">{t('proxies.form.retentionHint')}</p>
+      </div>
+
+      <WindowFooter>
         <div className="actions">
           {proxy ? (
             <Button variant="ghost" size="sm" onClick={() => setForm(formOf(proxy))}>
+              {t('common.cancel')}
+            </Button>
+          ) : onCancel ? (
+            <Button variant="ghost" size="sm" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
           ) : null}
@@ -471,6 +521,16 @@ function SettingsTab({
             {proxy ? t('common.saveChanges') : t('proxies.form.createSubmit')}
           </Button>
         </div>
+      </WindowFooter>
+    </>
+  );
+
+  if (embedded) return <div className="flex flex-col gap-4">{fields}</div>;
+
+  return (
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+      <Panel title={t('proxies.form.title')} bodyClassName="flex flex-col gap-4">
+        {fields}
       </Panel>
 
       {proxy ? (

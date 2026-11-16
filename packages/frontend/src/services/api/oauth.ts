@@ -1,4 +1,11 @@
 import { fetchJson, fetchMutate } from './core.js';
+import { urlOverridesBody, urlOverridesInit, type UrlOverrides } from './provider-urls.js';
+
+/** Query params of a GET flow start: `urlOverrides` as JSON, only when set. */
+function urlOverridesParam(urlOverrides?: UrlOverrides): { urlOverrides?: string } {
+  const body = urlOverridesBody(urlOverrides);
+  return body.urlOverrides ? { urlOverrides: JSON.stringify(body.urlOverrides) } : {};
+}
 
 export type MinimaxOAuthRegion = 'global' | 'cn';
 
@@ -21,15 +28,17 @@ export interface MinimaxOAuthPollResponse {
   pollIntervalMs?: number;
 }
 
-export function getOpenaiOAuthUrl(agentName: string) {
+export function getOpenaiOAuthUrl(agentName: string, urlOverrides?: UrlOverrides) {
   return fetchJson<{ url: string }>(`/oauth/openai/authorize`, {
     agentName,
+    ...urlOverridesParam(urlOverrides),
   });
 }
 
-export function getXaiOAuthUrl(agentName: string) {
+export function getXaiOAuthUrl(agentName: string, urlOverrides?: UrlOverrides) {
   return fetchJson<{ url: string }>(`/oauth/xai/authorize`, {
     agentName,
+    ...urlOverridesParam(urlOverrides),
   });
 }
 
@@ -67,10 +76,14 @@ export function revokeXaiOAuth(agentName: string, label?: string) {
   );
 }
 
-export function startMinimaxOAuth(agentName: string, region: MinimaxOAuthRegion = 'global') {
+export function startMinimaxOAuth(
+  agentName: string,
+  region: MinimaxOAuthRegion = 'global',
+  urlOverrides?: UrlOverrides,
+) {
   return fetchMutate<MinimaxOAuthStartResponse>(
     `/oauth/minimax/start?agentName=${encodeURIComponent(agentName)}&region=${encodeURIComponent(region)}`,
-    { method: 'POST' },
+    { method: 'POST', ...urlOverridesInit(urlOverrides) },
   );
 }
 
@@ -95,10 +108,12 @@ type OpencodeConsoleProvider = 'opencode' | 'opencode-go';
 export function startOpencodeOAuth(
   agentName: string,
   provider: OpencodeConsoleProvider = 'opencode-go',
+  urlOverrides?: UrlOverrides,
 ) {
   const params = new URLSearchParams({ agentName, provider });
   return fetchMutate<MinimaxOAuthStartResponse>(`/oauth/opencode/start?${params.toString()}`, {
     method: 'POST',
+    ...urlOverridesInit(urlOverrides),
   });
 }
 
@@ -136,7 +151,11 @@ export function getOpencodeGoUsage(agentName: string) {
   return fetchJson<{ usage: OpencodeGoUsage | null }>(`/oauth/opencode/usage`, { agentName });
 }
 
-export function startKiroOAuth(agentName: string, options: KiroOAuthStartOptions = {}) {
+export function startKiroOAuth(
+  agentName: string,
+  options: KiroOAuthStartOptions = {},
+  urlOverrides?: UrlOverrides,
+) {
   const params = new URLSearchParams({ agentName });
   const startUrl = options.startUrl?.trim();
   const region = options.region?.trim();
@@ -144,6 +163,7 @@ export function startKiroOAuth(agentName: string, options: KiroOAuthStartOptions
   if (region) params.set('region', region);
   return fetchMutate<MinimaxOAuthStartResponse>(`/oauth/kiro/start?${params.toString()}`, {
     method: 'POST',
+    ...urlOverridesInit(urlOverrides),
   });
 }
 
@@ -165,10 +185,10 @@ export interface AnthropicOAuthAuthorizeResponse {
   state: string;
 }
 
-export function startAnthropicOAuth(agentName: string) {
+export function startAnthropicOAuth(agentName: string, urlOverrides?: UrlOverrides) {
   return fetchMutate<AnthropicOAuthAuthorizeResponse>(
     `/oauth/anthropic/authorize?agentName=${encodeURIComponent(agentName)}`,
-    { method: 'POST' },
+    { method: 'POST', ...urlOverridesInit(urlOverrides) },
   );
 }
 
@@ -196,9 +216,10 @@ export function revokeAnthropicOAuth(agentName: string, label?: string) {
   );
 }
 
-export function getGeminiOAuthUrl(agentName: string) {
+export function getGeminiOAuthUrl(agentName: string, urlOverrides?: UrlOverrides) {
   return fetchJson<{ url: string }>(`/oauth/gemini/authorize`, {
     agentName,
+    ...urlOverridesParam(urlOverrides),
   });
 }
 
@@ -224,7 +245,7 @@ export function revokeGeminiOAuth(agentName: string, label?: string) {
  * right getUrl/submitCallback/revoke triplet based on the provider id.
  */
 export interface PopupOauthApi {
-  getUrl: (agentName: string) => Promise<{ url: string }>;
+  getUrl: (agentName: string, urlOverrides?: UrlOverrides) => Promise<{ url: string }>;
   submitCallback: (code: string, state: string) => Promise<{ ok: boolean }>;
   revoke: (agentName: string, label?: string) => Promise<{ ok: boolean; notifications?: string[] }>;
 }
@@ -264,7 +285,11 @@ export function getPopupOauthApi(providerId: string): PopupOauthApi {
 export interface DeviceCodeApi {
   start: (
     agentName: string,
-    options?: { region?: MinimaxOAuthRegion | string; startUrl?: string },
+    options?: {
+      region?: MinimaxOAuthRegion | string;
+      startUrl?: string;
+      urlOverrides?: UrlOverrides;
+    },
   ) => Promise<MinimaxOAuthStartResponse>;
   poll: (flowId: string) => Promise<MinimaxOAuthPollResponse>;
   revoke: (agentName: string, label?: string) => Promise<{ ok: boolean; notifications?: string[] }>;
@@ -274,7 +299,11 @@ export interface DeviceCodeApi {
 const DEVICE_CODE_PROVIDERS: Record<string, DeviceCodeApi> = {
   minimax: {
     start: (agentName, options) =>
-      startMinimaxOAuth(agentName, (options?.region as MinimaxOAuthRegion | undefined) ?? 'global'),
+      startMinimaxOAuth(
+        agentName,
+        (options?.region as MinimaxOAuthRegion | undefined) ?? 'global',
+        options?.urlOverrides,
+      ),
     poll: pollMinimaxOAuth,
     revoke: revokeMinimaxOAuth,
     hasRegion: true,
@@ -288,6 +317,7 @@ const DEVICE_CODE_PROVIDERS: Record<string, DeviceCodeApi> = {
       return startKiroOAuth(
         agentName,
         kiroOptions.startUrl || kiroOptions.region ? kiroOptions : undefined,
+        options?.urlOverrides,
       );
     },
     poll: pollKiroOAuth,
@@ -295,13 +325,14 @@ const DEVICE_CODE_PROVIDERS: Record<string, DeviceCodeApi> = {
     hasRegion: false,
   },
   'opencode-go': {
-    start: (agentName) => startOpencodeOAuth(agentName, 'opencode-go'),
+    start: (agentName, options) =>
+      startOpencodeOAuth(agentName, 'opencode-go', options?.urlOverrides),
     poll: pollOpencodeOAuth,
     revoke: (agentName, label) => revokeOpencodeOAuth(agentName, label, 'opencode-go'),
     hasRegion: false,
   },
   opencode: {
-    start: (agentName) => startOpencodeOAuth(agentName, 'opencode'),
+    start: (agentName, options) => startOpencodeOAuth(agentName, 'opencode', options?.urlOverrides),
     poll: pollOpencodeOAuth,
     revoke: (agentName, label) => revokeOpencodeOAuth(agentName, label, 'opencode'),
     hasRegion: false,

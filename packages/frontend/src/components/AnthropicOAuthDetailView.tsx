@@ -11,8 +11,9 @@ import {
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import AuthUrlFallback from './AuthUrlFallback.js';
-import { Button } from './ui.js';
+import { Button, WindowFooter } from './ui.js';
 import { SubscriptionAccountList, renameSubscriptionKey } from './OAuthDetailView.js';
+import { collectUrlOverrides, useUrlsScope } from './ConnectionUrlsScope.js';
 
 interface Props {
   provDef: ProviderDef;
@@ -47,6 +48,7 @@ export default function AnthropicOAuthDetailView(props: Props) {
   const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
   const latest = useRef(props);
   latest.current = props;
+  const urlsScope = useUrlsScope();
 
   const activeKeys = props.activeKeys ?? [];
   const isMultiKey = activeKeys.length > 1;
@@ -55,6 +57,8 @@ export default function AnthropicOAuthDetailView(props: Props) {
 
   const handleSignIn = async () => {
     setError(null);
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
     // Open synchronously while the click still has user activation. Browsers
     // can block a window opened after the OAuth start request completes.
     // A blocked popup (null) doesn't stop the flow: the view shows the URL to
@@ -67,7 +71,9 @@ export default function AnthropicOAuthDetailView(props: Props) {
 
     latest.current.setBusy(true);
     try {
-      const { url, state: authState } = await startAnthropicOAuth(latest.current.agentName);
+      const { url, state: authState } = await (urlOverrides
+        ? startAnthropicOAuth(latest.current.agentName, urlOverrides)
+        : startAnthropicOAuth(latest.current.agentName));
       setState(authState);
       if (!popup) setBlockedUrl(url);
       else if (!popup.closed) popup.location.replace(url);
@@ -200,15 +206,35 @@ export default function AnthropicOAuthDetailView(props: Props) {
             }}
           />
           {error ? <div className="form-error">{error}</div> : null}
-          <Button
-            block
-            busy={props.busy}
-            disabled={!input.trim()}
-            onClick={() => void handleSubmit()}
-          >
-            {t('providerSetup.shared.connect')}
-          </Button>
+          {props.newConnection ? null : (
+            <Button
+              block
+              busy={props.busy}
+              disabled={!input.trim()}
+              onClick={() => void handleSubmit()}
+            >
+              {t('providerSetup.shared.connect')}
+            </Button>
+          )}
         </div>
+        {props.newConnection ? (
+          // A new-connection window: Cancel and Connect sit in its fixed footer.
+          <WindowFooter>
+            <div className="flex w-full justify-between gap-2">
+              <Button variant="ghost" size="sm" disabled={props.busy} onClick={props.onClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                busy={props.busy}
+                disabled={!input.trim()}
+                onClick={() => void handleSubmit()}
+              >
+                {t('providerSetup.shared.connect')}
+              </Button>
+            </div>
+          </WindowFooter>
+        ) : null}
         {addingAccount ? (
           <Button variant="ghost" block disabled={props.busy} onClick={cancelAddAccount}>
             {t('common.cancel')}

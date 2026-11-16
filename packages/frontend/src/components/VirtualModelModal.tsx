@@ -19,7 +19,6 @@ import type {
 } from '../services/api.js';
 import type { VirtualModelRouteInput } from 'thinker-shared';
 import {
-  deleteVirtualModelPrompt,
   mapVirtualModelError,
   nonStreamingRoutes,
   previewShadows,
@@ -467,11 +466,8 @@ export default function VirtualModelModal(props: Props) {
               <Button
                 variant="danger"
                 className="header-tier-modal__delete-btn mr-auto"
-                onClick={() => {
-                  if (confirm(deleteVirtualModelPrompt(editing.name))) {
-                    props.onDelete!(editing.id);
-                  }
-                }}
+                // The caller asks for confirmation.
+                onClick={() => props.onDelete!(editing.id)}
               >
                 {t('common.delete')}
               </Button>

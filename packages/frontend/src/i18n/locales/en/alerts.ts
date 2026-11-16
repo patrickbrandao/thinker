@@ -23,6 +23,7 @@ export default {
     catalog: 'Catalog',
   },
   col: {
+    level: 'Severity',
     event: 'Event',
     category: 'Category',
     actor: 'Who',

@@ -276,12 +276,14 @@ describe('VirtualModelModal', () => {
     expect(mockUpdate).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes after confirmation', () => {
+  it('hands Delete to the caller, which confirms it in-app', () => {
     const onDelete = vi.fn();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirm = vi.spyOn(window, 'confirm');
     renderModal({ editing: existing, onDelete });
     fireEvent.click(screen.getByText('Delete'));
     expect(onDelete).toHaveBeenCalledWith('vm-1');
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 
   it('closes on Escape and on Cancel', () => {

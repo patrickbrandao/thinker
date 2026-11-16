@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpException,
@@ -17,6 +18,7 @@ import { ProviderService } from '../../routing-core/provider.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
+import { flowUrlConnection } from '../../provider-urls/provider-urls';
 
 @MinRole('admin', { includeReads: true })
 @UseInterceptors(OutboundProviderScope('kiro'))
@@ -34,6 +36,11 @@ export class KiroOauthController {
     @TenantCtx() ctx: TenantContext,
     @Query('startUrl') startUrl?: string | string[],
     @Query('region') region?: string | string[],
+    /**
+     * Slot id → URL (ADR 0012), for this login and its account. Its
+     * `start_url` wins over the `startUrl` query parameter.
+     */
+    @Body('urlOverrides') urlOverrides?: unknown,
   ) {
     if (!agentName) {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
@@ -52,12 +59,14 @@ export class KiroOauthController {
       agentName,
       PROVIDER_CONNECTION_SCOPE,
     );
+    const urls = await flowUrlConnection('kiro', null, urlOverrides, ctx);
     try {
       return await this.oauthService.startAuthorization(
         agent.id,
         agent.tenant_id,
         ctx.userId,
         options,
+        urls,
       );
     } catch (err) {
       if (err instanceof KiroAuthorizationOptionsError) {

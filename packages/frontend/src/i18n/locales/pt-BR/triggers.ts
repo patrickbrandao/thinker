@@ -37,6 +37,8 @@ const ptBR: Catalog<typeof en> = {
     modelAdded: 'Modelo adicionado',
     modelRemoved: 'Modelo removido',
     modelError: 'Erro de modelo',
+    routeOutOfService: 'Rota fora de serviço',
+    routeRestored: 'Rota de volta ao serviço',
     oauthRefreshFailed: 'Falha ao renovar OAuth',
     triggerFailed: 'Falha na entrega de trigger',
     auditCreated: 'Auditoria: criação',
@@ -301,11 +303,6 @@ const ptBR: Catalog<typeof en> = {
     missing: 'Trigger excluído',
     readOnly:
       'Só membros, administradores e proprietários podem alterar os triggers de um harness.',
-  },
-  org: {
-    title: 'Triggers',
-    body: 'Destinos de e-mail, webhook, Telegram, syslog, GELF e RELP para eventos de harness e do workspace.',
-    open: 'Abrir triggers',
   },
 };
 

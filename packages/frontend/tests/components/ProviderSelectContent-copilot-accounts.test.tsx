@@ -83,5 +83,8 @@ describe('ProviderSelectContent Copilot accounts', () => {
 
     expect(detail.getAttribute('data-active-count')).toBe('1');
     expect(detail.getAttribute('data-active-labels')).toBe('Work');
+    // The subscription flow also gets the optional URLs tab, after the flow.
+    const tabs = [...container.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent);
+    expect(tabs).toEqual(['Connection', 'URLs']);
   });
 });

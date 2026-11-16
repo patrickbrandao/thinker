@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import UnifiedChartCard, { type ChartTab } from '../components/UnifiedChartCard.js';
-import ReliabilityKpiCards from '../components/ReliabilityKpiCards.js';
+import ReliabilityKpiCards, {
+  applyKpiFilter,
+  kpiChartTab,
+  kpiChartTitle,
+  kpiDetailsHref,
+  type KpiView,
+} from '../components/ReliabilityKpiCards.js';
 import FilterSelect from '../components/FilterSelect.js';
 import { AGENT_COLORS } from '../components/MultiAgentTokenChart.js';
 import CostByModelTable from '../components/CostByModelTable.js';
@@ -163,14 +169,16 @@ export default function Overview() {
     markUserSelected: () => setUserSelectedRange(true),
   });
 
-  const [activeView, setActiveViewRaw] = useState<ChartTab>('requests');
+  // The selected KPI card drives the chart (tab + status filter).
+  const [kpiView, setKpiViewRaw] = useState<KpiView>('requests');
   const [tokenChartRequested, setTokenChartRequested] = useState(false);
   const [costChartRequested, setCostChartRequested] = useState(false);
-  const setActiveView = (view: ChartTab) => {
+  const setKpiView = (view: KpiView) => {
     if (view === 'tokens') setTokenChartRequested(true);
     if (view === 'cost') setCostChartRequested(true);
-    setActiveViewRaw(view);
+    setKpiViewRaw(view);
   };
+  const activeView: ChartTab = kpiChartTab(kpiView);
 
   // One token per range/agent visit: its identity changes on every transition
   // (A → B → A included) but stays stable across same-scope SSE refreshes, so
@@ -266,19 +274,10 @@ export default function Overview() {
     [range, agentName, ping],
   );
 
-  const recoveredTs = useMemo(() => {
-    const ts = statusTs.data;
-    if (!ts) return undefined;
-    const picked = ts.keys.map((k, i) => ({ k, i })).filter(({ k }) => k === 'fallback');
-    return {
-      ...ts,
-      keys: picked.map(({ k }) => k),
-      buckets: ts.buckets.map((b) => ({
-        bucket: b.bucket,
-        counts: picked.map(({ i }) => b.counts[i] ?? 0),
-      })),
-    };
-  }, [statusTs.data]);
+  const filteredStatusTs = useMemo(
+    () => applyKpiFilter(statusTs.data, kpiView),
+    [statusTs.data, kpiView],
+  );
 
   const allProviders = useMemo(() => {
     const set = new Set<string>([
@@ -331,15 +330,6 @@ export default function Overview() {
     [providerCostTs.data, effectiveSelected],
   );
 
-  const recoveredTrendPct = (() => {
-    const s = reliabilityStats;
-    if (!s) return 0;
-    const cur = s.fallback_saves?.value ?? 0;
-    const prev = s.fallback_saves?.previous ?? 0;
-    if (prev === 0) return 0;
-    return Math.max(-999, Math.min(999, Math.round(((cur - prev) / prev) * 100)));
-  })();
-
   const encodedAgent = encodeURIComponent(agentName);
   const name = agentDisplayName() ?? agentName;
 
@@ -371,23 +361,30 @@ export default function Overview() {
           </div>
         ) : null}
 
-        <ReliabilityKpiCards stats={reliabilityStats} agentName={agentName} range={range} />
+        <ReliabilityKpiCards
+          stats={reliabilityStats}
+          cost={{
+            value: data.summary?.cost_today?.value ?? 0,
+            trendPct: data.summary?.cost_today?.trend_pct ?? 0,
+          }}
+          tokens={{
+            value: data.summary?.tokens_today?.value ?? 0,
+            trendPct: data.summary?.tokens_today?.trend_pct ?? 0,
+          }}
+          selected={kpiView}
+          onSelect={setKpiView}
+        />
 
         <UnifiedChartCard
           activeTab={activeView}
-          onTabChange={setActiveView}
-          requestsValue={data.summary?.messages?.value ?? 0}
-          requestsTrendPct={data.summary?.messages?.trend_pct ?? 0}
-          recoveredValue={reliabilityStats?.fallback_saves?.value ?? 0}
-          recoveredTrendPct={recoveredTrendPct}
-          recoveredTimeseries={recoveredTs}
+          onTabChange={setKpiView}
+          title={kpiChartTitle(kpiView)}
+          detailsHref={kpiDetailsHref(kpiView, { agentName, range })}
           costValue={data.summary?.cost_today?.value ?? 0}
-          costTrendPct={data.summary?.cost_today?.trend_pct ?? 0}
-          costInfoTooltip={t('overview.costInfo')}
           tokensValue={data.summary?.tokens_today?.value ?? 0}
-          tokensTrendPct={data.summary?.tokens_today?.trend_pct ?? 0}
+          tokensTrendPct={0}
           range={range}
-          requestStatusTimeseries={statusTs.data}
+          requestStatusTimeseries={filteredStatusTs}
           agentTimeseries={filteredTokenTs}
           agentCostTimeseries={filteredCostTs}
           colorMap={providerColorMap}
@@ -451,9 +448,15 @@ export default function Overview() {
       <meta name="description" content={t('overview.agentMetaDescription', { name })} />
 
       {showDashboard ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="overview-filter-bar flex min-h-9 flex-wrap items-center justify-start gap-2 rounded-control border border-line bg-elev px-3 py-1.5">
+          <span className="text-xs text-muted">{t('overview.periodFilter')}</span>
           <div className="w-44">
-            <Select value={range} onChange={handleRangeChange} options={rangeOptions()} />
+            <Select
+              label={t('overview.periodFilter')}
+              value={range}
+              onChange={handleRangeChange}
+              options={rangeOptions()}
+            />
           </div>
         </div>
       ) : null}

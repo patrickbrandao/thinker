@@ -3,8 +3,6 @@ export default {
   pageTitle: 'Sessions - Thinker',
   metaDescription: 'Harness sessions: duration, requests, tokens and cost per session.',
   title: 'Sessions',
-  subtitle:
-    'Requests grouped by the session id each harness sends in its headers. Subagent sessions count toward their main session.',
   allHarnesses: 'All harnesses',
   total: '{{ count }} sessions',
   tokensInOut: '{{ input }} in · {{ output }} out',
@@ -16,8 +14,26 @@ export default {
     chart: 'Chart',
   },
   filter: {
+    running: 'Running',
     withErrors: 'With errors',
     withSubagents: 'With subagents',
+  },
+  liveAgents: 'Live agents',
+  liveAgentsHint: 'Open a new tab that watches every running session live',
+  wall: {
+    pageTitle: 'Live agents - Thinker',
+    title: 'Live agents',
+    count: '{{ count }} running',
+    emptyTitle: 'No session running',
+    emptyBody:
+      'A tile opens here by itself as soon as a harness session has activity, and closes a minute after the session stops.',
+    finished: 'Ended',
+    waiting: '{{ count }} more waiting for a free tile',
+    waitingHint:
+      'At most {{ max }} tiles are live at once (each holds a connection to the server). Close a tile to open the next waiting session.',
+    pin: 'Keep this tile open',
+    unpin: 'Let this tile close when the session ends',
+    loadError: 'Could not load the running sessions. Retrying…',
   },
   chart: {
     showing: 'Showing the {{ shown }} most active of {{ total }} sessions.',

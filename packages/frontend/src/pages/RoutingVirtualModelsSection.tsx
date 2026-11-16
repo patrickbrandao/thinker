@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import { GripVertical } from 'lucide-react';
 import VirtualModelCard from '../components/VirtualModelCard.js';
 import VirtualModelSnippetModal from '../components/VirtualModelSnippetModal.js';
-import { cx } from '../components/ui.js';
+import { ConfirmDialog, cx } from '../components/ui.js';
 import {
   deleteVirtualModel,
   listVirtualModels,
@@ -23,6 +23,7 @@ import { toast } from '../services/toast-store.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 import { deleteVirtualModelPrompt } from '../services/virtual-model-form.js';
+import { ROUTE_STATUS_CHANGED_EVENT } from '../services/api/route-status.js';
 
 // The create/edit modal only mounts on click; keep it out of the route chunk.
 const VirtualModelModal = lazy(() => import('../components/VirtualModelModal.js'));
@@ -78,10 +79,20 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
     [props.agentName],
   );
   dataRef.current = list.data;
+  const reloadList = list.reload;
+  useEffect(() => {
+    const reload = () => void reloadList();
+    window.addEventListener(ROUTE_STATUS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(ROUTE_STATUS_CHANGED_EVENT, reload);
+  }, [reloadList]);
   const items: VirtualModel[] = list.data ?? [];
   const mutate = list.setData;
 
   const [modal, setModal] = useState<VirtualModel | 'new' | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Pick<VirtualModel, 'id' | 'name'> | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
   const [snippetFor, setSnippetFor] = useState<VirtualModel | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
@@ -132,12 +143,16 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
   };
 
   const handleDelete = async (vm: Pick<VirtualModel, 'id' | 'name'>) => {
+    setDeleting(true);
     try {
       await deleteVirtualModel(props.agentName, vm.id);
       mutate((prev) => prev?.filter((v) => v.id !== vm.id));
       toast.success(t('models.section.deleted', { name: vm.name }));
     } catch {
       // fetchMutate already showed the backend message.
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
     }
   };
 
@@ -234,9 +249,7 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
                   handleFallbacksUpdate(vm, routes)
                 }
                 onEdit={() => setModal(vm)}
-                onDelete={() => {
-                  if (confirm(deleteVirtualModelPrompt(vm.name))) void handleDelete(vm);
-                }}
+                onDelete={() => setPendingDelete(vm)}
                 onShowExample={() => setSnippetFor(vm)}
                 onMoveUp={index > 0 ? () => void reorder(index, index - 1) : undefined}
                 onMoveDown={
@@ -307,12 +320,23 @@ export default function RoutingVirtualModelsSection(props: RoutingVirtualModelsS
                 ? undefined
                 : (id: string) => {
                     setModal(null);
-                    void handleDelete({ id, name: modal.name });
+                    setPendingDelete({ id, name: modal.name });
                   }
             }
           />
         </Suspense>
       ) : null}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={t('models.vmCard.delete')}
+        message={pendingDelete ? deleteVirtualModelPrompt(pendingDelete.name) : ''}
+        confirmLabel={t('common.delete')}
+        danger
+        busy={deleting}
+        onConfirm={() => pendingDelete && void handleDelete(pendingDelete)}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       <div className="sr-only" role="status" aria-live="polite">
         {announcement}

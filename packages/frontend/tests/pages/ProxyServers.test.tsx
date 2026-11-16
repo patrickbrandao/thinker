@@ -5,7 +5,11 @@ import { MemoryRouter } from 'react-router';
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock('../../src/services/toast-store.js', () => ({ toast: toastMock }));
 
-const api = vi.hoisted(() => ({ listProxies: vi.fn(), updateProxy: vi.fn() }));
+const api = vi.hoisted(() => ({
+  listProxies: vi.fn(),
+  updateProxy: vi.fn(),
+  createProxy: vi.fn(),
+}));
 vi.mock('../../src/services/api/proxies.js', async (orig) => ({
   ...(await orig<object>()),
   ...api,
@@ -18,6 +22,9 @@ vi.mock('../../src/components/proxy/ProxyProfilesTab', () => ({
 vi.mock('../../src/components/proxy/ProviderDefaultsTab', () => ({
   default: () => <div data-testid="providers-tab" />,
 }));
+// The new-proxy window lives in the detail page module; its chart tabs aren't needed here.
+vi.mock('../../src/components/proxy/ProxyLogsTab', () => ({ default: () => null }));
+vi.mock('../../src/components/proxy/ProxyStatsTab', () => ({ default: () => null }));
 
 import ProxyServers from '../../src/pages/ProxyServers';
 import { setMe } from '../../src/services/session-store';
@@ -46,9 +53,24 @@ const alpha = proxyView({
   host: 'proxy-a.example.com',
   binding_count: 2,
   debug_enabled: true,
-  stats_7d: { connections: 1500, successes: 1490, failures: 10, avg_tunnel_ms: 41.6, bytes_sent: 0, bytes_received: 0 },
+  stats_7d: {
+    connections: 1500,
+    successes: 1490,
+    failures: 10,
+    avg_tunnel_ms: 41.6,
+    bytes_sent: 0,
+    bytes_received: 0,
+  },
 });
-const beta = proxyView({ id: 'p2', name: 'Beta', host: '::1', port: 8080, scheme: 'https', status: 'failing', enabled: false });
+const beta = proxyView({
+  id: 'p2',
+  name: 'Beta',
+  host: '::1',
+  port: 8080,
+  scheme: 'https',
+  status: 'failing',
+  enabled: false,
+});
 
 describe('ProxyServers page', () => {
   beforeEach(() => {
@@ -64,7 +86,9 @@ describe('ProxyServers page', () => {
   it('is admin-only: a member sees the notice and nothing is fetched', () => {
     asRole('member');
     renderPage();
-    expect(screen.getByText('Only admins and owners can see and manage proxy servers.')).toBeTruthy();
+    expect(
+      screen.getByText('Only admins and owners can see and manage proxy servers.'),
+    ).toBeTruthy();
     expect(screen.queryByRole('tablist')).toBeNull();
     expect(screen.queryByText('Add proxy server')).toBeNull();
     expect(api.listProxies).not.toHaveBeenCalled();
@@ -76,21 +100,53 @@ describe('ProxyServers page', () => {
     const link = await screen.findByRole('link', { name: 'Alpha' });
     expect(link.getAttribute('href')).toBe('/proxy-servers/p1');
     const row = link.closest('tr')!;
-    const cells = within(row).getAllByRole('cell').map((c) => c.textContent);
-    expect(cells.slice(0, 7)).toEqual(['AlphaDebug', 'http://proxy-a.example.com:3128', 'Healthy', '1.5k', '10', '42 ms', '2']);
-    expect(within(row).getByRole('switch', { name: 'Enable Alpha' }).getAttribute('aria-checked')).toBe('true');
+    const cells = within(row)
+      .getAllByRole('cell')
+      .map((c) => c.textContent);
+    expect(cells.slice(0, 7)).toEqual([
+      'AlphaDebug',
+      'http://proxy-a.example.com:3128',
+      'Healthy',
+      '1.5k',
+      '10',
+      '42 ms',
+      '2',
+    ]);
+    expect(
+      within(row).getByRole('switch', { name: 'Enable Alpha' }).getAttribute('aria-checked'),
+    ).toBe('true');
 
     const second = screen.getByRole('link', { name: 'Beta' }).closest('tr')!;
-    const c2 = within(second).getAllByRole('cell').map((c) => c.textContent);
+    const c2 = within(second)
+      .getAllByRole('cell')
+      .map((c) => c.textContent);
     // No stats yet: zeros and a dash, IPv6 host bracketed.
     expect(c2.slice(0, 7)).toEqual(['Beta', 'https://[::1]:8080', 'Failing', '0', '0', '—', '0']);
-    expect(within(second).getByRole('switch', { name: 'Enable Beta' }).getAttribute('aria-checked')).toBe('false');
+    expect(
+      within(second).getByRole('switch', { name: 'Enable Beta' }).getAttribute('aria-checked'),
+    ).toBe('false');
   });
 
-  it('has an Add proxy server link to the creation page', async () => {
+  it('adds a proxy server in a floating window without leaving the list', async () => {
+    api.createProxy.mockResolvedValue({ ...alpha, id: 'p-new', name: 'Gamma' });
     renderPage();
     await screen.findByText('Alpha');
-    expect(screen.getByRole('link', { name: 'Add proxy server' }).getAttribute('href')).toBe('/proxy-servers/new');
+    fireEvent.click(screen.getByRole('button', { name: 'Add proxy server' }));
+    const dialog = screen.getByRole('dialog', { name: t('proxies.form.createTitle') });
+    expect(dialog.getAttribute('aria-modal')).toBe('false');
+    // The list stays on screen behind the window.
+    expect(screen.getByText('Alpha')).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText(t('proxies.form.name')), {
+      target: { value: 'Gamma' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(t('proxies.form.host')), {
+      target: { value: 'gamma.local' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: t('proxies.form.createSubmit') }));
+    await waitFor(() => expect(api.createProxy).toHaveBeenCalledTimes(1));
+    expect(api.createProxy.mock.calls[0][0]).toMatchObject({ name: 'Gamma', host: 'gamma.local' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.listProxies.mock.calls.length).toBeGreaterThan(1);
   });
 
   it('shows the global proxy from the environment and its bypass list', async () => {
@@ -126,7 +182,9 @@ describe('ProxyServers page', () => {
     await waitFor(() => expect(api.updateProxy).toHaveBeenCalledWith('p1', { enabled: false }));
     expect(toastMock.success).toHaveBeenCalledWith('Proxy server disabled');
     await waitFor(() =>
-      expect(screen.getByRole('switch', { name: 'Enable Alpha' }).getAttribute('aria-checked')).toBe('false'),
+      expect(
+        screen.getByRole('switch', { name: 'Enable Alpha' }).getAttribute('aria-checked'),
+      ).toBe('false'),
     );
     // The other row is untouched.
     expect(api.updateProxy).toHaveBeenCalledTimes(1);
@@ -151,21 +209,33 @@ describe('ProxyServers page', () => {
   it('switches between the three tabs by URL and marks the active one', async () => {
     const { unmount } = renderPage('/proxy-servers?tab=profiles');
     expect(await screen.findByTestId('profiles-tab')).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Outbound profiles' }).getAttribute('aria-selected')).toBe('true');
-    expect(screen.getByRole('tab', { name: 'Outbound profiles' }).getAttribute('href')).toBe('/proxy-servers?tab=profiles');
-    expect(screen.getByRole('tab', { name: 'Provider defaults' }).getAttribute('href')).toBe('/proxy-servers?tab=providers');
-    expect(screen.getByRole('tab', { name: 'Proxy servers' }).getAttribute('href')).toBe('/proxy-servers');
+    expect(
+      screen.getByRole('tab', { name: 'Outbound profiles' }).getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Outbound profiles' }).getAttribute('href')).toBe(
+      '/proxy-servers?tab=profiles',
+    );
+    expect(screen.getByRole('tab', { name: 'Provider defaults' }).getAttribute('href')).toBe(
+      '/proxy-servers?tab=providers',
+    );
+    expect(screen.getByRole('tab', { name: 'Proxy servers' }).getAttribute('href')).toBe(
+      '/proxy-servers',
+    );
     expect(api.listProxies).not.toHaveBeenCalled();
     unmount();
 
     const providers = renderPage('/proxy-servers?tab=providers');
     expect(await screen.findByTestId('providers-tab')).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Provider defaults' }).getAttribute('aria-selected')).toBe('true');
+    expect(
+      screen.getByRole('tab', { name: 'Provider defaults' }).getAttribute('aria-selected'),
+    ).toBe('true');
     providers.unmount();
 
     renderPage('/proxy-servers?tab=nonsense');
     expect(await screen.findByText('Alpha')).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Proxy servers' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Proxy servers' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
   });
 
   it('renders in pt-BR', async () => {
@@ -174,8 +244,10 @@ describe('ProxyServers page', () => {
     await screen.findByText('Alpha');
     expect(screen.getByRole('tab', { name: t('proxies.tabs.profiles') })).toBeTruthy();
     expect(t('proxies.tabs.profiles')).not.toBe('Outbound profiles');
-    expect(screen.getByRole('link', { name: t('proxies.create') })).toBeTruthy();
-    expect(screen.getByRole('switch', { name: t('proxies.list.toggle', { name: 'Alpha' }) })).toBeTruthy();
+    expect(screen.getByRole('button', { name: t('proxies.create') })).toBeTruthy();
+    expect(
+      screen.getByRole('switch', { name: t('proxies.list.toggle', { name: 'Alpha' }) }),
+    ).toBeTruthy();
     expect(screen.getByText(t('proxies.status.ok'))).toBeTruthy();
     expect(screen.queryByText('Healthy')).toBeNull();
   });

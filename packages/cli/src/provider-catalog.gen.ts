@@ -22,6 +22,12 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     authTypes: ['api_key', 'subscription'],
   },
   {
+    id: 'atlascloud',
+    displayName: 'Atlas Cloud',
+    aliases: ['atlas-cloud', 'atlas cloud'],
+    authTypes: ['api_key'],
+  },
+  {
     id: 'bedrock',
     displayName: 'AWS Bedrock',
     aliases: ['aws-bedrock', 'aws bedrock', 'amazon-bedrock', 'amazon bedrock'],
@@ -53,6 +59,12 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
   {
     id: 'deepseek',
     displayName: 'DeepSeek',
+    authTypes: ['api_key'],
+  },
+  {
+    id: 'edenai',
+    displayName: 'Eden AI',
+    aliases: ['eden-ai', 'eden ai'],
     authTypes: ['api_key'],
   },
   {
@@ -187,6 +199,11 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
   {
     id: 'openrouter',
     displayName: 'OpenRouter',
+    authTypes: ['api_key'],
+  },
+  {
+    id: 'requesty',
+    displayName: 'Requesty',
     authTypes: ['api_key'],
   },
   {

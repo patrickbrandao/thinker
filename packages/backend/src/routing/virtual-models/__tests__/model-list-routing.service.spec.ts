@@ -131,6 +131,17 @@ describe('ModelListRoutingService', () => {
     expect(providerKeyService.getRouteProviderRecords).toHaveBeenCalledWith('tenant-1', 'agent-1');
   });
 
+  it('keeps listing a virtual model with no route left when it continues on Default', async () => {
+    virtualModels.list.mockResolvedValue([
+      vmRow('gone', {
+        override_route: route('mistral', 'mistral-large'),
+        continue_on_default: true,
+      }),
+    ]);
+    const res = await service.forAgent('agent-1', 'tenant-1', CATALOG);
+    expect(res.virtuals.map((v) => v.name)).toEqual(['gone']);
+  });
+
   it('leaves a route of a disconnected provider out of the window', async () => {
     // Mistral is neither in the catalog nor among the agent's credential rows.
     virtualModels.list.mockResolvedValue([
@@ -140,10 +151,8 @@ describe('ModelListRoutingService', () => {
 
     const res = await service.forAgent('agent-1', 'tenant-1', CATALOG);
 
-    expect(res.virtuals).toEqual([
-      { name: 'mixed', context_length: 128000 },
-      { name: 'gone', context_length: null },
-    ]);
+    // "gone" has no route left and does not continue on Default: hidden.
+    expect(res.virtuals).toEqual([{ name: 'mixed', context_length: 128000 }]);
   });
 
   it('keeps the window unknown on cold discovery of a connected provider', async () => {

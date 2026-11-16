@@ -166,7 +166,7 @@ export class ProviderKeyService {
     route: ModelRoute,
     agentId?: string,
   ): Promise<boolean> {
-    if (!route.provider) return false;
+    if (!route.provider || route.disabled === true) return false;
     const keys = await this.getProviderKeys(tenantId, route.provider, route.authType, agentId);
     return keys.length > 0;
   }
@@ -345,6 +345,7 @@ export class ProviderKeyService {
             region: record.region,
             baseUrl: record.auth_type === 'api_key' ? (record.base_url ?? null) : null,
             baseUrlAllowsPrivate: record.allow_private_destination !== false,
+            urlOverrides: record.url_overrides ?? null,
             streamWarmupMs: record.stream_warmup_ms,
             streamIdleTimeoutMs: record.stream_idle_timeout_ms,
           },
@@ -362,6 +363,7 @@ export class ProviderKeyService {
           region: record.region,
           baseUrl: record.auth_type === 'api_key' ? (record.base_url ?? null) : null,
           baseUrlAllowsPrivate: record.allow_private_destination !== false,
+          urlOverrides: record.url_overrides ?? null,
           streamWarmupMs: record.stream_warmup_ms,
           streamIdleTimeoutMs: record.stream_idle_timeout_ms,
         },
@@ -425,6 +427,8 @@ export class ProviderKeyService {
    * legacy name-only behavior.
    */
   async isRouteAvailable(tenantId: string, route: ModelRoute, agentId?: string): Promise<boolean> {
+    // An administrator-disabled route stays in its chain but never serves.
+    if (route.disabled === true) return false;
     if (!route.provider) {
       return this.isModelAvailable(tenantId, route.model, agentId);
     }

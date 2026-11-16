@@ -17,6 +17,14 @@ vi.mock('../../src/services/model-display', () => ({
   preloadModelDisplayNames: vi.fn(),
 }));
 
+// The window manager lives in the app shell; "Watch live" needs it to render.
+vi.mock('../../src/components/live-session/LiveSessionWindows', () => ({
+  useLiveSessions: () => ({
+    openLiveSession: vi.fn(),
+    closeLiveSession: vi.fn(),
+    openSessionIds: [],
+  }),
+}));
 import Sessions from '../../src/pages/Sessions';
 import { resetLocaleForTests } from '../../src/i18n';
 
@@ -141,8 +149,9 @@ describe('Sessions page', () => {
     renderPage();
     const live = (await screen.findByText('a')).closest('tr')!;
     const old = screen.getByText('b').closest('tr')!;
-    expect(within(live).getByText('Active')).toBeTruthy();
-    expect(within(old).queryByText('Active')).toBeNull();
+    // Active sessions get "Watch live" with the blinking green dot inside.
+    expect(within(live).getByRole('button', { name: /Watch live/ })).toBeTruthy();
+    expect(within(old).queryByRole('button', { name: /Watch live/ })).toBeNull();
   });
 
   it('shows subagent and failure counts, and collapses models beyond two', async () => {
@@ -317,6 +326,43 @@ describe('Sessions page', () => {
         ),
       );
     });
+  });
+
+  it('has no intro text above the filters', async () => {
+    renderPage();
+    await screen.findByText('claude-dev');
+    expect(screen.queryByText(/Requests grouped by the session id/)).toBeNull();
+  });
+
+  it('"Running" sits before "With errors" and filters with running=1 / running=true', async () => {
+    renderPage();
+    await screen.findByText('claude-dev');
+    const chips = screen
+      .getAllByRole('button', { pressed: false })
+      .map((b) => b.textContent)
+      .filter((x) => x === 'Running' || x === 'With errors');
+    expect(chips).toEqual(['Running', 'With errors']);
+    fireEvent.click(screen.getByRole('button', { name: 'Running' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toContain('running=1'));
+    await waitFor(() =>
+      expect(mockGetSessions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ running: 'true', offset: '0' }),
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Running' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Running' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).not.toContain('running='));
+  });
+
+  it('"Live agents" opens the live wall in a new tab', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderPage();
+    await screen.findByText('claude-dev');
+    fireEvent.click(screen.getByRole('button', { name: 'Live agents' }));
+    expect(open).toHaveBeenCalledWith('/sessions/live', '_blank', 'noopener');
+    open.mockRestore();
   });
 
   it('sets the document title and meta description', async () => {

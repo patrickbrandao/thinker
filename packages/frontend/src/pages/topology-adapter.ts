@@ -131,6 +131,90 @@ const harnessHref = (name: string) => `/harnesses/${encodeURIComponent(name)}`;
 const providerName = (provider: string, fallback: string) =>
   PROVIDERS.find((p) => p.id === provider.toLowerCase())?.name ?? fallback;
 
+/** Provider types present in the topology, as select options sorted by label. */
+export function topologyProviderTypes(data: Topology): Array<{ value: string; label: string }> {
+  const seen = new Map<string, string>();
+  for (const p of data.providers) {
+    const key = p.provider.toLowerCase();
+    if (!seen.has(key)) seen.set(key, providerName(p.provider, p.name));
+  }
+  return [...seen]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * Narrows the topology to one harness and/or one provider type (empty: all).
+ * Keeps the chosen harnesses, the clients calling them, their connections of
+ * the chosen type and everything downstream of those connections.
+ */
+export function filterTopology(
+  data: Topology,
+  filter: { harness?: string; provider?: string },
+): Topology {
+  if (!filter.harness && !filter.provider) return data;
+  const harnessIds = new Set(data.harnesses.map((h) => h.id));
+  const providerIds = new Set(
+    data.providers
+      .filter((p) => !filter.provider || p.provider.toLowerCase() === filter.provider)
+      .map((p) => p.id),
+  );
+  const allProviders = new Set(data.providers.map((p) => p.id));
+  let harnesses = data.harnesses.filter((h) => !filter.harness || h.id === filter.harness);
+  if (filter.provider) {
+    const linked = new Set(
+      data.links
+        .filter((l) => providerIds.has(l.target) && harnessIds.has(l.source))
+        .map((l) => l.source),
+    );
+    harnesses = harnesses.filter((h) => linked.has(h.id));
+  }
+  const keep = new Set(harnesses.map((h) => h.id));
+  // Clients of the kept harnesses.
+  for (const l of data.links)
+    if (keep.has(l.target) && !harnessIds.has(l.source)) keep.add(l.source);
+  // Connections of the kept harnesses (of the chosen type), then downstream.
+  const queue: string[] = [];
+  for (const l of data.links) {
+    if (
+      harnessIds.has(l.source) &&
+      keep.has(l.source) &&
+      providerIds.has(l.target) &&
+      !keep.has(l.target)
+    ) {
+      keep.add(l.target);
+      queue.push(l.target);
+    }
+  }
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const l of data.links) {
+      if (
+        l.source !== id ||
+        keep.has(l.target) ||
+        harnessIds.has(l.target) ||
+        allProviders.has(l.target)
+      )
+        continue;
+      keep.add(l.target);
+      queue.push(l.target);
+    }
+  }
+  const only = <T extends { id: string }>(list: T[] | undefined) =>
+    list?.filter((n) => keep.has(n.id));
+  return {
+    ...data,
+    clients: only(data.clients)!,
+    harnesses: only(data.harnesses)!,
+    providers: only(data.providers)!,
+    proxies: only(data.proxies)!,
+    servers: only(data.servers)!,
+    egress: only(data.egress)!,
+    destinations: only(data.destinations),
+    links: data.links.filter((l) => keep.has(l.source) && keep.has(l.target)),
+  };
+}
+
 function linkTooltip(l: TopologyLink): string | undefined {
   const lines: string[] = [];
   for (const m of [...(l.models ?? [])].sort((a, b) => b.requests - a.requests)) {

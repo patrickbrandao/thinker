@@ -8,7 +8,11 @@ import { TierService } from '../routing-core/tier.service';
 import { SpecificityService } from '../routing-core/specificity.service';
 import { ProviderKeyService } from '../routing-core/provider-key.service';
 import { VirtualModelService } from './virtual-model.service';
-import { virtualModelContextLength, type RouteSnapshot } from './virtual-model-chain';
+import {
+  virtualModelContextLength,
+  virtualModelRoutable,
+  type RouteSnapshot,
+} from './virtual-model-chain';
 import { autoContextLength } from './model-list-context';
 import { collectLinkedRoutes } from './model-list-scope';
 
@@ -77,8 +81,18 @@ export class ModelListRoutingService {
       ? await this.specificityService.getActiveAssignments(agentId)
       : [];
 
-    const enabled = rows.filter((row) => row.enabled);
     const defaultTier = tiers.find((t) => t.tier === DEFAULT_TIER_SLOT) ?? null;
+    // A virtual model whose own routes are all out of service or disabled is
+    // left out, unless it continues on the Default tier (then it still routes
+    // like `auto`). The proxy keeps answering its name with M301.
+    const listed = await Promise.all(
+      rows.map(
+        async (row) =>
+          row.enabled &&
+          (row.continue_on_default || (await virtualModelRoutable(row, defaultTier, snapshot))),
+      ),
+    );
+    const enabled = rows.filter((_, i) => listed[i]);
     const contextLengths = await Promise.all(
       enabled.map((row) => virtualModelContextLength(row, defaultTier, snapshot)),
     );

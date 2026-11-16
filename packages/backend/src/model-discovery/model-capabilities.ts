@@ -12,10 +12,12 @@ const DEFAULT_MODALITIES: readonly ModelModality[] = ['text'];
 
 const STREAMING_ENDPOINT_PROVIDERS = new Set([
   'anthropic',
+  'atlascloud',
   'byteplus',
   'commandcode',
   'copilot',
   'deepseek',
+  'edenai',
   'fireworks',
   'gemini',
   'groq',
@@ -33,6 +35,7 @@ const STREAMING_ENDPOINT_PROVIDERS = new Set([
   'opencode',
   'openrouter',
   'qwen',
+  'requesty',
   'xai',
   'xiaomi',
   'zai',

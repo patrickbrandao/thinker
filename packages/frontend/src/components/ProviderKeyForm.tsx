@@ -1,5 +1,5 @@
 import { useProviderWizard } from './ProviderWizard.js';
-import AccountBaseUrlField from './AccountBaseUrlField.js';
+import { collectUrlOverrides, useUrlsScope } from './ConnectionUrlsScope.js';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ListPlus, Trash2 } from 'lucide-react';
 import { MAX_KEYS_PER_PROVIDER as SHARED_MAX_KEYS_PER_PROVIDER } from 'thinker-shared';
@@ -22,7 +22,7 @@ import {
 import { suggestNextProviderKeyLabel } from '../services/provider-key-labels.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
-import { Button, cx } from './ui.js';
+import { Button, WindowFooter, cx } from './ui.js';
 
 export const MAX_KEYS_PER_PROVIDER = SHARED_MAX_KEYS_PER_PROVIDER;
 const MAX_LABEL_LENGTH = 50;
@@ -108,6 +108,7 @@ function TrashIcon() {
 const ProviderKeyForm = (props: ProviderKeyFormProps) => {
   const { provDef, provId, isSubMode, connected, selectedAuthType } = props;
   const wizard = useProviderWizard();
+  const urlsScope = useUrlsScope();
   const isPopupOAuth = provDef.subscriptionAuthMode === 'popup_oauth';
   const shouldRevokeOpenaiOAuth =
     provId === 'openai' && isPopupOAuth && selectedAuthType === 'subscription';
@@ -299,6 +300,8 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
       props.setValidationError(result.error!);
       return;
     }
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
 
     props.setBusy(true);
     try {
@@ -308,6 +311,7 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         authType: selectedAuthType,
         ...(endpointRegionPayload && { region: endpointRegionPayload }),
         ...(label && { label }),
+        ...(urlOverrides && { urlOverrides }),
       });
       toast.success(t('providerSetup.shared.connected', { name: provDef.name }));
       props.onBack();
@@ -384,17 +388,14 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
   // validate paste tokens with a different prefix/format than their api_key
   // counterparts. Branch the validator so the chain-add flow doesn't reject
   // a valid setup token using the api-key rules.
-  const handleAddKey = async (
-    label: string,
-    apiKey: string,
-    region?: string,
-    accountBaseUrl?: string,
-  ) => {
+  const handleAddKey = async (label: string, apiKey: string, region?: string) => {
     const result = validateKey(apiKey);
     if (!result.valid) {
       toast.error(result.error!);
       return false;
     }
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return false;
     props.setBusy(true);
     try {
       await connectProvider(props.agentName, {
@@ -403,7 +404,7 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         authType: selectedAuthType,
         label,
         ...(region && { region }),
-        ...(accountBaseUrl && { accountBaseUrl }),
+        ...(urlOverrides && { urlOverrides }),
       });
       toast.success(t('providerSetup.keyForm.keyAdded', { name: provDef.name, label }));
       props.onUpdate();
@@ -468,9 +469,6 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
         hint={startKey && startKey === freeKey ? freeKeyHint : null}
         initialEndpointRegion={preset.endpointRegion}
         lockEndpointRegion={!!preset.endpointRegion}
-        baseUrlFor={
-          !isSubMode && !provId.startsWith('custom:') && !provDef.noKeyRequired ? provId : undefined
-        }
         onCancel={wizard?.onBack}
         cancelLabel={wizard?.onBack ? t('providerSetup.wizard.back') : undefined}
         bare
@@ -644,12 +642,7 @@ const ProviderKeyForm = (props: ProviderKeyFormProps) => {
 
 /** @internal Exported for testing only. */
 export interface AddAnotherKeyActionProps {
-  onAdd: (
-    label: string,
-    apiKey: string,
-    region?: string,
-    accountBaseUrl?: string,
-  ) => Promise<boolean>;
+  onAdd: (label: string, apiKey: string, region?: string) => Promise<boolean>;
   busy: boolean;
   setBusy: SetValue<boolean>;
   provDef: ProviderDef;
@@ -674,8 +667,6 @@ export interface AddAnotherKeyActionProps {
   hint?: ReactNode;
   /** Hide the region select: the wizard's part 1 already fixed it. */
   lockEndpointRegion?: boolean;
-  /** Provider id whose official base URL the optional "Base URL" field shows. */
-  baseUrlFor?: string;
   /** Replaces closing the form (the wizard goes back to part 1). */
   onCancel?: () => void;
   cancelLabel?: string;
@@ -694,7 +685,6 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
     props.initialEndpointRegion ?? props.endpointRegions?.[0]?.value,
   );
   const [customEndpointUrl, setCustomEndpointUrl] = useState('');
-  const [accountBaseUrl, setAccountBaseUrl] = useState('');
   const apiKeyInputRef = useRef<HTMLInputElement>(null);
   const prevOpen = useRef<boolean | undefined>(undefined);
 
@@ -707,6 +697,13 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
   const customEndpointPayload = !selectedEndpointRegionOption?.baseUrlPlaceholder
     ? endpointRegion
     : customEndpointUrl.trim() || undefined;
+
+  // The URLs tab shows the defaults of the chosen region.
+  const urlsScope = useUrlsScope();
+  const slotRegion = selectedEndpointRegionOption?.baseUrlPlaceholder ? undefined : endpointRegion;
+  useEffect(() => {
+    urlsScope?.setRegion(slotRegion);
+  }, [urlsScope, slotRegion]);
 
   // Sync the label suggestion and region when opened (also from outside) and
   // focus the key field. Runs on open changes only, so typing never steals focus.
@@ -739,12 +736,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
       toast.error(t('providerSetup.keyForm.nameTaken', { label: labelToUse }));
       return;
     }
-    const ok = await props.onAdd(
-      labelToUse,
-      apiKey.trim(),
-      customEndpointPayload,
-      accountBaseUrl.trim() || undefined,
-    );
+    const ok = await props.onAdd(labelToUse, apiKey.trim(), customEndpointPayload);
     if (ok) {
       setIsOpen(false);
       setLabel('');
@@ -773,6 +765,23 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
   }
 
   const baseUrlPlaceholder = selectedEndpointRegionOption?.baseUrlPlaceholder;
+  // Bare (a new-connection window): the buttons go to the window's fixed footer.
+  const actions = (
+    <div className={cx('flex w-full justify-between gap-2', !props.bare && 'mt-3')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => (props.onCancel ? props.onCancel() : setIsOpen(false))}
+        disabled={props.busy}
+      >
+        {props.cancelLabel ?? t('common.cancel')}
+      </Button>
+      <Button size="sm" busy={props.busy} disabled={!apiKey.trim()} onClick={() => void submit()}>
+        {props.submitLabel ?? t('providerSetup.keyForm.addKey')}
+      </Button>
+    </div>
+  );
+
   return (
     <div className={cx('flex flex-col', !props.bare && 'well mt-3')}>
       <label className="label" htmlFor="add-key-label">
@@ -871,28 +880,7 @@ export function AddAnotherKeyAction(props: AddAnotherKeyActionProps) {
         owner={props.credentialOwnerName}
         noun={props.credentialNoun}
       />
-      {props.baseUrlFor ? (
-        <AccountBaseUrlField
-          provider={props.baseUrlFor}
-          region={customEndpointPayload}
-          value={accountBaseUrl}
-          onChange={setAccountBaseUrl}
-          disabled={props.busy}
-        />
-      ) : null}
-      <div className="mt-3 flex justify-between gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => (props.onCancel ? props.onCancel() : setIsOpen(false))}
-          disabled={props.busy}
-        >
-          {props.cancelLabel ?? t('common.cancel')}
-        </Button>
-        <Button size="sm" busy={props.busy} disabled={!apiKey.trim()} onClick={() => void submit()}>
-          {props.submitLabel ?? t('providerSetup.keyForm.addKey')}
-        </Button>
-      </div>
+      {props.bare ? <WindowFooter>{actions}</WindowFooter> : actions}
     </div>
   );
 }
@@ -920,6 +908,7 @@ interface KeyChainViewProps {
 }
 
 function KeyChainView(props: KeyChainViewProps) {
+  const urlsScope = useUrlsScope();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -976,6 +965,8 @@ function KeyChainView(props: KeyChainViewProps) {
       toast.error(result.error!);
       return false;
     }
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return false;
     props.setBusy(true);
     try {
       await connectProvider(props.agentName, {
@@ -984,6 +975,7 @@ function KeyChainView(props: KeyChainViewProps) {
         authType: props.authType,
         label,
         ...(region && { region }),
+        ...(urlOverrides && { urlOverrides }),
       });
       toast.success(t('providerSetup.keyForm.keyAdded', { name: props.provDef.name, label }));
       props.onUpdate();

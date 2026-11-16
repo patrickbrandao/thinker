@@ -399,7 +399,7 @@ describe('ModelDiscoveryService', () => {
         'decrypted-key',
         'api_key',
         'https://bedrock-mantle.eu-west-1.api.aws',
-        { previousModels: cached },
+        { previousModels: cached, region: 'eu-west-1' },
       );
     });
 
@@ -416,7 +416,7 @@ describe('ModelDiscoveryService', () => {
         'decrypted-key',
         'api_key',
         'https://bedrock-mantle.us-east-1.api.aws',
-        { forceRefresh: true, previousModels: [] },
+        { forceRefresh: true, previousModels: [], region: 'us-east-1' },
       );
     });
 
@@ -2582,6 +2582,10 @@ describe('ModelDiscoveryService', () => {
 
       expect(mockCopilotTokenService.getCopilotToken).toHaveBeenCalledWith(
         'ghu_github_oauth_token',
+        expect.objectContaining({
+          url: 'https://api.github.com/copilot_internal/v2/token',
+          overridden: false,
+        }),
       );
       expect(fetcher.fetch).toHaveBeenCalledWith(
         'copilot',

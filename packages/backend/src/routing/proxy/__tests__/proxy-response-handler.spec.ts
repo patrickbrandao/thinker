@@ -2108,6 +2108,7 @@ describe('proxy-response-handler', () => {
       expect(usage).toEqual({
         prompt_tokens: 50,
         completion_tokens: 12,
+        response_model: 'claude-sonnet-4-5-20250929',
         cache_read_tokens: undefined,
         cache_creation_tokens: 0,
       });

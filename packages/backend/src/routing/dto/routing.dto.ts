@@ -14,6 +14,7 @@ import {
   ValidateBy,
   ValidateIf,
   IsInt,
+  IsObject,
   Min,
   Max,
 } from 'class-validator';
@@ -54,6 +55,11 @@ export class ModelRouteDto {
   @MaxLength(MAX_PROVIDER_KEY_LABEL_LENGTH)
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   keyLabel?: string;
+
+  /** Echoed back from a read; the stored flag wins for routes already in the chain. */
+  @IsOptional()
+  @IsBoolean()
+  disabled?: boolean;
 }
 
 export class AgentNameParamDto {
@@ -119,6 +125,14 @@ export class ConnectProviderDto {
   @IsString()
   @MaxLength(2048)
   accountBaseUrl?: string;
+
+  /**
+   * The connection's editable URLs (ADR 0012): slot id → URL. Wins over
+   * `accountBaseUrl` for the `inference` slot. Validated by checkUrlOverrides.
+   */
+  @IsOptional()
+  @IsObject()
+  urlOverrides?: Record<string, string | null>;
 
   @IsOptional()
   @IsString()
@@ -299,6 +313,12 @@ export class SetBaseUrlDto {
   @IsString()
   @MaxLength(2048)
   base_url!: string | null;
+}
+
+/** `PATCH /api/v1/providers/connections/:id/urls`: slot id → URL, null = back to the default. */
+export class SetUrlOverridesDto {
+  @IsObject()
+  overrides!: Record<string, string | null>;
 }
 
 export function responseModeFromDto(body: SetResponseModeDto): ResponseMode | undefined {

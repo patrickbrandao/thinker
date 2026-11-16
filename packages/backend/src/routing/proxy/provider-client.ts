@@ -9,9 +9,18 @@ import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
 import {
   PROVIDER_ENDPOINTS,
   ProviderEndpoint,
+  buildEndpointOverride,
+  buildSlotEndpoint,
   resolveBedrockEndpointKey,
   resolveEndpointKey,
 } from './provider-endpoints';
+import { CustomProviderService } from '../custom-provider/custom-provider.service';
+import {
+  effectiveUrlOverrides,
+  inferenceSlotForEndpoint,
+  resolveProviderUrl,
+  type ProviderUrlConnection,
+} from '../provider-urls/provider-urls';
 import { applyParamPolicy } from './param-policy';
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { ssrfSafeFetch } from '../../common/utils/ssrf-safe-fetch';
@@ -76,7 +85,10 @@ import {
 import { ProviderModelRegistryService } from '../../model-discovery/provider-model-registry.service';
 import { qualifyChatGptResponse } from './chatgpt-response-qualifier';
 import { isBedrockProvider } from '../bedrock-region';
-import { getBedrockRuntimeCapabilities } from '../bedrock-runtime-capabilities';
+import {
+  bedrockRuntimeChatNeedsResponses,
+  getBedrockRuntimeCapabilities,
+} from '../bedrock-runtime-capabilities';
 
 export interface ForwardResult {
   response: Response;
@@ -431,6 +443,7 @@ export class ProviderClient {
       model,
       opts.apiMode,
       body,
+      opts.urls,
     );
     const isGoogle = endpoint.format === 'google';
     const isAnthropic = endpoint.format === 'anthropic';
@@ -468,6 +481,15 @@ export class ProviderClient {
         signal,
         timeoutMs: PROVIDER_TIMEOUT_MS,
         extraHeaders,
+        ...(endpoint.requiresSsrfRevalidation
+          ? {
+              endpoint: {
+                url: endpoint.baseUrl,
+                overridden: true,
+                allowPrivate: endpoint.allowPrivateDestination !== false,
+              },
+            }
+          : {}),
       });
       const response = timeProviderResponse(kiroResponse, opts.attempt);
       return {
@@ -536,6 +558,8 @@ export class ProviderClient {
       attempt?.startRecording?.({
         requestBody,
         wireFormat: resolvedWireFormat,
+        url,
+        headers: finalHeaders,
       });
     }
     this.logger.debug(`Forwarding to ${endpointKey}: ${url.replace(/key=[^&]+/, 'key=***')}`);
@@ -614,10 +638,74 @@ export class ProviderClient {
     model: string,
     apiMode: ForwardOptions['apiMode'],
     body?: Record<string, unknown>,
+    urls?: ProviderUrlConnection,
   ): Promise<{ endpoint: ProviderEndpoint; endpointKey: string }> {
-    if (customEndpoint) {
-      return { endpoint: customEndpoint, endpointKey: 'custom' };
+    // Runtime Chat Completions rejects function tools next to reasoning on GPT
+    // profiles, so those chat requests go to Runtime Responses instead.
+    // `THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES=false` turns it off.
+    const viaResponses =
+      body !== undefined &&
+      isBedrockProvider(provider) &&
+      (apiMode === undefined || apiMode === 'chat_completions') &&
+      process.env.THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES !== 'false' &&
+      bedrockRuntimeChatNeedsResponses(model, body);
+    // A connection's own inference URL (ADR 0012) replaces the base only
+    // after the variant is chosen for the model, so the format choice below
+    // (Responses, Anthropic, Google, Mantle or Runtime) still applies. An
+    // override beats the region endpoint.
+    const ownInference =
+      urls !== undefined &&
+      !CustomProviderService.isCustom(provider) &&
+      Object.keys(effectiveUrlOverrides(urls)).some((slot) => slot.startsWith('inference'));
+    if (customEndpoint && !ownInference) return this.regionEndpoint(customEndpoint, viaResponses);
+    const native = await this.resolveNativeEndpointKey(
+      provider,
+      authType,
+      model,
+      apiMode,
+      body,
+      viaResponses,
+    );
+    if (ownInference) {
+      const target = resolveProviderUrl(urls, inferenceSlotForEndpoint(native));
+      if (target?.overridden) {
+        return {
+          endpoint: buildSlotEndpoint(target.url, native, target.allowPrivate),
+          endpointKey: native,
+        };
+      }
+      if (customEndpoint) return this.regionEndpoint(customEndpoint, viaResponses);
     }
+    return { endpoint: PROVIDER_ENDPOINTS[native], endpointKey: native };
+  }
+
+  /** A stored-region (or custom provider) endpoint, as resolveForwardEndpoint built it. */
+  private regionEndpoint(
+    customEndpoint: ProviderEndpoint,
+    viaResponses: boolean,
+  ): { endpoint: ProviderEndpoint; endpointKey: string } {
+    // A stored-region connection arrives as the Runtime chat override; swap
+    // it for the Responses template on the same host.
+    if (viaResponses && customEndpoint.format === 'openai') {
+      const responsesEndpoint = buildEndpointOverride(
+        customEndpoint.baseUrl,
+        'bedrock-runtime-responses',
+      );
+      responsesEndpoint.allowPrivateDestination = customEndpoint.allowPrivateDestination;
+      return { endpoint: responsesEndpoint, endpointKey: 'custom' };
+    }
+    return { endpoint: customEndpoint, endpointKey: 'custom' };
+  }
+
+  /** The endpoint key a model of this provider goes to: the per-model variant. */
+  private async resolveNativeEndpointKey(
+    provider: string,
+    authType: string | undefined,
+    model: string,
+    apiMode: ForwardOptions['apiMode'],
+    body: Record<string, unknown> | undefined,
+    viaResponses: boolean,
+  ): Promise<string> {
     let resolved = resolveEndpointKey(provider);
     if (!resolved) {
       throw new Error(`No endpoint configured for provider: ${provider}`);
@@ -627,7 +715,7 @@ export class ProviderClient {
       if (override) resolved = override;
     }
     if (resolved === 'bedrock') {
-      resolved = resolveBedrockEndpointKey(model, apiMode);
+      resolved = resolveBedrockEndpointKey(model, viaResponses ? 'responses' : apiMode);
     }
     if (resolved === 'qwen-subscription') {
       const bareQwenModel = stripVendorPrefix(model);
@@ -675,7 +763,7 @@ export class ProviderClient {
         resolved = 'commandcode-anthropic';
       }
     }
-    return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved };
+    return resolved;
   }
 
   /**
@@ -904,10 +992,12 @@ export class ProviderClient {
                 endpointKey === 'openai-subscription' ||
                 endpointKey === 'openai-responses' ||
                 endpointKey === 'xai-responses',
-              // Only OpenAI infrastructure is known to accept
-              // reasoning.summary; other Responses backends may 400 on it.
+              // Only OpenAI infrastructure and Bedrock Runtime are known to
+              // accept reasoning.summary; other Responses backends may 400 on it.
               mapReasoningEffort:
-                endpointKey === 'openai-subscription' || endpointKey === 'openai-responses',
+                endpointKey === 'openai-subscription' ||
+                endpointKey === 'openai-responses' ||
+                endpoint.acceptsReasoningSummary === true,
             });
       if (endpointKey === 'xai-responses' || endpoint.acceptsPromptCacheKey) {
         applyHashedPromptCacheKey(requestBody, ctx.providerCacheKey);

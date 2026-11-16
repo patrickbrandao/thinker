@@ -27,6 +27,7 @@ import { ModelsDevReasoningCatalog } from './reasoning-model-catalog';
 import { CodexSessionAffinity } from './codex-session-affinity';
 import { ProxyExceptionFilter } from './proxy-exception.filter';
 import { AttemptRecordingService } from './attempt-recording.service';
+import { LiveSessionModule } from '../../live-session/live-session.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AttemptRecordingService } from './attempt-recording.service';
     ResolveModule,
     CustomProviderModule,
     VirtualModelsModule,
+    LiveSessionModule,
   ],
   controllers: [ProxyController],
   providers: [

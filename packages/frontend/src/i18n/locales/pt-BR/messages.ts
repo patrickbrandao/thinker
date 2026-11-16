@@ -143,6 +143,8 @@ const ptBR: Catalog<typeof en> = {
   },
   drawer: {
     title: 'Requisição {{ id }}',
+    pin: 'Fixar janela (o próximo clique abre outra)',
+    unpin: 'Desafixar janela',
     close: 'Fechar',
     float: 'Destacar em janela flutuante',
     dock: 'Fixar na lateral',

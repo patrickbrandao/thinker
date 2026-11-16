@@ -53,6 +53,8 @@
   --ok-tint: rgb(21 128 61 / 0.1);
   --warn: #b45309;
   --warn-tint: rgb(180 83 9 / 0.12);
+  /* Dark orange: a chain that needs attention (no route can serve). */
+  --attention: #c2410c;
   --danger: #dc2626;
   --danger-tint: rgb(220 38 38 / 0.1);
   --info: #0e7490;
@@ -131,6 +133,7 @@
   --ok-tint: rgb(74 222 128 / 0.12);
   --warn: #fbbf24;
   --warn-tint: rgb(251 191 36 / 0.12);
+  --attention: #ea580c;
   --danger: #f87171;
   --danger-tint: rgb(248 113 113 / 0.12);
   --info: #22d3ee;

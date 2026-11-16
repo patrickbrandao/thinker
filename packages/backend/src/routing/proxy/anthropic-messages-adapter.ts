@@ -887,7 +887,9 @@ function closeStream(state: StreamState): string[] {
     formatMessagesEvent('message_delta', {
       type: 'message_delta',
       delta: {
-        stop_reason: state.stopReason ?? 'end_turn',
+        // Some upstreams end the stream without a finish_reason even after emitting
+        // tool calls; reporting end_turn would make the harness skip the tools.
+        stop_reason: state.stopReason ?? (state.toolCalls.size > 0 ? 'tool_use' : 'end_turn'),
         stop_sequence: null,
       },
       usage: state.finalUsage ?? toAnthropicUsage({}),

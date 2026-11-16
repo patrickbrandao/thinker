@@ -11,6 +11,7 @@ import {
   EmptyState,
   Field,
   FloatingWindow,
+  WindowFooter,
   IconButton,
   Kbd,
   Menu,
@@ -641,7 +642,35 @@ describe('FloatingWindow', () => {
         c
       </FloatingWindow>,
     );
-    expect(document.querySelector('.floating-window-foot')).toBeNull();
+    // The footer slot stays empty (hidden by CSS :empty) when nothing fills it.
+    expect(document.querySelector('.floating-window-foot')?.childNodes.length).toBe(0);
+  });
+
+  it('moves a WindowFooter into the fixed footer, outside the scrolling body', () => {
+    render(
+      <FloatingWindow open title="W" onClose={() => {}}>
+        <p>content</p>
+        <WindowFooter>
+          <button type="button">Save</button>
+        </WindowFooter>
+      </FloatingWindow>,
+    );
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save.closest('.floating-window-foot')).toBeTruthy();
+    expect(save.closest('.floating-window-body')).toBeNull();
+  });
+
+  it('renders a WindowFooter in place outside a window', () => {
+    render(
+      <div data-testid="host">
+        <WindowFooter>
+          <button type="button">Save</button>
+        </WindowFooter>
+      </div>,
+    );
+    expect(screen.getByTestId('host').contains(screen.getByRole('button', { name: 'Save' }))).toBe(
+      true,
+    );
   });
 
   it('closes with the X and with Escape; an outside click does not close it', () => {

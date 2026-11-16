@@ -83,6 +83,9 @@ export default function UserMenu() {
           <div className="text-[13px] font-semibold text-ink truncate">{name}</div>
           {user?.email ? <div className="text-xs text-muted truncate">{user.email}</div> : null}
         </div>
+        <MenuItem icon={<Settings />} to="/account">
+          {t('nav.accountPreferences')}
+        </MenuItem>
         <MenuSeparator />
         <MenuHeading>{t('shell.user.organization')}</MenuHeading>
         {org ? (
@@ -153,9 +156,6 @@ export default function UserMenu() {
           CLI
         </MenuItem>
         <MenuSeparator />
-        <MenuItem icon={<Settings />} to="/account">
-          {t('nav.accountPreferences')}
-        </MenuItem>
         <MenuItem icon={<LogOut />} danger onSelect={() => void signOut()}>
           {t('nav.logOut')}
         </MenuItem>

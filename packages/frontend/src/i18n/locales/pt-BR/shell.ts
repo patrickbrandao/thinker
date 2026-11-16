@@ -15,7 +15,7 @@ const shell: Catalog<typeof en> = {
   user: {
     organization: 'Organização',
     role: 'Seu papel: {{ role }}',
-    instanceAdmin: 'admin da instância',
+    instanceAdmin: 'super usuário',
     manageOrganization: 'Organização e membros',
     viewOrganization: 'Dados da organização',
     switchOrganization: 'Trocar de organização',
@@ -51,6 +51,10 @@ const shell: Catalog<typeof en> = {
     },
   },
   flow: {
+    harness: 'Harness',
+    allHarnesses: 'Todos os harnesses',
+    providerType: 'Tipo de provedor',
+    allProviders: 'Todos os provedores',
     subtitle:
       'Como as requisições saem dos clientes, passam pelos harnesses e provedores e chegam à internet.',
     empty: 'Nenhum harness ainda. Crie um e os provedores dele vão aparecer aqui.',

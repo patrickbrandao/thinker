@@ -16,7 +16,7 @@ describe('OpencodeOauthController', () => {
   };
   let resolveAgent: { resolve: jest.Mock };
   let providerService: { removeProvider: jest.Mock };
-  let providerKeys: { getProviderApiKey: jest.Mock };
+  let providerKeys: { selectProviderKey: jest.Mock };
 
   const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as TenantContext;
   const agent = { id: 'agent-1', tenant_id: 'tenant-1' };
@@ -29,7 +29,7 @@ describe('OpencodeOauthController', () => {
     };
     resolveAgent = { resolve: jest.fn().mockResolvedValue(agent) };
     providerService = { removeProvider: jest.fn().mockResolvedValue({ notifications: ['n1'] }) };
-    providerKeys = { getProviderApiKey: jest.fn() };
+    providerKeys = { selectProviderKey: jest.fn() };
     controller = new OpencodeOauthController(
       oauthService as unknown as OpencodeOauthService,
       resolveAgent as unknown as ResolveAgentService,
@@ -62,14 +62,14 @@ describe('OpencodeOauthController', () => {
     });
 
     it('resolves the agent inside the caller tenant and reads the stored OpenCode Go login', async () => {
-      providerKeys.getProviderApiKey.mockResolvedValue('stored-blob');
+      providerKeys.selectProviderKey.mockResolvedValue({ apiKey: 'stored-blob' });
       const usage = { rolling: null, weekly: null, monthly: null };
       oauthService.readGoUsage.mockResolvedValue(usage);
 
       const result = await controller.usage('my-agent', '  work  ', ctx);
 
       expect(resolveAgent.resolve).toHaveBeenCalledWith('tenant-1', 'my-agent');
-      expect(providerKeys.getProviderApiKey).toHaveBeenCalledWith(
+      expect(providerKeys.selectProviderKey).toHaveBeenCalledWith(
         'tenant-1',
         'opencode-go',
         'subscription',
@@ -87,26 +87,26 @@ describe('OpencodeOauthController', () => {
 
     it('scopes by the resolved agent tenant, not by the user id', async () => {
       resolveAgent.resolve.mockResolvedValue({ id: 'agent-9', tenant_id: 'tenant-9' });
-      providerKeys.getProviderApiKey.mockResolvedValue(null);
+      providerKeys.selectProviderKey.mockResolvedValue(null);
       await controller.usage('a', undefined, ctx);
-      expect(providerKeys.getProviderApiKey.mock.calls[0][0]).toBe('tenant-9');
-      expect(JSON.stringify(providerKeys.getProviderApiKey.mock.calls)).not.toContain('user-1');
+      expect(providerKeys.selectProviderKey.mock.calls[0][0]).toBe('tenant-9');
+      expect(JSON.stringify(providerKeys.selectProviderKey.mock.calls)).not.toContain('user-1');
     });
 
     it('returns a null usage when no login is stored, without calling the service', async () => {
-      providerKeys.getProviderApiKey.mockResolvedValue(null);
+      providerKeys.selectProviderKey.mockResolvedValue(null);
       await expect(controller.usage('a', undefined, ctx)).resolves.toEqual({ usage: null });
       expect(oauthService.readGoUsage).not.toHaveBeenCalled();
     });
 
     it('treats a blank label as no label', async () => {
-      providerKeys.getProviderApiKey.mockResolvedValue(null);
+      providerKeys.selectProviderKey.mockResolvedValue(null);
       await controller.usage('a', '   ', ctx);
-      expect(providerKeys.getProviderApiKey.mock.calls[0][3]).toBeUndefined();
+      expect(providerKeys.selectProviderKey.mock.calls[0][3]).toBeUndefined();
     });
 
     it('maps a usage failure to 503 with the error message', async () => {
-      providerKeys.getProviderApiKey.mockResolvedValue('blob');
+      providerKeys.selectProviderKey.mockResolvedValue({ apiKey: 'blob' });
       oauthService.readGoUsage.mockRejectedValue(new Error('OpenCode Go usage returned 500'));
       await expect(controller.usage('a', undefined, ctx)).rejects.toMatchObject({
         message: 'OpenCode Go usage returned 500',
@@ -115,7 +115,7 @@ describe('OpencodeOauthController', () => {
     });
 
     it('uses a generic message for a non-Error failure', async () => {
-      providerKeys.getProviderApiKey.mockResolvedValue('blob');
+      providerKeys.selectProviderKey.mockResolvedValue({ apiKey: 'blob' });
       oauthService.readGoUsage.mockRejectedValue('boom');
       await expect(controller.usage('a', undefined, ctx)).rejects.toMatchObject({
         message: 'Failed to read OpenCode Go usage',
@@ -124,14 +124,14 @@ describe('OpencodeOauthController', () => {
     });
 
     it('never puts the stored credential in the response', async () => {
-      providerKeys.getProviderApiKey.mockResolvedValue('SECRET-TOKEN-BLOB');
+      providerKeys.selectProviderKey.mockResolvedValue({ apiKey: 'SECRET-TOKEN-BLOB' });
       oauthService.readGoUsage.mockResolvedValue({ rolling: null, weekly: null, monthly: null });
       const result = await controller.usage('a', undefined, ctx);
       expect(JSON.stringify(result)).not.toContain('SECRET-TOKEN-BLOB');
     });
 
     it('does not leak the credential through an error', async () => {
-      providerKeys.getProviderApiKey.mockResolvedValue('SECRET-TOKEN-BLOB');
+      providerKeys.selectProviderKey.mockResolvedValue({ apiKey: 'SECRET-TOKEN-BLOB' });
       oauthService.readGoUsage.mockRejectedValue(new Error('upstream failed'));
       const err = await controller.usage('a', undefined, ctx).catch((e) => e);
       expect(JSON.stringify(err.getResponse())).not.toContain('SECRET-TOKEN-BLOB');
@@ -156,6 +156,7 @@ describe('OpencodeOauthController', () => {
         'tenant-1',
         'user-1',
         'opencode-go',
+        undefined,
       );
       expect(result).toEqual({ flowId: 'f1' });
     });

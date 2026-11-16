@@ -113,7 +113,11 @@ export function timelineBucket(range: string | undefined): TimelineBucket {
  * with `root` and `agent_id`. Both look at the whole session (main and
  * subagents), like the totals shown in the list, not only inside the range.
  */
-function sessionFilters(filters: { hasErrors?: boolean; hasSubagents?: boolean }): string {
+function sessionFilters(filters: {
+  hasErrors?: boolean;
+  hasSubagents?: boolean;
+  running?: boolean;
+}): string {
   const sessionHas = (condition: string) => `EXISTS (
            SELECT 1 FROM requests x
             WHERE x.tenant_id = $1 AND x.agent_id IS NOT DISTINCT FROM s.agent_id
@@ -122,6 +126,15 @@ function sessionFilters(filters: { hasErrors?: boolean; hasSubagents?: boolean }
   const having: string[] = [];
   if (filters.hasErrors) having.push(sessionHas(sqlIsFailedStatus('x.status')));
   if (filters.hasSubagents) having.push(sessionHas('x.parent_session_id IS NOT NULL'));
+  // Running: activity in the last five minutes, the same rule the dashboard
+  // uses for "Watch live" (a request's end is its start plus its duration).
+  if (filters.running) {
+    having.push(
+      sessionHas(
+        `x.timestamp + make_interval(secs => COALESCE(x.duration_ms, 0) / 1000.0) > NOW() - INTERVAL '5 minutes'`,
+      ),
+    );
+  }
   return having.length ? `\n         HAVING ${having.join(' AND ')}` : '';
 }
 
@@ -180,6 +193,7 @@ export class SessionsService {
     agentName?: string;
     hasErrors?: boolean;
     hasSubagents?: boolean;
+    running?: boolean;
   }): Promise<SessionsTimeline> {
     const range = params.range || '24h';
     const bucket = timelineBucket(range);
@@ -237,6 +251,7 @@ export class SessionsService {
     agentName?: string;
     hasErrors?: boolean;
     hasSubagents?: boolean;
+    running?: boolean;
     limit: number;
     offset: number;
   }): Promise<{ items: SessionSummary[]; has_more: boolean }> {

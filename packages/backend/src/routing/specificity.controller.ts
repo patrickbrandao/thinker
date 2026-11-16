@@ -20,18 +20,21 @@ import {
 } from './dto/routing.dto';
 import { SetSpecificityOverrideDto, ToggleSpecificityDto } from './dto/specificity.dto';
 import { SPECIFICITY_CATEGORIES } from 'thinker-shared';
+import { RouteStatusService } from './route-status/route-status.service';
 
 @Controller('api/v1/routing')
 export class SpecificityController {
   constructor(
     private readonly specificityService: SpecificityService,
     private readonly resolveAgentService: ResolveAgentService,
+    private readonly routeStatus: RouteStatusService,
   ) {}
 
   @Get(':agentName/specificity')
   async getAssignments(@TenantCtx() ctx: TenantContext, @Param() params: AgentNameParamDto) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, params.agentName);
-    return this.specificityService.getAssignments(agent.id);
+    const rows = await this.specificityService.getAssignments(agent.id);
+    return this.routeStatus.withStatus(agent.tenant_id, agent.id, rows);
   }
 
   @Put(':agentName/specificity/:category')

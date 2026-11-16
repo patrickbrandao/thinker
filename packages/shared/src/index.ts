@@ -95,6 +95,21 @@ export {
   routeToLegacy,
 } from './model-route';
 export type { ModelRoute, LegacyOverrideTriple } from './model-route';
+export {
+  ROUTE_STATUSES,
+  ROUTE_CHAIN_KINDS,
+  isRouteDisabled,
+  combineRouteStatus,
+  withDisabled,
+} from './route-status';
+export type {
+  RouteStatus,
+  RouteStatusInfo,
+  RouteOutOfServiceReason,
+  ChainRouteStatus,
+  RouteChainKind,
+  SetRouteDisabledRequest,
+} from './route-status';
 export { applyRequestParamDefaults } from './request-params';
 export type { JsonValue, RequestParamDefaults } from './request-params';
 export { snapshotRequestParams } from './request-params-snapshot';
@@ -282,3 +297,36 @@ export type {
   SystemEventType,
   SystemEventView,
 } from './system-events';
+export {
+  emptyLiveState,
+  applyLiveEvent,
+  reduceLiveEvents,
+  liveProviderFrames,
+  liveSessionStatus,
+} from './live-session';
+export type {
+  LiveWireFormat,
+  LiveEventType,
+  LiveEvent,
+  LiveBlockType,
+  LiveSessionMeta,
+  LiveConversationMessage,
+  LiveUsage,
+  LiveBlock,
+  LiveAttemptStatus,
+  LiveAttempt,
+  LiveMessage,
+  LiveItem,
+  LiveState,
+  LiveSnapshotData,
+  LiveRequestStartedData,
+  LiveSessionStatus,
+} from './live-session';
+export { PROVIDER_URL_SLOTS, PROVIDER_URL_MAX_LENGTH, providerUrlSlots } from './provider-urls';
+export type {
+  ProviderUrlKind,
+  ProviderUrlCredential,
+  ProviderUrlAuthType,
+  ProviderUrlSlot,
+  ProviderUrlOverrides,
+} from './provider-urls';

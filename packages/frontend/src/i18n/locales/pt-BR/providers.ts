@@ -200,6 +200,8 @@ const ptBR: Catalog<typeof en> = {
   customForm: {
     estimatedPrice: 'Preço estimado. Pode não ser exato.',
     enterBaseUrl: 'Informe uma URL base primeiro',
+    baseUrlOnUrlsTab: 'Informe a URL base na guia URLs.',
+    urlsIntro: 'O endereço da API do provedor, usado na inferência e para buscar os modelos.',
     noModels: 'O servidor não retornou nenhum modelo',
     probeFailed: 'A consulta falhou',
     connectedToast: '{{ name }} conectado',

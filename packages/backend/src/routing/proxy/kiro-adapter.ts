@@ -3,7 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 import { mergeExtraHeaders } from './extra-headers';
-import { outboundFetch } from '../../common/outbound/outbound-proxy';
+import {
+  builtInProviderUrl,
+  fetchProviderUrl,
+  type ResolvedProviderUrl,
+} from '../provider-urls/provider-url-scope';
 
 export const KIRO_BASE_URL = 'https://q.us-east-1.amazonaws.com';
 export const KIRO_MODELS_TARGET = 'AmazonCodeWhispererService.ListAvailableModels';
@@ -1170,6 +1174,8 @@ export async function forwardKiroChat(opts: {
   signal?: AbortSignal;
   timeoutMs: number;
   extraHeaders?: Record<string, string>;
+  /** The connection's `inference` slot (ADR 0012); the built-in Kiro host otherwise. */
+  endpoint?: ResolvedProviderUrl;
 }): Promise<Response> {
   const timeoutSignal = AbortSignal.timeout(opts.timeoutMs);
   const fetchSignal = opts.signal ? AbortSignal.any([timeoutSignal, opts.signal]) : timeoutSignal;
@@ -1186,7 +1192,7 @@ export async function forwardKiroChat(opts: {
   // Kiro reports no token counts, so seed the estimated usage with the prompt
   // size of the conversation we are about to send.
   const promptTokens = estimateKiroPromptTokens(body);
-  const upstream = await outboundFetch(KIRO_BASE_URL, {
+  const upstream = await fetchProviderUrl(opts.endpoint ?? builtInProviderUrl(KIRO_BASE_URL), {
     method: 'POST',
     headers,
     body: JSON.stringify(body),

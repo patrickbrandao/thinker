@@ -12,11 +12,18 @@ import { analyticsPing } from '../services/sse.js';
 import { useResource } from '../lib/use-resource.js';
 import { useSignal } from '../lib/signal.js';
 import { t } from '../i18n/index.js';
-import { buildTopologyGraph, topologyLegend } from './topology-adapter.js';
+import {
+  buildTopologyGraph,
+  filterTopology,
+  topologyLegend,
+  topologyProviderTypes,
+} from './topology-adapter.js';
 import '../styles/canvas.css';
 
 const RANGE_KEY = 'thinker.topologyRange';
 const MODE_KEY = 'thinker.topologyMode';
+const HARNESS_KEY = 'thinker.topologyHarness';
+const PROVIDER_KEY = 'thinker.topologyProvider';
 /**
  * Recent: every node over the window. Traffic: only what carried it. Live:
  * requests in flight. Interval: requests that started or ended between two instants.
@@ -54,6 +61,23 @@ function savedMode(): Mode {
   }
 }
 
+function saved(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function remember(key: string, value: string) {
+  try {
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {
+    /* per-viewer convenience only */
+  }
+}
+
 function savedRange(): { count: number; unit: Unit } {
   try {
     return parseRange(localStorage.getItem(RANGE_KEY)) ?? { count: 24, unit: 'h' };
@@ -88,6 +112,9 @@ export default function Topology() {
     return () => clearTimeout(timer);
   }, [span]);
   const [mode, setMode] = useState<Mode>(savedMode);
+  // Narrow the canvas to one harness and/or one provider type ('' = all).
+  const [harnessFilter, setHarnessFilter] = useState(() => saved(HARNESS_KEY));
+  const [providerFilter, setProviderFilter] = useState(() => saved(PROVIDER_KEY));
   const live = mode === 'live';
   // Interval bounds as `datetime-local` values; the fetch waits for a valid pair.
   const [bounds, setBounds] = useState({ from: '', to: '' });
@@ -133,13 +160,30 @@ export default function Topology() {
     () =>
       topology.data
         ? buildTopologyGraph(
-            { ...topology.data, positions: { ...topology.data.positions, ...moved } },
+            {
+              ...filterTopology(topology.data, {
+                harness: harnessFilter,
+                provider: providerFilter,
+              }),
+              positions: { ...topology.data.positions, ...moved },
+            },
             { activeOnly: mode === 'traffic', live },
           )
         : { nodes: [], edges: [] },
-    [topology.data, mode, live, moved],
+    [topology.data, mode, live, moved, harnessFilter, providerFilter],
   );
   const legend = useMemo(() => topologyLegend(), []);
+  const harnessOptions = useMemo(
+    () =>
+      (topology.data?.harnesses ?? [])
+        .map((h) => ({ value: h.id, label: h.displayName || h.name }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [topology.data],
+  );
+  const providerOptions = useMemo(
+    () => (topology.data ? topologyProviderTypes(topology.data) : []),
+    [topology.data],
+  );
 
   const hint =
     topology.loading && !topology.data
@@ -188,6 +232,46 @@ export default function Topology() {
             {MODES.map((m) => (
               <option key={m} value={m}>
                 {t(`shell.flow.modes.${m}`)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="field stage-mode"
+            aria-label={t('shell.flow.harness')}
+            value={harnessFilter}
+            onChange={(e) => {
+              const next = e.currentTarget.value;
+              setHarnessFilter(next);
+              remember(HARNESS_KEY, next);
+            }}
+          >
+            <option value="">{t('shell.flow.allHarnesses')}</option>
+            {harnessFilter && !harnessOptions.some((o) => o.value === harnessFilter) ? (
+              <option value={harnessFilter}>{harnessFilter}</option>
+            ) : null}
+            {harnessOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="field stage-mode"
+            aria-label={t('shell.flow.providerType')}
+            value={providerFilter}
+            onChange={(e) => {
+              const next = e.currentTarget.value;
+              setProviderFilter(next);
+              remember(PROVIDER_KEY, next);
+            }}
+          >
+            <option value="">{t('shell.flow.allProviders')}</option>
+            {providerFilter && !providerOptions.some((o) => o.value === providerFilter) ? (
+              <option value={providerFilter}>{providerFilter}</option>
+            ) : null}
+            {providerOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>

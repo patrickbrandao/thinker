@@ -95,7 +95,9 @@ export default {
     requestSuccessRate:
       'Successful requests over all requests. Recovered requests count as successful.',
   },
+  periodFilter: 'Period filter',
   kpi: {
+    successfulRequests: 'Successful requests',
     successRate: 'Success rate',
     recoveredRequests: 'Recovered requests',
     recoveredByFallback: 'Recovered by Fallback',
@@ -105,6 +107,7 @@ export default {
     subjectRecovered: 'recovered requests',
     subjectRecoveredByFallback: 'requests recovered by fallback',
     subjectFailed: 'failed requests',
+    scopeConnection: 'View the {{ subject }} of this account',
     scopeHarness: "View this harness's {{ subject }}",
     scopeAll: 'View {{ subject }} across all harnesses',
   },
@@ -113,6 +116,8 @@ export default {
     recoveredRequests: 'Recovered requests',
     cost: 'Cost',
     tokenUsage: 'Token usage',
+    costUsd: 'Cost (US $)',
+    viewDetails: 'View details',
     loading: 'Loading chart…',
     noRequestData: 'No request data for this time range',
     noRecovered: 'No recovered requests in this time range',

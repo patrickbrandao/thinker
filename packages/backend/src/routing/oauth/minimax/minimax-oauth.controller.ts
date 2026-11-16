@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpException,
@@ -16,6 +17,7 @@ import { ProviderService } from '../../routing-core/provider.service';
 import { optionalTrimmedStringQuery } from '../core/query-params';
 import { MinRole } from '../../../common/decorators/roles.decorator';
 import { PROVIDER_CONNECTION_SCOPE } from '../../routing-core/resolve-agent.service';
+import { flowUrlConnection } from '../../provider-urls/provider-urls';
 
 @MinRole('admin', { includeReads: true })
 @UseInterceptors(OutboundProviderScope('minimax'))
@@ -32,6 +34,8 @@ export class MinimaxOauthController {
     @Query('agentName') agentName: string,
     @Query('region') region: string | undefined,
     @TenantCtx() ctx: TenantContext,
+    /** Slot id → URL (ADR 0012), for this login and its account. */
+    @Body('urlOverrides') urlOverrides?: unknown,
   ) {
     if (!agentName) {
       throw new HttpException('agentName query parameter is required', HttpStatus.BAD_REQUEST);
@@ -49,12 +53,14 @@ export class MinimaxOauthController {
       PROVIDER_CONNECTION_SCOPE,
     );
     const selectedRegion = region && isMinimaxRegion(region) ? region : 'global';
+    const urls = await flowUrlConnection('minimax', selectedRegion, urlOverrides, ctx);
     try {
       return await this.oauthService.startAuthorization(
         agent.id,
         agent.tenant_id,
         selectedRegion,
         ctx.userId,
+        urls,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start MiniMax OAuth';

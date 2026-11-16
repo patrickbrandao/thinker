@@ -156,6 +156,7 @@ export default function Alerts() {
             <table className="data alerts-table">
               <thead>
                 <tr>
+                  <th className="w-px whitespace-nowrap">{t('alerts.col.level')}</th>
                   <th>{t('alerts.col.event')}</th>
                   <th>{t('alerts.col.category')}</th>
                   <th>{t('alerts.col.actor')}</th>
@@ -166,11 +167,11 @@ export default function Alerts() {
               <tbody>
                 {data.events.map((e) => (
                   <tr key={e.id} className={cx(!e.read_at && 'is-unread')}>
+                    <td className="whitespace-nowrap">
+                      <Badge tone={LEVEL_TONE[e.level] ?? 'neutral'}>{levelLabel(e.level)}</Badge>
+                    </td>
                     <td>
-                      <div className="row-title flex items-center gap-2">
-                        <Badge tone={LEVEL_TONE[e.level] ?? 'neutral'}>{levelLabel(e.level)}</Badge>
-                        <span>{e.title}</span>
-                      </div>
+                      <div className="row-title">{e.title}</div>
                       {e.message ? <div className="row-sub">{e.message}</div> : null}
                       <div className="row-sub font-mono">{e.type}</div>
                     </td>

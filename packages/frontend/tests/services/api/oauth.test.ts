@@ -269,6 +269,28 @@ describe('oauth API client', () => {
     expect((init as RequestInit).method).toBe('POST');
   });
 
+  it('flow starts carry urlOverrides only when the URLs tab changed a slot', async () => {
+    const fetchMock = setupFetch({ url: 'https://claude.ai/oauth/authorize?state=s', state: 's' });
+    await oauth.startAnthropicOAuth('demo');
+    expect((fetchMock.mock.calls[0][1] as RequestInit).body).toBeUndefined();
+    await oauth.startAnthropicOAuth('demo', { oauth_token: 'https://mock.test/token' });
+    expect((fetchMock.mock.calls[1][1] as RequestInit).body).toBe(
+      JSON.stringify({ urlOverrides: { oauth_token: 'https://mock.test/token' } }),
+    );
+    await oauth.getDeviceCodeApi('kiro').start('demo', {
+      region: 'us-east-1',
+      urlOverrides: { oidc: 'https://oidc.mock.test' },
+    });
+    expect((fetchMock.mock.calls[2][1] as RequestInit).body).toBe(
+      JSON.stringify({ urlOverrides: { oidc: 'https://oidc.mock.test' } }),
+    );
+    await oauth.getOpenaiOAuthUrl('demo', { oauth_authorize: 'https://auth.mock.test' });
+    const url = new URL(fetchMock.mock.calls[3][0] as string);
+    expect(JSON.parse(url.searchParams.get('urlOverrides')!)).toEqual({
+      oauth_authorize: 'https://auth.mock.test',
+    });
+  });
+
   it('submitAnthropicOAuth POSTs the code/state pair as JSON', async () => {
     const fetchMock = setupFetch({ ok: true });
     await oauth.submitAnthropicOAuth('demo', 'auth-code-1', 'state-1');

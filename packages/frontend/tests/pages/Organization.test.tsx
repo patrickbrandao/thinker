@@ -13,8 +13,8 @@ vi.mock('../../src/services/api/organizations.js', () => ({
   addMember: (...a: unknown[]) => mockAddMember(...a),
   renameOrganization: vi.fn(),
   deleteOrganization: vi.fn(),
-  updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
+  listAdminUsers: vi.fn(),
 }));
 
 import { setMe } from '../../src/services/session-store';
@@ -47,38 +47,53 @@ describe('Organization page', () => {
     mockListMembers.mockResolvedValue({ members });
   });
 
-  it('lets an admin manage non-owners only, without rename or delete', async () => {
-    asRole('admin');
+  const renderAt = (tab?: string) =>
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[tab ? `/organization?tab=${tab}` : '/organization']}>
         <Organization />
       </MemoryRouter>,
     );
-    await screen.findByText('owner@x.io');
-    expect(screen.queryByLabelText('Role of owner@x.io')).toBeNull();
-    expect(screen.getByLabelText('Role of view@x.io')).toBeTruthy();
-    const options = Array.from(
-      (screen.getByLabelText('Role of view@x.io') as HTMLSelectElement).options,
-    ).map((o) => o.value);
-    expect(options).not.toContain('owner');
+
+  it('splits the sections into tabs without a Triggers section', async () => {
+    asRole('owner');
+    renderAt();
+    const tabs = screen.getAllByRole('tab').map((el) => el.textContent);
+    expect(tabs).toEqual(
+      expect.arrayContaining(['General', 'Log retention', 'API keys', 'Danger zone']),
+    );
+    expect(tabs.some((label) => label?.startsWith('Members'))).toBe(true);
+    expect(screen.queryByText('Open triggers')).toBeNull();
+    // Only the General tab shows on arrival.
+    expect(screen.getByLabelText('Organization name')).toBeTruthy();
     expect(screen.queryByText('Delete organization')).toBeNull();
-    expect(screen.getByLabelText('Organization name').hasAttribute('readonly')).toBe(true);
+    fireEvent.click(screen.getByRole('tab', { name: 'Danger zone' }));
+    expect(screen.getByText('Delete organization')).toBeTruthy();
+  });
+
+  it('lets an admin remove non-owners only, with no role editing and no delete tab', async () => {
+    asRole('admin');
+    renderAt('members');
+    await screen.findByText('owner@x.io');
+    expect(screen.queryByRole('tab', { name: 'Danger zone' })).toBeNull();
+    // Roles are read-only badges; members are only added or removed.
+    expect(screen.queryAllByRole('combobox').map((el) => el.id)).toEqual(['org-add-role']);
+    expect(screen.getAllByText('Remove')).toHaveLength(2);
+    const options = Array.from((screen.getByLabelText('Role') as HTMLSelectElement).options).map(
+      (o) => o.value,
+    );
+    expect(options).not.toContain('owner');
     expect(screen.getByText('Pending password change')).toBeTruthy();
   });
 
   it('is read-only for a viewer', async () => {
     asRole('viewer');
-    render(
-      <MemoryRouter>
-        <Organization />
-      </MemoryRouter>,
-    );
+    renderAt('members');
     await screen.findByText('owner@x.io');
     expect(screen.queryByRole('form', { name: 'Add member' })).toBeNull();
     expect(screen.queryByText('Remove')).toBeNull();
   });
 
-  it('shows the temporary password once after adding a member', async () => {
+  it('adds an existing account by email, with no name field', async () => {
     asRole('owner');
     mockAddMember.mockResolvedValue({
       member: {
@@ -86,28 +101,24 @@ describe('Organization page', () => {
         email: 'new@x.io',
         name: '',
         role: 'member',
-        mustChangePassword: true,
+        mustChangePassword: false,
       },
-      temporaryPassword: 'Temp-Pass-123',
+      temporaryPassword: null,
     });
-    render(
-      <MemoryRouter>
-        <Organization />
-      </MemoryRouter>,
-    );
+    renderAt('members');
     await screen.findByText('owner@x.io');
-    expect(screen.getByText('Delete organization')).toBeTruthy();
     const form = screen.getByRole('form', { name: 'Add member' });
+    expect(form.querySelectorAll('input')).toHaveLength(1);
     const email = form.querySelector('input[type="email"]') as HTMLInputElement;
     fireEvent.change(email, { target: { value: 'new@x.io' } });
     fireEvent.submit(form);
     await waitFor(() =>
-      expect(mockAddMember).toHaveBeenCalledWith('org-1', { email: 'new@x.io', role: 'member' }),
+      expect(mockAddMember).toHaveBeenCalledWith(
+        'org-1',
+        { email: 'new@x.io', role: 'member' },
+        { silent: true },
+      ),
     );
-    const box = await screen.findByTestId('temporary-password');
-    expect(box.textContent).toBe('Temp-Pass-123');
-    expect(box.closest('.well')?.querySelector('.copy-btn')).toBeTruthy();
-    fireEvent.click(screen.getByText('I saved it'));
     expect(screen.queryByTestId('temporary-password')).toBeNull();
   });
 });

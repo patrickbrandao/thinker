@@ -16,6 +16,8 @@ import {
   createTimeScaleRange,
   createFormatLegendTimestamp,
   formatLegendTokens,
+  formatAxisKTokens,
+  formatAxisDollars,
   isMultiDayRange,
   fillDailyGaps,
 } from '../services/chart-utils.js';
@@ -109,6 +111,8 @@ export default function MultiAgentTokenChart(props: MultiAgentTokenChartProps) {
     const bars = uPlot.paths.bars!({ size: [1, 20], gap: 2 });
     const multiDay = isMultiDayRange(range);
     const cost = latest.current.label === 'Cost';
+    // No label = token usage: the axis reads in thousands ("250k", "1,2m").
+    const tokens = !latest.current.label;
 
     const series: uPlot.Series[] = [
       { value: createFormatLegendTimestamp(range) },
@@ -129,9 +133,8 @@ export default function MultiAgentTokenChart(props: MultiAgentTokenChartProps) {
       ...axes[1]!,
       values: (u: uPlot, vals: number[]) =>
         vals.map((v) =>
-          // formatCost surfaces sub-cent values as "< $0.01" instead of
-          // rounding them to "$0.00".
-          cost ? (formatCost(v) ?? formatCost(0)!) : formatLegendTokens(u, v),
+          // Cost reads in plain dollars: the chart title carries "(US $)".
+          cost ? formatAxisDollars(v) : tokens ? formatAxisKTokens(v) : formatLegendTokens(u, v),
         ),
     };
 
@@ -208,7 +211,7 @@ export default function MultiAgentTokenChart(props: MultiAgentTokenChartProps) {
     el,
     data: props.timeseries,
     buildData,
-    structureKey: `${props.range}::${props.agents.join(',')}`,
+    structureKey: `${props.label ?? 'tokens'}::${props.range}::${props.agents.join(',')}`,
     buildChart,
   });
 
@@ -225,6 +228,15 @@ export default function MultiAgentTokenChart(props: MultiAgentTokenChartProps) {
         fmtVal={fmtVal}
         hostWidth={() => el.current?.clientWidth ?? 0}
       />
+      {/* Same legend row as the requests chart, so every view keeps one height. */}
+      <div className="rel-chart__legend flex flex-wrap justify-center gap-4 pt-2 text-xs text-muted">
+        {props.agents.map((agent) => (
+          <span key={agent} className="rel-chart__legend-item inline-flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm" style={{ background: colorFor(agent) }} />
+            {agent}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

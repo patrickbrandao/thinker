@@ -5,7 +5,7 @@
 # reuse an existing block before inventing one, and when a canonical rule
 # exists for a selector, edit THAT rule — never add a competing one.
 
-## Tokens (58 on :root, 50 dark overrides)
+## Tokens (59 on :root, 51 dark overrides)
 ### chart
 --chart-1: #2563eb | dark: #3b82f6
 --chart-2: #0d9488 | dark: #2dd4bf
@@ -20,6 +20,7 @@
 --accent-hover: #1d4ed8 | dark: #60a5fa
 --accent-soft: #1d4ed8 | dark: #7cb0fb
 --accent-tint: rgb(37 99 235 / 0.1) | dark: rgb(59 130 246 / 0.14)
+--attention: #c2410c | dark: #ea580c
 --bg: #f7f8fa | dark: #0f1115
 --bg-chrome: #f3f4f6 | dark: #0b0d11
 --bg-elev: #ffffff | dark: #161920
@@ -177,7 +178,7 @@ is-ok (base.css): is-ok
 is-outline (base.css): is-outline
 is-pulse (base.css): is-pulse
 is-round (canvas.css): is-round
-is-selected (base.css, canvas.css): is-selected
+is-selected (base.css, canvas.css, shell.css): is-selected
 is-selecting (canvas.css): is-selecting
 is-sink (canvas.css): is-sink
 is-success (shell.css): is-success
@@ -299,11 +300,12 @@ user-trigger (shell.css): user-trigger
 well (base.css): well
 wide (shell.css): wide
 
-## Primitives (19)
+## Primitives (21)
 Avatar: src/components/ui.tsx
 Badge: src/components/ui.tsx
 Button: src/components/ui.tsx
 ButtonLink: src/components/ui.tsx
+ConfirmDialog: src/components/ui.tsx
 EmptyState: src/components/ui.tsx
 Field: src/components/ui.tsx
 FloatingWindow: src/components/ui.tsx
@@ -319,23 +321,24 @@ Skel: src/components/ui.tsx
 Status: src/components/ui.tsx
 Switch: src/components/ui.tsx
 Tabs: src/components/ui.tsx
+WindowFooter: src/components/ui.tsx
 
 ## Migration map — legacy component → primitive to use instead (0)
 (empty until primitives exist)
 
 ## Canonical rules — same selector+property declared twice with different values; the winner renders (5)
-.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1073  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1073  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1082  [@media (max-width: 900px)]
-.liquid-metal::after { inset: -5px }  ← shell.css:1248
-.liquid-metal::after { padding: 5px }  ← shell.css:1249
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1089  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1089  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1098  [@media (max-width: 900px)]
+.liquid-metal::after { inset: -5px }  ← shell.css:1264
+.liquid-metal::after { padding: 5px }  ← shell.css:1265
 
 ## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (5)
-.app.is-collapsed .nav-action { display: revert }  at shell.css:1066 loses to shell.css:1073
-.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1066 loses to shell.css:1073
-.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1078 loses to shell.css:1082
-.liquid-metal::after { inset: -2px }  at shell.css:1204 loses to shell.css:1248
-.liquid-metal::after { padding: 2px }  at shell.css:1206 loses to shell.css:1249
+.app.is-collapsed .nav-action { display: revert }  at shell.css:1082 loses to shell.css:1089
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1082 loses to shell.css:1089
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1094 loses to shell.css:1098
+.liquid-metal::after { inset: -2px }  at shell.css:1220 loses to shell.css:1264
+.liquid-metal::after { padding: 2px }  at shell.css:1222 loses to shell.css:1265
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

@@ -456,7 +456,6 @@ describe('Overview', () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain('$3.50');
       expect(container.textContent).toContain('50000');
-      expect(container.textContent).toContain('42');
     });
   });
 
@@ -466,7 +465,6 @@ describe('Overview', () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain('+12%');
       expect(container.textContent).toContain('-5%');
-      expect(container.textContent).toContain('+8%');
     });
   });
 
@@ -510,8 +508,9 @@ describe('Overview', () => {
     const { container } = renderOverview();
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Recent Requests');
-      expect(container.textContent).toContain('msg-1234');
       expect(container.textContent).toContain('gpt-4o');
+      // No Request (id) or Attempts columns on the overview.
+      expect(container.textContent).not.toContain('msg-1234');
     });
   });
 
@@ -617,23 +616,40 @@ describe('Overview', () => {
 
     await vi.waitFor(() => {
       expect(mockPerProviderMessages).toHaveBeenCalledTimes(1);
-      expect(container.querySelectorAll('.chart-card__stat').length).toBe(4);
+      expect(container.querySelectorAll('.stat-tile').length).toBe(5);
     });
-    const stats = container.querySelectorAll('.chart-card__stat');
-    fireEvent.click(stats[2]); // cost (Requests=0, Recovered=1, Cost=2, Token usage=3)
+    fireEvent.click(screen.getByText('Cost', { selector: '.stat-label' }).closest('.stat-tile')!);
     await vi.waitFor(() => {
       expect(mockPerProviderCosts).toHaveBeenCalledWith('test-agent', '30d');
     });
   });
 
-  it('has clickable stat headers for requests, recovered requests, cost and tokens', async () => {
+  it('drives the chart from the KPI cards (no stat tabs on the chart)', async () => {
     mockGetOverview.mockResolvedValue(overviewData);
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      const clickable = container.querySelectorAll('.chart-card__stat');
-      expect(clickable.length).toBe(4);
+      expect(container.querySelectorAll('.stat-tile').length).toBe(5);
     });
-    expect(screen.getAllByText('Recovered requests').length).toBeGreaterThan(0);
+    expect(container.querySelector('.chart-card__stat')).toBeNull();
+    const labels = [...container.querySelectorAll('.stat-tile .stat-label')].map(
+      (el) => el.textContent,
+    );
+    expect(labels).toEqual([
+      'Successful requests',
+      'Cost',
+      'Token usage',
+      'Recovered requests',
+      'Failed requests',
+    ]);
+    // Successful requests is selected by default and shows the Requests chart.
+    const tile = (label: string) =>
+      screen.getByText(label, { selector: '.stat-label' }).closest('.stat-tile')!;
+    expect(tile('Successful requests').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(tile('Failed requests'));
+    await vi.waitFor(() => {
+      expect(tile('Failed requests').getAttribute('aria-pressed')).toBe('true');
+      expect(tile('Successful requests').getAttribute('aria-pressed')).toBe('false');
+    });
   });
 
   it('loads and renders the reliability KPIs and recovered tab for every tenant', async () => {
@@ -644,10 +660,10 @@ describe('Overview', () => {
       expect(screen.getAllByText('Success rate').length).toBeGreaterThan(0);
     });
     expect(mockGetReliabilityStats).toHaveBeenCalledWith('30d', 'test-agent');
-    // Tab + KPI cards share the label; both surfaces are present.
-    expect(screen.getAllByText('Recovered requests').length).toBeGreaterThanOrEqual(2);
+    // Only the KPI card carries the label: the chart has no recovered tab.
+    expect(screen.getAllByText('Recovered requests')).toHaveLength(1);
     expect(screen.queryByText('Recovered by Autofix')).toBeNull();
-    expect(screen.getByText('Recovered by Fallback')).toBeDefined();
+    expect(screen.queryByText('Recovered by Fallback')).toBeNull();
   });
 
   it('switches chart view when stat header clicked', async () => {
@@ -659,24 +675,25 @@ describe('Overview', () => {
     const { container } = renderOverview();
     // The Requests view is status-only now (no per-provider request chart);
     // usage views render the multi-provider chart. Order:
-    // Requests / Recovered requests / Cost / Tokens.
+    // The KPI cards pick the view: Cost and Token usage are cards now.
     await vi.waitFor(() => {
-      expect(container.querySelectorAll('.chart-card__stat').length).toBe(4);
+      expect(container.querySelectorAll('.stat-tile').length).toBe(5);
     });
     expect(container.querySelector('[data-testid="multi-agent-chart"]')).toBeNull();
 
-    const stats = container.querySelectorAll('.chart-card__stat');
+    const tile = (label: string) =>
+      screen.getByText(label, { selector: '.stat-label' }).closest('.stat-tile')!;
 
-    fireEvent.click(stats[2]); // cost
+    fireEvent.click(tile('Cost'));
     await vi.waitFor(() => {
-      const active = container.querySelector('.chart-card__stat.is-active');
-      expect(active?.textContent).toContain('Cost');
+      expect(tile('Cost').getAttribute('aria-pressed')).toBe('true');
+      // The chart title follows the card; Cost names its unit.
+      expect(screen.getByText('Cost (US $)')).toBeDefined();
     });
 
-    fireEvent.click(stats[3]); // tokens — renders the token-view chart
+    fireEvent.click(tile('Token usage')); // renders the token-view chart
     await vi.waitFor(() => {
-      const active = container.querySelector('.chart-card__stat.is-active');
-      expect(active?.textContent).toContain('Token usage');
+      expect(tile('Token usage').getAttribute('aria-pressed')).toBe('true');
       expect(container.querySelector('[data-testid="multi-agent-chart"]')).not.toBeNull();
     });
   });
@@ -814,7 +831,7 @@ describe('Overview', () => {
     mockGetOverview.mockResolvedValue({ ...emptyOverviewData, has_providers: true });
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(container.querySelector('.chart-card__stat')).not.toBeNull();
+      expect(container.querySelector('.chart-card')).not.toBeNull();
       expect(container.textContent).toContain('$0.00');
     });
   });
@@ -823,7 +840,7 @@ describe('Overview', () => {
     mockGetOverview.mockResolvedValue({ ...overviewData, has_data: true, has_providers: false });
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      expect(container.querySelector('.chart-card__stat')).not.toBeNull();
+      expect(container.querySelector('.chart-card')).not.toBeNull();
       expect(container.querySelector('.empty')).toBeNull();
     });
   });

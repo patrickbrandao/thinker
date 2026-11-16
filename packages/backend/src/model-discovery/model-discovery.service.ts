@@ -1,7 +1,7 @@
-import { allowsPrivateDestination } from '../common/utils/private-url-policy';
 import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { emitAlert } from '../common/services/alert-sink';
 import { modelChangeAlerts } from './model-change-alerts';
+import { diffModelIds, notifyModelCatalogChange } from './model-catalog-change';
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,8 +15,11 @@ import {
   PROVIDER_BLOCKLIST,
   PROVIDER_NON_CHAT,
   filterNonChatModels,
+  type ModelUrlOverrides,
   type ProviderModelFetchOptions,
+  modelsRegionEndpoint,
 } from './provider-model-fetcher.service';
+import { connectionUrls, resolveProviderUrl } from '../routing/provider-urls/provider-urls';
 import { ProviderModelRegistryService } from './provider-model-registry.service';
 import { DiscoveredModel, contextWindowFields } from './model-fetcher';
 import { decryptWithAny, getDecryptionSecrets } from '../common/utils/crypto.util';
@@ -27,20 +30,7 @@ import {
   type ModelsDevModelEntry,
 } from '../database/models-dev-sync.service';
 import { parseOAuthTokenBlob } from '../routing/oauth/core';
-import { getQwenCompatibleBaseUrl, isQwenResolvedEndpoint } from '../routing/qwen-region';
-import {
-  getBedrockMantleBaseUrl,
-  isBedrockProvider,
-  isBedrockRegion,
-} from '../routing/bedrock-region';
-import { MINIMAX_BASE_URLS } from '../routing/oauth/minimax/minimax-oauth-helpers';
-import {
-  getXiaomiTokenPlanBaseUrl,
-  isXiaomiProviderId,
-  isXiaomiTokenPlanRegion,
-} from '../routing/xiaomi-region';
-import { getZaiCodingPlanBaseUrl } from '../routing/zai-region';
-import { defaultAccountBaseUrl } from '../routing/account-base-url';
+import { isBedrockProvider } from '../routing/bedrock-region';
 import { CopilotTokenService } from '../routing/proxy/copilot-token.service';
 import {
   findOpenRouterPrefix,
@@ -155,8 +145,9 @@ export class ModelDiscoveryService {
     options: DiscoverModelsOptions,
   ): Promise<DiscoveredModel[]> {
     let apiKey = '';
-    let endpointOverride: string | undefined;
+    let resourceUrl: string | undefined;
     const lowerProvider = provider.provider.toLowerCase();
+    const urls = connectionUrls(provider);
     if (provider.api_key_encrypted) {
       try {
         apiKey = decryptWithAny(provider.api_key_encrypted, getDecryptionSecrets()).plaintext;
@@ -185,19 +176,15 @@ export class ModelDiscoveryService {
         if (blob?.t) {
           apiKey = blob.t;
           if (lowerProvider === 'minimax' && blob.u) {
-            endpointOverride = blob.u;
+            resourceUrl = blob.u;
           }
-        }
-        // Pasted MiniMax Coding Plan tokens (sk-cp-) have no OAuth blob, so
-        // discovery has no resource URL to use. Fall back to the persisted
-        // region column so CN tokens discover models against the CN host
-        // instead of incorrectly probing api.minimax.io.
-        if (lowerProvider === 'minimax' && !endpointOverride && provider.region === 'cn') {
-          endpointOverride = `${MINIMAX_BASE_URLS.cn}/anthropic/v1`;
         }
       } else if (lowerProvider === 'copilot' && this.copilotTokenService) {
         try {
-          apiKey = await this.copilotTokenService.getCopilotToken(apiKey);
+          apiKey = await this.copilotTokenService.getCopilotToken(
+            apiKey,
+            resolveProviderUrl(urls, 'token_exchange') ?? undefined,
+          );
         } catch {
           this.logger.warn(
             'Copilot token exchange failed for model discovery — falling back to known models',
@@ -206,38 +193,27 @@ export class ModelDiscoveryService {
         }
       }
     }
-    if (
-      lowerProvider === 'minimax' &&
-      provider.auth_type === 'api_key' &&
-      provider.region === 'cn'
-    ) {
-      endpointOverride = `${MINIMAX_BASE_URLS.cn}/v1`;
-    }
-    if (isQwenProvider(provider.provider) && isQwenResolvedEndpoint(provider.region)) {
-      endpointOverride = getQwenCompatibleBaseUrl(provider.region);
-    }
-    if (isBedrockProvider(provider.provider) && isBedrockRegion(provider.region)) {
-      endpointOverride = getBedrockMantleBaseUrl(provider.region);
-    }
-    if (
-      provider.provider.toLowerCase() === 'zai' &&
-      provider.auth_type === 'subscription' &&
-      provider.region === 'cn'
-    ) {
-      endpointOverride = getZaiCodingPlanBaseUrl('cn');
-    }
-    if (
-      isXiaomiProviderId(provider.provider) &&
-      provider.auth_type === 'subscription' &&
-      isXiaomiTokenPlanRegion(provider.region)
-    ) {
-      endpointOverride = getXiaomiTokenPlanBaseUrl(provider.region);
-    }
+    // The regional or plan base of the listing (MiniMax's OAuth resource URL
+    // included), the same one inference uses.
+    const endpointOverride = modelsRegionEndpoint(
+      provider.provider,
+      provider.auth_type,
+      provider.region,
+      resourceUrl,
+    );
 
-    // An API-key connection's own base URL replaces the official base of the
-    // models endpoint too (see routing/account-base-url.ts).
-    const accountBaseUrl =
-      provider.auth_type === 'api_key' && provider.base_url ? provider.base_url : null;
+    // The connection's own listing URLs (ADR 0012): an explicit override, or
+    // one that follows an overridden inference base.
+    const urlOverrides: ModelUrlOverrides = {};
+    for (const slot of [
+      'models',
+      'models_base_catalog',
+      'models_recommended',
+      'cris_profiles',
+    ] as const) {
+      const resolved = resolveProviderUrl(urls, slot);
+      if (resolved?.overridden) urlOverrides[slot] = resolved;
+    }
 
     if (options.forceRefresh && !options.skipModelsDevRefresh) {
       await this.refreshModelsDevCache();
@@ -246,7 +222,8 @@ export class ModelDiscoveryService {
     let raw: DiscoveredModel[];
 
     const useCuratedSubscriptionModels =
-      provider.auth_type === 'subscription' && (!apiKey || lowerProvider === 'anthropic');
+      provider.auth_type === 'subscription' &&
+      (!apiKey || (lowerProvider === 'anthropic' && !urlOverrides.models));
 
     const fetchOptions: ProviderModelFetchOptions = {
       ...(options.forceRefresh ? { forceRefresh: true } : {}),
@@ -254,15 +231,9 @@ export class ModelDiscoveryService {
       ...(isBedrockProvider(provider.provider)
         ? { previousModels: provider.cached_models ?? [] }
         : {}),
-      ...(accountBaseUrl
-        ? {
-            accountBaseUrl: {
-              base: accountBaseUrl,
-              official: defaultAccountBaseUrl(provider.provider, 'api_key', provider.region),
-              allowPrivate: allowsPrivateDestination(provider.allow_private_destination),
-            },
-          }
-        : {}),
+      ...(Object.keys(urlOverrides).length > 0 ? { urls: urlOverrides } : {}),
+      // Bedrock lists its CRIS profiles in the connection's own region.
+      ...(isBedrockProvider(provider.provider) ? { region: provider.region ?? null } : {}),
     };
     const fetchProviderModels = () =>
       this.fetcher.fetch(
@@ -394,11 +365,22 @@ export class ModelDiscoveryService {
     }
 
     const changes = modelChangeAlerts(provider, provider.cached_models, filtered);
+    const diff = diffModelIds(provider.cached_models, filtered);
     provider.cached_models = filtered;
     provider.models_fetched_at = new Date().toISOString();
     await this.providerRepo.save(provider);
     for (const alert of changes) emitAlert(alert);
     await this.invalidateProviderAccess(provider);
+    notifyModelCatalogChange({
+      connection: {
+        id: provider.id,
+        tenant_id: provider.tenant_id,
+        provider: provider.provider,
+        auth_type: provider.auth_type,
+        label: provider.label ?? null,
+      },
+      ...diff,
+    });
 
     this.logger.log(
       `Discovered ${filtered.length} models for provider ${provider.provider} (tenant ${provider.tenant_id})`,

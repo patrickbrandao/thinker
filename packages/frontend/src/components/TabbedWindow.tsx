@@ -85,3 +85,53 @@ export default function TabbedWindow({
     </FloatingWindow>
   );
 }
+
+/**
+ * Sections as tabs inside a form that is not a {@link TabbedWindow} (a
+ * connect flow in a window or modal). Every section stays mounted, so a
+ * hidden tab keeps its state (a running sign-in, typed values).
+ */
+export function SectionTabs({
+  sections,
+  label,
+  tab,
+  onTabChange,
+  className,
+}: {
+  sections: WindowSection[];
+  label: string;
+  /** Controlled active tab; uncontrolled when omitted. */
+  tab?: string;
+  onTabChange?: (key: string) => void;
+  className?: string;
+}) {
+  const [own, setOwn] = useState<string | undefined>(undefined);
+  const wanted = tab ?? own;
+  const active = sections.find((s) => s.key === wanted) ?? sections[0];
+  const select = (key: string) => {
+    setOwn(key);
+    onTabChange?.(key);
+  };
+  return (
+    <div className={className}>
+      <Tabs
+        className="mb-4"
+        label={label}
+        value={active?.key ?? ''}
+        onChange={select}
+        items={sections.map((s) => ({ key: s.key, label: s.label }))}
+      />
+      {sections.map((s) => (
+        <div
+          key={s.key}
+          role="tabpanel"
+          aria-label={s.label}
+          data-section={s.key}
+          hidden={s.key !== active?.key}
+        >
+          {s.content}
+        </div>
+      ))}
+    </div>
+  );
+}

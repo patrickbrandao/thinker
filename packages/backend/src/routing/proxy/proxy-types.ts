@@ -1,3 +1,4 @@
+import type { ProviderUrlConnection } from '../provider-urls/provider-url-scope';
 import type { EgressHop, EgressSummary, OutboundScope } from '../../common/outbound/outbound-proxy';
 import type { IncomingHttpHeaders } from 'http';
 import type { RecordingResponseBody } from './attempt-recording.types';
@@ -41,6 +42,9 @@ export type ProviderWireFormat =
 export interface ProviderAttemptRecordingStart {
   requestBody: Record<string, unknown>;
   wireFormat: ProviderWireFormat;
+  /** Provider URL and headers, for the live session Inspector (never stored). */
+  url?: string;
+  headers?: Record<string, string>;
 }
 
 export interface ProviderAttemptStart {
@@ -62,6 +66,8 @@ export interface ProviderAttemptStart {
    */
   virtualModelId?: string;
   virtualModelName?: string;
+  /** How the route was chosen (`tier: complex`…), shown by the live session window. */
+  routeLabel?: string;
 }
 
 /** Identity and measured start of one Attempt. */
@@ -125,6 +131,11 @@ export interface ForwardOptions {
    */
   extraHeaders?: Record<string, string>;
   customEndpoint?: ProviderEndpoint;
+  /**
+   * The serving connection's URLs (ADR 0012). An overridden inference slot
+   * replaces the base of the variant ProviderClient picks for the model.
+   */
+  urls?: ProviderUrlConnection;
   authType?: string;
   /** Lookup for re-injecting cached thought_signature values (Google only). */
   signatureLookup?: SignatureLookup;

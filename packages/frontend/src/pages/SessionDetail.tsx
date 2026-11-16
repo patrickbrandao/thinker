@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import ErrorState from '../components/ErrorState.js';
 import MessageTable from '../components/MessageTable.js';
-import RequestDrawer from '../components/RequestDrawer.js';
+import RequestDrawerStack from '../components/RequestDrawerStack.js';
+import { WatchLiveButton } from '../components/live-session/WatchLiveButton.js';
+import { useLiveSessions } from '../components/live-session/LiveSessionWindows.js';
 import { DETAILED_COLUMNS, type MessageRow } from '../components/message-table-types.js';
 import { Badge, Button, Panel, Skel } from '../components/ui.js';
 import { t } from '../i18n/index.js';
@@ -37,6 +39,29 @@ export default function SessionDetail() {
   const { sessionId = '' } = useParams();
   useEffect(() => preloadModelDisplayNames(), []);
   const session = useResource(() => getSession(sessionId), [sessionId]);
+  const liveWindows = useLiveSessions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const watch = searchParams.get('watch');
+  const watchRequest = searchParams.get('request');
+
+  // `?watch=live|replay[&request=<id>]` (the stand-alone request page's "Open
+  // session") opens the window here, then leaves the URL clean.
+  useEffect(() => {
+    if (!liveWindows || (watch !== 'live' && watch !== 'replay')) return;
+    liveWindows.openLiveSession(sessionId, {
+      live: watch === 'live',
+      requestId: watchRequest ?? undefined,
+    });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('watch');
+        next.delete('request');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [liveWindows, watch, watchRequest, sessionId, setSearchParams]);
 
   const [rows, setRows] = useState<MessageRow[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -97,7 +122,15 @@ export default function SessionDetail() {
                 {s.id}
               </span>
             }
-            actions={isActive(s.last_at) ? <Badge tone="ok">{t('sessions.active')}</Badge> : null}
+            actions={
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <WatchLiveButton
+                  sessionId={s.id}
+                  live={isActive(s.last_at)}
+                  inFlight={s.in_flight > 0}
+                />
+              </div>
+            }
           >
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 2xl:grid-cols-8">
               <Stat label={t('sessions.detail.harness')} value={s.agent_name ?? '—'} />
@@ -283,7 +316,7 @@ export default function SessionDetail() {
           </section>
         </div>
       )}
-      <RequestDrawer messageId={selected} onClose={() => setSelected(null)} />
+      <RequestDrawerStack messageId={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

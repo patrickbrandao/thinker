@@ -12,6 +12,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import uPlot from 'uplot';
 import { formatNumber } from './formatters.js';
 import { dayMonth } from './overview-format.js';
+import { intlLocale } from '../i18n/index.js';
 
 export interface UseChartLifecycleOptions<T> {
   /** Ref to the element uPlot renders into (its width drives resizes). */
@@ -125,6 +126,23 @@ export function createFormatLegendTimestamp(
     const mm = String(d.getMinutes()).padStart(2, '0');
     return `${dayMonth(d)}, ${hh}:${mm}`;
   };
+}
+
+/** Token axis in thousands: "0", "250k", "1,5m" (above 999k). */
+export function formatAxisKTokens(val: number): string {
+  if (val == null || isNaN(val)) return '';
+  if (val === 0) return '0';
+  const fmt = (n: number) =>
+    new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 1 }).format(n);
+  return val >= 999_500 ? `${fmt(val / 1_000_000)}m` : `${fmt(val / 1_000)}k`;
+}
+
+/** Cost axis in dollars, numbers only (the chart title names the unit). */
+export function formatAxisDollars(val: number): string {
+  if (val == null || isNaN(val)) return '';
+  return new Intl.NumberFormat(intlLocale(), {
+    maximumFractionDigits: Math.abs(val) >= 1 || val === 0 ? 2 : 3,
+  }).format(val);
 }
 
 export function formatLegendTokens(_u: uPlot, val: number): string {

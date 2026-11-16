@@ -10,6 +10,10 @@ interface ConnectionBreadcrumb {
   label: string | null;
   backLink: string;
   backLabel: Label;
+  /** Account status, shown as a badge next to the title (null: unknown). */
+  active: boolean | null;
+  /** A custom provider, flagged next to the title. */
+  custom: boolean;
 }
 
 export const connectionBreadcrumbSignal = signal<ConnectionBreadcrumb>({
@@ -18,6 +22,8 @@ export const connectionBreadcrumbSignal = signal<ConnectionBreadcrumb>({
   label: null,
   backLink: '/providers/subscriptions',
   backLabel: () => t('providers.kind.subscriptions'),
+  active: null,
+  custom: false,
 });
 
 export function connectionBreadcrumbName(): string | null {
@@ -47,6 +53,7 @@ export function setConnectionBreadcrumb(
   backLabel?: Label,
   providerId?: string,
   label?: string,
+  status?: { active: boolean; custom: boolean },
 ): void {
   connectionBreadcrumbSignal.set((prev) => ({
     name,
@@ -54,5 +61,7 @@ export function setConnectionBreadcrumb(
     label: label ?? null,
     backLink: backLink ?? prev.backLink,
     backLabel: backLabel ?? prev.backLabel,
+    active: status?.active ?? null,
+    custom: status?.custom ?? false,
   }));
 }

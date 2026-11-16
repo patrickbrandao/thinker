@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { AuthType } from 'thinker-shared';
 import { t } from '../i18n/index.js';
-import { cx } from './ui.js';
+import { Button, WindowFooter, cx } from './ui.js';
 
 /**
  * Two-step "add provider" flow inside the floating window: part 1 picks the
@@ -109,10 +109,13 @@ export function ProviderWizard({
   providerId,
   authType,
   render,
+  onCancel,
 }: {
   providerId: string;
   authType: AuthType;
   render: (providerId: string) => ReactNode;
+  /** Shown as Cancel next to Next on the first step. */
+  onCancel?: () => void;
 }) {
   const variants = providerVariants(providerId, authType);
   const [chosen, setChosen] = useState<ProviderVariant | null>(null);
@@ -154,11 +157,19 @@ export function ProviderWizard({
             </label>
           ))}
         </fieldset>
-        <div className="mt-4 flex justify-end">
-          <button type="button" className="btn btn-sm" onClick={() => setChosen(selected)}>
-            {t('providerSetup.wizard.next')}
-          </button>
-        </div>
+        {/* In a window, this row sits in its fixed footer. */}
+        <WindowFooter>
+          <div className={cx('flex w-full gap-2', onCancel ? 'justify-between' : 'justify-end')}>
+            {onCancel ? (
+              <Button variant="ghost" size="sm" onClick={onCancel}>
+                {t('common.cancel')}
+              </Button>
+            ) : null}
+            <Button size="sm" onClick={() => setChosen(selected)}>
+              {t('providerSetup.wizard.next')}
+            </Button>
+          </div>
+        </WindowFooter>
       </div>
     );
   }

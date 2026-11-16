@@ -1,5 +1,6 @@
 import {
   BEDROCK_RUNTIME_CAPABILITY_CATALOG,
+  bedrockRuntimeChatNeedsResponses,
   getBedrockRuntimeCapabilities,
   getBedrockRuntimeSupportedEndpoints,
   BEDROCK_RUNTIME_CLAUDE_MESSAGES_MODELS,
@@ -73,6 +74,8 @@ describe('Bedrock Runtime Claude Messages list', () => {
     'anthropic.claude-opus-5-5',
     'anthropic.claude-haiku-4-5-20251001-v1:0',
     'anthropic.claude-haiku-5-5',
+    'anthropic.claude-fable-5',
+    'anthropic.claude-fable-5-1',
   ];
   const UNSUPPORTED_IDS = [
     'anthropic.claude-opus-4-1-20250805-v1:0',
@@ -81,8 +84,6 @@ describe('Bedrock Runtime Claude Messages list', () => {
     'anthropic.claude-sonnet-4-20250514-v1:0',
     'anthropic.claude-sonnet-4-5-20250929-v1:0',
     'anthropic.claude-sonnet-4-6',
-    'anthropic.claude-fable-5',
-    'anthropic.claude-fable-5-1',
     'anthropic.claude-3-haiku-20240307-v1:0',
     'anthropic.claude-3-5-sonnet-20241022-v2:0',
   ];
@@ -138,5 +139,66 @@ describe('Bedrock Runtime Claude Messages list', () => {
   it('does not match a listed id that is only a prefix of the model', () => {
     expect(isBedrockRuntimeClaudeProfile('us.anthropic.claude-sonnet-5-5-extra')).toBe(false);
     expect(isBedrockRuntimeClaudeProfile('us.anthropic.claude-opus-5-50')).toBe(false);
+  });
+});
+
+describe('bedrockRuntimeChatNeedsResponses', () => {
+  const tools = [{ type: 'function', function: { name: 'f', parameters: { type: 'object' } } }];
+
+  it.each(['low', 'medium', 'high', 'xhigh', 'max'])(
+    'moves a GPT profile with function tools and effort %s',
+    (effort) => {
+      expect(
+        bedrockRuntimeChatNeedsResponses('global.openai.gpt-6-luna', {
+          tools,
+          reasoning_effort: effort,
+        }),
+      ).toBe(true);
+      expect(
+        bedrockRuntimeChatNeedsResponses('bedrock/us.openai.gpt-5.6-luna', {
+          tools,
+          reasoning_effort: effort,
+        }),
+      ).toBe(true);
+    },
+  );
+
+  it('keeps Luna and Sol on chat with effort none or no effort', () => {
+    expect(bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-sol', { tools })).toBe(false);
+    expect(
+      bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-sol', { tools, reasoning_effort: 'none' }),
+    ).toBe(false);
+  });
+
+  it('moves Astra with function tools whatever the effort', () => {
+    expect(bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-astra', { tools })).toBe(true);
+    expect(
+      bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-astra', {
+        tools,
+        reasoning_effort: 'none',
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps requests without function tools on chat', () => {
+    const effort = { reasoning_effort: 'high' };
+    expect(bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-astra', effort)).toBe(false);
+    expect(bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-luna', { ...effort, tools: [] })).toBe(
+      false,
+    );
+    expect(
+      bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-luna', {
+        ...effort,
+        tools: [{ type: 'web_search' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('leaves non-GPT profiles, base model IDs and unlisted models alone', () => {
+    const body = { tools, reasoning_effort: 'high' };
+    expect(bedrockRuntimeChatNeedsResponses('global.moonshotai.kimi-k3', body)).toBe(false);
+    expect(bedrockRuntimeChatNeedsResponses('openai.gpt-6-luna', body)).toBe(false);
+    expect(bedrockRuntimeChatNeedsResponses('us.openai.gpt-6-1-sol', body)).toBe(false);
+    expect(bedrockRuntimeChatNeedsResponses('us.anthropic.claude-sonnet-5-5', body)).toBe(false);
   });
 });

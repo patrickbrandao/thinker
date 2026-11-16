@@ -327,22 +327,14 @@ describe('OrganizationsService.addMember', () => {
     expect(tenantCache.addMember).not.toHaveBeenCalled();
   });
 
-  it('creates an account for an unknown email and returns the temporary password once', async () => {
-    const { service, accounts, ds, tenantCache } = build({ roles: { [CALLER]: 'owner' } });
+  it('refuses an unknown email instead of creating an account', async () => {
+    const { service, accounts, tenantCache } = build({ roles: { [CALLER]: 'owner' } });
     accounts.findByEmail.mockResolvedValue(null);
-    accounts.createAccount.mockResolvedValue({
-      account: { id: 'fresh' },
-      temporaryPassword: 'tmp-secret',
-    });
-    ds.query.mockResolvedValue([memberRow('fresh', 'owner')]);
-    const result = await service.addMember(CALLER, ORG, {
-      email: 'new@b.test',
-      name: 'New',
-      role: 'owner',
-    });
-    expect(accounts.createAccount).toHaveBeenCalledWith('new@b.test', 'New');
-    expect(tenantCache.addMember).toHaveBeenCalledWith(ORG, 'fresh', 'owner');
-    expect(result.temporaryPassword).toBe('tmp-secret');
+    await expect(
+      service.addMember(CALLER, ORG, { email: 'new@b.test', name: 'New', role: 'owner' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(accounts.createAccount).not.toHaveBeenCalled();
+    expect(tenantCache.addMember).not.toHaveBeenCalled();
   });
 });
 

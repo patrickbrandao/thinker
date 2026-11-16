@@ -52,6 +52,7 @@ describe('TierController', () => {
     controller = new TierController(
       tierService as unknown as TierService,
       resolveAgentService as unknown as ResolveAgentService,
+      { withStatus: async (_t: string, _a: string, rows: unknown[]) => rows } as never,
       agentRepo as unknown as Repository<Agent>,
       recordingConfig as unknown as AgentRecordingConfigService,
     );

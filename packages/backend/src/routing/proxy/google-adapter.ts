@@ -4,7 +4,7 @@
  * accept the OpenAI format directly.
  */
 
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 import { OpenAIMessage, SignatureLookup } from './proxy-types';
 
@@ -131,7 +131,9 @@ function sanitizeSchema(schema: unknown, isPropertiesMap = false): unknown {
 
 function safeParseArgs(args: string | undefined): Record<string, unknown> {
   try {
-    return JSON.parse(args || '{}') as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(args || '{}');
+    // Gemini requires a Struct: `null`, arrays and scalars are rejected.
+    return isRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -248,6 +250,22 @@ function messageToContent(
           ? signature
           : 'context_engineering_is_the_way_to_go';
       parts.push(part);
+    }
+  }
+
+  // A text-only assistant reply: put back the signature Gemini attached to
+  // its last part, when the cache still has it.
+  if (
+    msg.role === 'assistant' &&
+    signatureLookup &&
+    !parts.some((p) => p.functionCall) &&
+    parts.length > 0
+  ) {
+    const text = parts.map((p) => p.text ?? '').join('');
+    const last = parts[parts.length - 1]!;
+    if (text && typeof last.text === 'string' && !last.thoughtSignature) {
+      const signature = signatureLookup(textSignatureKey(text));
+      if (typeof signature === 'string' && signature) last.thoughtSignature = signature;
     }
   }
 
@@ -369,6 +387,16 @@ function systemContentText(content: unknown): string {
     )
     .map((part) => part.text)
     .join('\n');
+}
+
+/**
+ * Cache key for a thoughtSignature that Gemini put on a text part (a reply
+ * with no function calls). Clients echo the reply back only as plain
+ * `content`, so the signature is found again by a hash of that text; sending
+ * it back lets Gemini 3.5+ reuse the earlier turn's reasoning (api-gemini G2).
+ */
+export function textSignatureKey(text: string): string {
+  return `text:${createHash('sha256').update(text).digest('hex').slice(0, 32)}`;
 }
 
 /** Extracted thought_signature entries from a Gemini response. */
@@ -505,7 +533,11 @@ export function fromGoogleResponse(
   const toolCalls: Record<string, unknown>[] = [];
   const extractedSignatures: ExtractedSignature[] = [];
 
+  let textSignature: string | undefined;
   for (const part of parts) {
+    if (part.text && !part.thought && typeof part.thoughtSignature === 'string') {
+      textSignature = part.thoughtSignature || textSignature;
+    }
     // Thinking summaries come back as text parts with `thought: true`. Skip
     // them — the OpenAI-compat surface doesn't expose them, and including
     // them in `content` would leak chain-of-thought into the assistant reply.
@@ -519,7 +551,7 @@ export function fromGoogleResponse(
       const toolCall: Record<string, unknown> = {
         id: toolCallId,
         type: 'function',
-        function: { name: fc.name, arguments: JSON.stringify(fc.args) },
+        function: { name: fc.name, arguments: JSON.stringify(fc.args ?? {}) },
       };
       const sig = part.thoughtSignature;
       if (typeof sig === 'string' && sig) {
@@ -532,6 +564,12 @@ export function fromGoogleResponse(
 
   const message: Record<string, unknown> = { role: 'assistant', content: textContent || null };
   if (toolCalls.length > 0) message.tool_calls = toolCalls;
+  if (textSignature && textContent && toolCalls.length === 0) {
+    extractedSignatures.push({
+      toolCallId: textSignatureKey(textContent),
+      signature: textSignature,
+    });
+  }
 
   const usage = googleResp.usageMetadata as Record<string, number> | undefined;
 
@@ -617,6 +655,10 @@ export interface GoogleStreamState {
   finished: boolean;
   /** Set once the usage chunk is sent, so the stream reports usage exactly once. */
   usageSent: boolean;
+  /** Visible text streamed so far, to key a text-part thoughtSignature. */
+  text?: string;
+  /** Latest thoughtSignature seen on a text part. */
+  textSignature?: string;
 }
 
 export function createGoogleStreamState(): GoogleStreamState {
@@ -659,7 +701,16 @@ export function transformGoogleStreamChunk(
 
   const toolCalls: Record<string, unknown>[] = [];
   const signatures: ExtractedSignature[] = [];
+  if (text) state.text = (state.text ?? '') + text;
   for (const part of parts) {
+    if (
+      part.text &&
+      !part.thought &&
+      typeof part.thoughtSignature === 'string' &&
+      part.thoughtSignature
+    ) {
+      state.textSignature = part.thoughtSignature;
+    }
     if (part.functionCall) {
       const fc = part.functionCall as GeminiFunctionCall;
       const toolCallId = typeof fc.id === 'string' && fc.id ? fc.id : `call_${randomUUID()}`;
@@ -698,11 +749,25 @@ export function transformGoogleStreamChunk(
   // candidate) closes the stream; its usage is the total.
   const usage = data.usageMetadata as Record<string, number> | undefined;
   if (usage) state.usage = usage;
-  const isTerminal = Boolean(candidate?.finishReason) || (Boolean(usage) && !candidate);
+  // A rejected prompt comes back with promptFeedback.blockReason and no
+  // candidate: close the stream as content_filter, not as a normal stop.
+  const promptBlocked =
+    !candidate &&
+    typeof (data.promptFeedback as { blockReason?: unknown } | undefined)?.blockReason === 'string';
+  const isTerminal =
+    Boolean(candidate?.finishReason) || promptBlocked || (Boolean(usage) && !candidate);
   if (isTerminal) {
     if (!state.finished) {
       state.finished = true;
-      const finishReason = mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
+      if (state.textSignature && state.text && state.toolCallCount === 0) {
+        signatures.push({
+          toolCallId: textSignatureKey(state.text),
+          signature: state.textSignature,
+        });
+      }
+      const finishReason = promptBlocked
+        ? 'content_filter'
+        : mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
       result += `data: ${JSON.stringify({
         id: state.id,
         object: 'chat.completion.chunk',

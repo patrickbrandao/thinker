@@ -57,6 +57,8 @@ interface ForwardProviderOptions {
   providerBaseUrl?: string | null;
   /** Whether that base URL may reach private addresses (ADR 0006 item 7). */
   providerBaseUrlAllowsPrivate?: boolean;
+  /** The connection's URL overrides (`tenant_providers.url_overrides`, ADR 0012). */
+  providerUrlOverrides?: Record<string, string> | null;
   apiMode?: ProxyApiMode;
   signatureLookup?: SignatureLookup;
   thinkingLookup?: ThinkingBlockLookup;
@@ -87,6 +89,30 @@ import { ProviderKeyService } from '../routing-core/provider-key.service';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 import { CustomProviderService } from '../custom-provider/custom-provider.service';
 import { resolveForwardEndpoint } from './forward-endpoint-resolver';
+import {
+  resolveProviderUrl,
+  runWithProviderUrls,
+  type ProviderUrlConnection,
+} from '../provider-urls/provider-urls';
+
+/** The serving connection's URLs, as the forward options carry them (ADR 0012). */
+function forwardUrlConnection(opts: {
+  provider: string;
+  authType?: string;
+  providerRegion?: string | null;
+  providerUrlOverrides?: Record<string, string> | null;
+  providerBaseUrl?: string | null;
+  providerBaseUrlAllowsPrivate?: boolean;
+}): ProviderUrlConnection {
+  return {
+    provider: opts.provider,
+    authType: opts.authType ?? 'api_key',
+    region: opts.providerRegion ?? null,
+    urlOverrides: opts.providerUrlOverrides ?? null,
+    baseUrl: opts.providerBaseUrl ?? null,
+    allowPrivate: opts.providerBaseUrlAllowsPrivate !== false,
+  };
+}
 import { OpenaiOauthService } from '../oauth/openai/openai-oauth.service';
 import { MinimaxOauthService } from '../oauth/minimax/minimax-oauth.service';
 import { AnthropicOauthService } from '../oauth/anthropic/anthropic-oauth.service';
@@ -414,6 +440,7 @@ export class ProxyFallbackService {
         providerRegion: credentials.providerRegion,
         providerBaseUrl: credentials.providerBaseUrl,
         providerBaseUrlAllowsPrivate: credentials.providerBaseUrlAllowsPrivate,
+        providerUrlOverrides: credentials.providerUrlOverrides,
         signatureLookup,
         thinkingLookup,
         clientAnthropicBeta,
@@ -604,6 +631,7 @@ export class ProxyFallbackService {
         providerRegion: k.region,
         providerBaseUrl: k.baseUrl ?? null,
         providerBaseUrlAllowsPrivate: k.baseUrlAllowsPrivate !== false,
+        providerUrlOverrides: k.urlOverrides ?? null,
       })),
     ];
   }
@@ -1005,21 +1033,23 @@ export class ProxyFallbackService {
       return unchanged;
     }
 
-    const refreshed = await refreshRejectedOAuthCredential(
-      opts.provider,
-      opts.rawApiKey,
-      opts.agentId,
-      opts.tenantId,
-      opts.providerKeyLabel,
-      {
-        openaiOauth: this.openaiOauth,
-        minimaxOauth: this.minimaxOauth,
-        anthropicOauth: this.anthropicOauth,
-        geminiOauth: this.geminiOauth,
-        kiroOauth: this.kiroOauth,
-        xaiOauth: this.xaiOauth,
-        opencodeOauth: this.opencodeOauth,
-      },
+    const refreshed = await runWithProviderUrls(forwardUrlConnection(opts), () =>
+      refreshRejectedOAuthCredential(
+        opts.provider,
+        opts.rawApiKey!,
+        opts.agentId!,
+        opts.tenantId!,
+        opts.providerKeyLabel,
+        {
+          openaiOauth: this.openaiOauth,
+          minimaxOauth: this.minimaxOauth,
+          anthropicOauth: this.anthropicOauth,
+          geminiOauth: this.geminiOauth,
+          kiroOauth: this.kiroOauth,
+          xaiOauth: this.xaiOauth,
+          opencodeOauth: this.opencodeOauth,
+        },
+      ),
     );
     if (!refreshed?.apiKey || refreshed.apiKey === opts.apiKey) {
       this.logger.warn(
@@ -1098,8 +1128,12 @@ export class ProxyFallbackService {
 
     // Copilot: exchange the stored GitHub OAuth token for a short-lived API token
     let effectiveKey = opts.apiKey;
+    const urls = forwardUrlConnection(opts);
     if (provider.toLowerCase() === 'copilot') {
-      effectiveKey = await this.copilotToken.getCopilotToken(opts.apiKey);
+      effectiveKey = await this.copilotToken.getCopilotToken(
+        opts.apiKey,
+        resolveProviderUrl(urls, 'token_exchange') ?? undefined,
+      );
     }
 
     // Custom providers store their endpoint on a DB row; fetch it so the shared
@@ -1121,8 +1155,6 @@ export class ProxyFallbackService {
       authType,
       model: opts.model,
       providerRegion,
-      providerBaseUrl: opts.providerBaseUrl,
-      providerBaseUrlAllowsPrivate: opts.providerBaseUrlAllowsPrivate,
       resourceUrl,
       customProvider,
       logger: this.logger,
@@ -1190,6 +1222,7 @@ export class ProxyFallbackService {
         signal,
         extraHeaders,
         customEndpoint,
+        urls,
         authType,
         apiMode: opts.apiMode,
         sessionKey: opts.sessionKey,

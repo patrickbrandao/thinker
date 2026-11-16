@@ -49,6 +49,7 @@ import {
 import { parseCustomProviderParams, parseProviderDeepLink } from '../services/routing-params.js';
 import { STAGES } from '../services/providers.js';
 import NoConnectionsPrompt from '../components/NoConnectionsPrompt.jsx';
+import { ROUTE_STATUS_CHANGED_EVENT } from '../services/api/route-status.js';
 
 const PREFILL_PARAMS = ['provider', 'name', 'baseUrl', 'apiKey', 'models'];
 
@@ -190,6 +191,16 @@ export default function Routing() {
     });
     modelParams.setData((rows) => [...(rows ?? []).filter((r) => !matches(r)), saved]);
   };
+
+  useEffect(() => {
+    const reload = () => {
+      void tiers.reload();
+      void specificityAssignments.reload();
+    };
+    window.addEventListener(ROUTE_STATUS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(ROUTE_STATUS_CHANGED_EVENT, reload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload handles are stable per resource
+  }, [agentName]);
 
   const refetchAll = async () => {
     await Promise.all([

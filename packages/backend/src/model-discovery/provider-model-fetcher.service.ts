@@ -1,7 +1,10 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DiscoveredModel, FetcherConfig, contextWindowFields } from './model-fetcher';
-import { rebaseUrl } from '../routing/account-base-url';
-import { validatePublicUrl } from '../common/utils/url-validation';
+import {
+  DiscoveredModel,
+  FetcherConfig,
+  LongContextPricing,
+  contextWindowFields,
+} from './model-fetcher';
 import { parseModalities } from './model-capabilities';
 import { OLLAMA_CLOUD_HOST, OLLAMA_HOST } from '../common/constants/ollama';
 import {
@@ -13,32 +16,48 @@ import {
   GROK_CLI_HEADERS,
   GROK_CLI_PROXY_BASE,
   OPENCODE_FREE_KEY,
+  OPENCODE_USER_AGENT,
   buildClaudeCodeSubscriptionHeaders,
 } from '../common/constants/subscription-clients';
 import {
   normalizeMinimaxSubscriptionBaseUrl,
   normalizeProviderBaseUrl,
 } from '../routing/provider-base-url';
-import { getQwenCompatibleBaseUrl, normalizeQwenCompatibleBaseUrl } from '../routing/qwen-region';
+import {
+  getQwenCompatibleBaseUrl,
+  isQwenResolvedEndpoint,
+  normalizeQwenCompatibleBaseUrl,
+} from '../routing/qwen-region';
 import {
   getBedrockControlPlaneBaseUrl,
   getBedrockMantleBaseUrl,
+  isBedrockProvider,
+  isBedrockRegion,
   normalizeBedrockMantleBaseUrl,
 } from '../routing/bedrock-region';
 import { getBedrockRuntimeSupportedEndpoints } from '../routing/bedrock-runtime-capabilities';
 import {
   getXiaomiTokenPlanBaseUrl,
+  isXiaomiProviderId,
+  isXiaomiTokenPlanRegion,
   normalizeXiaomiTokenPlanBaseUrl,
 } from '../routing/xiaomi-region';
 import { getZaiCodingPlanBaseUrl, normalizeZaiCodingPlanBaseUrl } from '../routing/zai-region';
 import { buildLocalServerHeaders, getLocalServerBaseUrl } from '../common/constants/local-servers';
 import { MINIMAX_BASE_URLS } from '../routing/oauth/minimax/minimax-oauth-helpers';
 import {
+  OPENCODE_CATALOG_URLS,
   OpencodeCatalogService,
+  parseOpencodeCatalog,
   type OpencodeCatalogEntry,
   type OpencodeCatalogProvider,
 } from './opencode-catalog.service';
-import { PROVIDER_ENDPOINTS } from '../routing/proxy/provider-endpoints';
+import {
+  ATLAS_CLOUD_BASE,
+  EDEN_AI_BASE,
+  PROVIDER_ENDPOINTS,
+  REQUESTY_BASE,
+} from '../routing/proxy/provider-endpoints';
 import {
   buildKiroHeaders,
   KIRO_BASE_URL,
@@ -53,8 +72,11 @@ import {
   type ModelCapability,
   type ModelModality,
 } from 'thinker-shared';
-import { outboundFetch } from '../common/outbound/outbound-proxy';
-import { ssrfSafeFetch } from '../common/utils/ssrf-safe-fetch';
+import {
+  builtInProviderUrl,
+  fetchProviderUrl,
+  type ResolvedProviderUrl,
+} from '../routing/provider-urls/provider-url-scope';
 
 const FETCH_TIMEOUT_MS = 5000;
 const ANTHROPIC_DEFAULT_CONTEXT = 200000;
@@ -1001,6 +1023,284 @@ function parseCopilot(body: unknown, provider: string): DiscoveredModel[] {
   });
 }
 
+/* ── OpenAI-compatible aggregators: Atlas Cloud, Eden AI, Requesty ── */
+
+/** A finite, non-negative price, from a number or a decimal string. */
+function nonNegativePrice(value: unknown): number | null {
+  if (typeof value !== 'number' && (typeof value !== 'string' || value.trim() === '')) return null;
+  const price = Number(value);
+  return Number.isFinite(price) && price >= 0 ? price : null;
+}
+
+/** Capability list of a gateway model: its input modalities, streaming, and tools when flagged. */
+function gatewayCapabilities(
+  inputModalities: readonly ModelModality[] | undefined,
+  tools: boolean,
+): ModelCapability[] {
+  const capabilities: ModelCapability[] = [...(inputModalities ?? ['text'])];
+  capabilities.push('stream');
+  if (tools) capabilities.push('tools');
+  return capabilities;
+}
+
+/** Long-context tier from a threshold and its rates; null when incomplete. */
+function longContextTier(
+  thresholdTokens: unknown,
+  input: unknown,
+  output: unknown,
+  cacheRead?: unknown,
+  cacheWrite?: unknown,
+): LongContextPricing | null {
+  const inputPricePerToken = nonNegativePrice(input);
+  const outputPricePerToken = nonNegativePrice(output);
+  if (
+    typeof thresholdTokens !== 'number' ||
+    !Number.isSafeInteger(thresholdTokens) ||
+    thresholdTokens <= 0 ||
+    inputPricePerToken === null ||
+    outputPricePerToken === null
+  ) {
+    return null;
+  }
+  const cacheReadPricePerToken = nonNegativePrice(cacheRead);
+  const cacheWritePricePerToken = nonNegativePrice(cacheWrite);
+  return {
+    thresholdTokens,
+    inputPricePerToken,
+    outputPricePerToken,
+    ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+    ...(cacheWritePricePerToken !== null ? { cacheWritePricePerToken } : {}),
+  };
+}
+
+interface AtlasCloudModelEntry {
+  id?: unknown;
+  name?: string;
+  context_length?: number;
+  input_modalities?: string[];
+  output_modalities?: string[];
+  supported_features?: string[];
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    input_cache_read?: string;
+    overrides?: {
+      prompt?: string;
+      completion?: string;
+      input_cache_read?: string;
+      min_context?: number;
+    }[];
+  };
+}
+
+/** Image generators Atlas Cloud lists with `output_modalities: ["text"]`. */
+const ATLAS_CLOUD_IMAGE_MODEL_RE = /(?:^|[/-])(?:gpt-)?image(?:-|$)/i;
+
+/**
+ * Atlas Cloud `GET /v1/models` (public): `{code, msg, data: [...]}` with
+ * OpenRouter-like per-token string prices and a long-context `overrides` tier.
+ * Image generators claim text output, so they are dropped by id
+ * (api-atlascloud).
+ */
+function parseAtlasCloud(body: unknown, provider: string): DiscoveredModel[] {
+  const data = (body as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((raw): DiscoveredModel[] => {
+    const entry = raw as AtlasCloudModelEntry;
+    if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
+    if (ATLAS_CLOUD_IMAGE_MODEL_RE.test(entry.id)) return [];
+    const output = entry.output_modalities?.map((o) => o.toLowerCase());
+    if (output && output.length > 0 && !output.every((o) => o === 'text')) return [];
+
+    const features = Array.isArray(entry.supported_features) ? entry.supported_features : [];
+    const inputModalities = parseModalities(entry.input_modalities);
+    const override = entry.pricing?.overrides?.find((o) => typeof o?.min_context === 'number');
+    const longContextPricing = override
+      ? longContextTier(
+          override.min_context,
+          override.prompt,
+          override.completion,
+          override.input_cache_read,
+        )
+      : null;
+    const cacheReadPricePerToken = nonNegativePrice(entry.pricing?.input_cache_read);
+    return [
+      {
+        id: entry.id,
+        displayName: entry.name || entry.id,
+        provider,
+        ...contextWindowFields(entry.context_length),
+        inputPricePerToken: nonNegativePrice(entry.pricing?.prompt),
+        outputPricePerToken: nonNegativePrice(entry.pricing?.completion),
+        ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+        ...(longContextPricing ? { longContextPricing } : {}),
+        capabilityReasoning: features.includes('reasoning'),
+        capabilityCode: features.includes('tools'),
+        ...(inputModalities ? { inputModalities } : {}),
+        outputModalities: ['text'],
+        qualityScore: 3,
+      },
+    ];
+  });
+}
+
+interface EdenAiModelEntry {
+  id?: unknown;
+  context_length?: number | null;
+  capabilities?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+    supports_reasoning?: boolean;
+    supports_function_calling?: boolean;
+  } | null;
+  pricing?: Record<string, unknown> | null;
+}
+
+/** Eden AI's LiteLLM-style long-context price keys, by prompt-token threshold. */
+const EDEN_AI_LONG_CONTEXT_TIERS: readonly (readonly [number, string])[] = [
+  [200_000, 'above_200k_tokens'],
+  [272_000, 'above_272k_tokens'],
+];
+
+/**
+ * Eden AI `GET /v3/models` (public): OpenAI `{object, data}` envelope, LLMs
+ * only, with LiteLLM-style per-token prices (`input_cost_per_token`,
+ * `cache_read_input_token_cost`, `..._above_200k_tokens`) and a
+ * `capabilities` object (api-edenai).
+ */
+function parseEdenAi(body: unknown, provider: string): DiscoveredModel[] {
+  const data = (body as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((raw): DiscoveredModel[] => {
+    const entry = raw as EdenAiModelEntry;
+    if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
+    const caps = entry.capabilities ?? undefined;
+    const output = caps?.output_modalities?.map((o) => o.toLowerCase());
+    if (output && output.length > 0 && !output.every((o) => o === 'text')) return [];
+
+    const pricing = entry.pricing ?? {};
+    const cacheReadPricePerToken = nonNegativePrice(pricing.cache_read_input_token_cost);
+    const cacheWritePricePerToken = nonNegativePrice(pricing.cache_creation_input_token_cost);
+    let longContextPricing: LongContextPricing | null = null;
+    for (const [threshold, suffix] of EDEN_AI_LONG_CONTEXT_TIERS) {
+      longContextPricing ??= longContextTier(
+        threshold,
+        pricing[`input_cost_per_token_${suffix}`],
+        pricing[`output_cost_per_token_${suffix}`],
+        pricing[`cache_read_input_token_cost_${suffix}`],
+        pricing[`cache_creation_input_token_cost_${suffix}`],
+      );
+    }
+    const inputModalities = parseModalities(caps?.input_modalities);
+    const tools = caps?.supports_function_calling === true;
+    return [
+      {
+        id: entry.id,
+        displayName: entry.id,
+        provider,
+        ...contextWindowFields(entry.context_length),
+        inputPricePerToken: nonNegativePrice(pricing.input_cost_per_token),
+        outputPricePerToken: nonNegativePrice(pricing.output_cost_per_token),
+        ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+        ...(cacheWritePricePerToken !== null ? { cacheWritePricePerToken } : {}),
+        ...(longContextPricing ? { longContextPricing } : {}),
+        capabilityReasoning: caps?.supports_reasoning === true,
+        capabilityCode: tools,
+        capabilities: gatewayCapabilities(inputModalities, tools),
+        ...(inputModalities ? { inputModalities } : {}),
+        outputModalities: ['text'],
+        qualityScore: 3,
+      },
+    ];
+  });
+}
+
+interface RequestyPriceTier {
+  prompt_tokens_threshold?: number;
+  input_price?: number;
+  output_price?: number;
+  cached_price?: number;
+  caching_price?: number;
+}
+
+interface RequestyModelEntry {
+  id?: unknown;
+  api?: string;
+  context_window?: number;
+  retires?: number | null;
+  input_price?: number;
+  output_price?: number;
+  cached_price?: number;
+  caching_price?: number;
+  pricing?: RequestyPriceTier[];
+  supports_vision?: boolean;
+  supports_reasoning?: boolean;
+  supports_tool_calling?: boolean;
+  supports_image_generation?: boolean;
+}
+
+/**
+ * Requesty `GET /v1/models` (public without a key; with one, only the models
+ * the key may use): OpenAI `{object, data}` envelope with per-token numeric
+ * prices, `cached_price` (read) and `caching_price` (write), tiers keyed by
+ * `prompt_tokens_threshold`, `supports_*` flags and `retires` in unix seconds
+ * (api-requesty).
+ */
+function parseRequesty(body: unknown, provider: string): DiscoveredModel[] {
+  const data = (body as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  const nowSeconds = Date.now() / 1000;
+  return data.flatMap((raw): DiscoveredModel[] => {
+    const entry = raw as RequestyModelEntry;
+    if (typeof entry.id !== 'string' || entry.id.length === 0) return [];
+    if (entry.api !== undefined && entry.api !== 'chat') return [];
+    if (entry.supports_image_generation === true) return [];
+    if (typeof entry.retires === 'number' && entry.retires > 0 && entry.retires <= nowSeconds) {
+      return [];
+    }
+
+    const tier = (Array.isArray(entry.pricing) ? entry.pricing : [])
+      .filter(
+        (t): t is RequestyPriceTier & { prompt_tokens_threshold: number } =>
+          typeof t?.prompt_tokens_threshold === 'number' && t.prompt_tokens_threshold > 0,
+      )
+      .sort((a, b) => a.prompt_tokens_threshold - b.prompt_tokens_threshold)[0];
+    const longContextPricing = tier
+      ? longContextTier(
+          tier.prompt_tokens_threshold,
+          tier.input_price,
+          tier.output_price,
+          tier.cached_price,
+          tier.caching_price,
+        )
+      : null;
+    const cacheReadPricePerToken = nonNegativePrice(entry.cached_price);
+    const cacheWritePricePerToken = nonNegativePrice(entry.caching_price);
+    const inputModalities: ModelModality[] =
+      entry.supports_vision === true ? ['text', 'image'] : ['text'];
+    const tools = entry.supports_tool_calling === true;
+    return [
+      {
+        id: entry.id,
+        displayName: entry.id,
+        provider,
+        ...contextWindowFields(entry.context_window),
+        inputPricePerToken: nonNegativePrice(entry.input_price),
+        outputPricePerToken: nonNegativePrice(entry.output_price),
+        ...(cacheReadPricePerToken !== null ? { cacheReadPricePerToken } : {}),
+        ...(cacheWritePricePerToken !== null ? { cacheWritePricePerToken } : {}),
+        ...(longContextPricing ? { longContextPricing } : {}),
+        capabilityReasoning: entry.supports_reasoning === true,
+        capabilityCode: tools,
+        capabilities: gatewayCapabilities(inputModalities, tools),
+        inputModalities,
+        outputModalities: ['text'],
+        qualityScore: 3,
+      },
+    ];
+  });
+}
+
 /* ── Provider configs ── */
 
 export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
@@ -1053,6 +1353,21 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     endpoint: FIREWORKS_MODELS_URL,
     buildHeaders: bearerHeaders,
     parse: parseFireworks,
+  },
+  atlascloud: {
+    endpoint: `${ATLAS_CLOUD_BASE}/models`,
+    buildHeaders: bearerHeaders,
+    parse: parseAtlasCloud,
+  },
+  edenai: {
+    endpoint: `${EDEN_AI_BASE}/models`,
+    buildHeaders: bearerHeaders,
+    parse: parseEdenAi,
+  },
+  requesty: {
+    endpoint: `${REQUESTY_BASE}/models`,
+    buildHeaders: bearerHeaders,
+    parse: parseRequesty,
   },
   kilo: {
     endpoint: `${KILO_GATEWAY_BASE}/models`,
@@ -1214,23 +1529,173 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
   },
 };
 
+/** Connection URL overrides of the model listing slots (only the overridden ones). */
+export type ModelUrlOverrides = Partial<
+  Record<
+    'models' | 'models_base_catalog' | 'models_recommended' | 'cris_profiles',
+    ResolvedProviderUrl
+  >
+>;
+
 export interface ProviderModelFetchOptions {
   /**
-   * The connection's own base URL and the official one it replaces: a models
-   * URL under the official base moves under the connection's base.
+   * The connection's overridden listing URLs (ADR 0012), resolved by
+   * `resolveProviderUrl`: an explicit override or one derived from an
+   * overridden inference base. They go out through `fetchProviderUrl`.
    */
-  accountBaseUrl?: {
-    base: string;
-    official: string | null;
-    /** False: refuse private/LAN addresses too (ADR 0006 item 7). Default true. */
-    allowPrivate?: boolean;
-  };
+  urls?: ModelUrlOverrides;
+  /** The connection's region (Bedrock CRIS profiles are listed in it). */
+  region?: string | null;
   forceRefresh?: boolean;
   /**
    * Bedrock only: the connection's last discovered models. Their CRIS profiles
    * are kept when the control plane can't be reached.
    */
   previousModels?: readonly DiscoveredModel[];
+}
+
+/**
+ * The PROVIDER_CONFIGS entry (or the dedicated fetcher) a connection lists
+ * its models with: `opencode`/`opencode-go` (catalog), `cline-pass`
+ * (recommended models), `kiro`, a config key, or null when it has no listing.
+ */
+export function modelsConfigKey(providerId: string, authType?: string | null): string | null {
+  const key = providerId.toLowerCase();
+  if (authType === 'subscription') {
+    if (key === 'moonshot' || key === 'gemini' || key === 'google') return null;
+    const sub = `${key}-subscription`;
+    if (PROVIDER_CONFIGS[sub]) return sub;
+  }
+  if (key === 'opencode' || key === 'opencode-go' || key === 'cline-pass' || key === 'kiro') {
+    return key;
+  }
+  if (key === 'google') return 'gemini';
+  if (key === 'alibaba') return 'qwen';
+  return PROVIDER_CONFIGS[key] ? key : null;
+}
+
+/**
+ * The regional or plan base a connection's listing moves to (what the
+ * inference endpoint uses for the same region), or undefined for the
+ * built-in one. `resourceUrl` is MiniMax's OAuth resource URL.
+ */
+export function modelsRegionEndpoint(
+  provider: string,
+  authType: string | null | undefined,
+  region: string | null | undefined,
+  resourceUrl?: string,
+): string | undefined {
+  const lower = provider.toLowerCase();
+  let endpointOverride: string | undefined;
+  if (lower === 'minimax' && authType === 'subscription') {
+    if (resourceUrl) endpointOverride = resourceUrl;
+    // Pasted Coding Plan tokens (sk-cp-) carry no resource URL: the region column.
+    else if (region === 'cn') endpointOverride = `${MINIMAX_BASE_URLS.cn}/anthropic/v1`;
+  }
+  if (lower === 'minimax' && authType === 'api_key' && region === 'cn') {
+    endpointOverride = `${MINIMAX_BASE_URLS.cn}/v1`;
+  }
+  if ((lower === 'qwen' || lower === 'alibaba') && isQwenResolvedEndpoint(region)) {
+    endpointOverride = getQwenCompatibleBaseUrl(region);
+  }
+  if (isBedrockProvider(lower) && isBedrockRegion(region)) {
+    endpointOverride = getBedrockMantleBaseUrl(region);
+  }
+  if (lower === 'zai' && authType === 'subscription' && region === 'cn') {
+    endpointOverride = getZaiCodingPlanBaseUrl('cn');
+  }
+  if (isXiaomiProviderId(lower) && authType === 'subscription' && isXiaomiTokenPlanRegion(region)) {
+    endpointOverride = getXiaomiTokenPlanBaseUrl(region);
+  }
+  return endpointOverride;
+}
+
+/** The listing URL of a config key, moved onto the regional base when one applies. */
+function regionalModelsUrl(
+  configKey: string,
+  apiKey: string,
+  endpointOverride: string | undefined,
+  warn?: (message: string) => void,
+): string | null {
+  const config = PROVIDER_CONFIGS[configKey];
+  if (!config) return null;
+  let url = typeof config.endpoint === 'function' ? config.endpoint(apiKey) : config.endpoint;
+  if (!endpointOverride) return url;
+  if (configKey === 'minimax') {
+    const minimaxBaseUrl = normalizeProviderBaseUrl(endpointOverride);
+    if (minimaxBaseUrl === MINIMAX_BASE_URLS.global || minimaxBaseUrl === MINIMAX_BASE_URLS.cn) {
+      url = `${minimaxBaseUrl}/v1/models`;
+    }
+  } else if (configKey === 'minimax-subscription') {
+    const minimaxBaseUrl = normalizeMinimaxSubscriptionBaseUrl(endpointOverride);
+    if (minimaxBaseUrl) url = `${minimaxBaseUrl}/models?limit=100`;
+    else warn?.('Ignoring invalid MiniMax subscription endpoint override');
+  } else if (configKey === 'bedrock') {
+    const bedrockBaseUrl = normalizeBedrockMantleBaseUrl(endpointOverride);
+    if (bedrockBaseUrl) url = `${bedrockBaseUrl}/v1/models`;
+    else warn?.('Ignoring invalid AWS Bedrock endpoint override');
+  } else if (configKey === 'qwen' || configKey === 'qwen-subscription') {
+    const qwenBaseUrl = normalizeQwenCompatibleBaseUrl(endpointOverride);
+    if (qwenBaseUrl) url = `${qwenBaseUrl}/v1/models`;
+    else warn?.('Ignoring invalid Qwen endpoint override');
+  } else if (configKey === 'zai-subscription') {
+    const zaiBaseUrl = normalizeZaiCodingPlanBaseUrl(endpointOverride);
+    if (zaiBaseUrl) url = `${zaiBaseUrl}/models`;
+    else warn?.('Ignoring invalid Z.ai subscription endpoint override');
+  } else if (configKey === 'xiaomi-subscription') {
+    const xiaomiBaseUrl = normalizeXiaomiTokenPlanBaseUrl(endpointOverride);
+    if (xiaomiBaseUrl) url = `${xiaomiBaseUrl}/v1/models`;
+    else warn?.('Ignoring invalid Xiaomi MiMo Token Plan endpoint override');
+  }
+  return url;
+}
+
+/**
+ * The region whose CRIS profiles a Bedrock connection lists: its own, or the
+ * one of the regional Mantle base discovery computed from it. Never parsed
+ * from a connection-set URL.
+ */
+function bedrockCrisRegion(
+  options: ProviderModelFetchOptions | undefined,
+  endpointOverride: string | undefined,
+): string | null {
+  if (options?.region !== undefined) return options.region;
+  if (!endpointOverride) return null;
+  try {
+    return new URL(endpointOverride).hostname.split('.')[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Bedrock's control-plane listing of system inference profiles in a region. */
+export function bedrockCrisProfilesUrl(region: string | null | undefined): string {
+  return (
+    `${getBedrockControlPlaneBaseUrl(region)}/inference-profiles` +
+    '?type=SYSTEM_DEFINED&maxResults=1000'
+  );
+}
+
+/** Pioneer's public base-model catalog (no key). */
+export { PIONEER_BASE_MODELS_URL, CLINE_PASS_RECOMMENDED_MODELS_URL };
+
+/**
+ * The listing URL a connection uses without an override of its own: the
+ * `models` slot default (ADR 0012). Null when the connection lists nothing.
+ */
+export function defaultModelsUrl(
+  provider: string,
+  authType: string | null | undefined,
+  region: string | null | undefined,
+): string | null {
+  const configKey = modelsConfigKey(provider, authType);
+  if (!configKey) return null;
+  if (configKey === 'opencode' || configKey === 'opencode-go') {
+    return OPENCODE_CATALOG_URLS[configKey];
+  }
+  if (configKey === 'cline-pass') return null;
+  if (configKey === 'kiro') return KIRO_BASE_URL;
+  return regionalModelsUrl(configKey, '', modelsRegionEndpoint(provider, authType, region));
 }
 
 @Injectable()
@@ -1250,117 +1715,64 @@ export class ProviderModelFetcherService {
     endpointOverride?: string,
     options?: ProviderModelFetchOptions,
   ): Promise<DiscoveredModel[]> {
-    let configKey = providerId.toLowerCase();
-    // OpenAI subscription tokens use a different models endpoint
-    if (configKey === 'openai' && authType === 'subscription') {
-      configKey = 'openai-subscription';
-    } else if (configKey === 'minimax' && authType === 'subscription') {
-      configKey = 'minimax-subscription';
-    } else if (configKey === 'mistral' && authType === 'subscription') {
-      configKey = 'mistral-subscription';
-    } else if (configKey === 'xiaomi' && authType === 'subscription') {
-      configKey = 'xiaomi-subscription';
-    } else if (configKey === 'moonshot' && authType === 'subscription') {
-      // Kimi Code documents a fixed subscription model catalog rather than a
-      // subscription-scoped /models endpoint.
-      return [];
-    } else if (configKey === 'qwen' && authType === 'subscription') {
-      configKey = 'qwen-subscription';
-    } else if (configKey === 'zai' && authType === 'subscription') {
-      configKey = 'zai-subscription';
-    } else if (configKey === 'xai' && authType === 'subscription') {
-      configKey = 'xai-subscription';
-    } else if (configKey === 'opencode' || configKey === 'opencode-go') {
+    const modelsUrl = options?.urls?.models;
+    const configKey = modelsConfigKey(providerId, authType);
+    if (configKey === 'opencode' || configKey === 'opencode-go') {
+      // The catalog is global (ADR 0009); a connection with its own listing
+      // URL reads that one instead, for itself only.
+      if (modelsUrl) return this.fetchOpencodeModelsFrom(configKey, apiKey, modelsUrl);
       return this.fetchOpencodeModels(configKey, apiKey, options?.forceRefresh === true);
-    } else if (configKey === 'cline-pass') {
-      return this.fetchClinePassModels();
-    } else if (configKey === 'gemini' && authType === 'subscription') {
-      // CodeAssist (`cloudcode-pa.googleapis.com`) does not expose a
-      // `/models` endpoint; the discovery fallback chain pulls Gemini
-      // models from the OpenRouter cache instead.
-      return [];
-    } else if (configKey === 'kiro') {
-      return this.fetchKiroModels(apiKey);
     }
-    const config = PROVIDER_CONFIGS[configKey];
-    if (!config) {
-      this.logger.warn(`No fetcher config for provider: ${providerId}`);
+    if (configKey === 'cline-pass') {
+      return this.fetchClinePassModels(options?.urls?.models_recommended);
+    }
+    if (configKey === 'kiro') return this.fetchKiroModels(apiKey, modelsUrl);
+    // Kimi Code documents a fixed subscription model catalog, and CodeAssist
+    // (`cloudcode-pa.googleapis.com`) has no `/models` endpoint: the
+    // discovery fallback chain fills them in.
+    if (!configKey) {
+      if (!(authType === 'subscription' && /^(moonshot|gemini|google)$/i.test(providerId))) {
+        this.logger.warn(`No fetcher config for provider: ${providerId}`);
+      }
       return [];
     }
+    const config = PROVIDER_CONFIGS[configKey]!;
 
     if (configKey === 'fireworks') {
-      return this.fetchFireworksModels(config, apiKey, providerId);
+      return this.fetchFireworksModels(config, apiKey, providerId, modelsUrl);
     }
     if (configKey === 'pioneer') {
-      return this.fetchPioneerModels(config, apiKey, providerId, authType);
+      return this.fetchPioneerModels(
+        config,
+        apiKey,
+        providerId,
+        authType,
+        modelsUrl,
+        options?.urls?.models_base_catalog,
+      );
     }
 
-    let url = typeof config.endpoint === 'function' ? config.endpoint(apiKey) : config.endpoint;
-    if (endpointOverride && configKey === 'minimax') {
-      const minimaxBaseUrl = normalizeProviderBaseUrl(endpointOverride);
-      if (minimaxBaseUrl === MINIMAX_BASE_URLS.global || minimaxBaseUrl === MINIMAX_BASE_URLS.cn) {
-        url = `${minimaxBaseUrl}/v1/models`;
-      }
-    } else if (endpointOverride && configKey === 'minimax-subscription') {
-      const minimaxBaseUrl = normalizeMinimaxSubscriptionBaseUrl(endpointOverride);
-      if (minimaxBaseUrl) {
-        url = `${minimaxBaseUrl}/models?limit=100`;
-      } else {
-        this.logger.warn('Ignoring invalid MiniMax subscription endpoint override');
-      }
-    } else if (endpointOverride && configKey === 'bedrock') {
-      const bedrockBaseUrl = normalizeBedrockMantleBaseUrl(endpointOverride);
-      if (bedrockBaseUrl) {
-        url = `${bedrockBaseUrl}/v1/models`;
-      } else {
-        this.logger.warn('Ignoring invalid AWS Bedrock endpoint override');
-      }
-    } else if (endpointOverride && (configKey === 'qwen' || configKey === 'qwen-subscription')) {
-      const qwenBaseUrl = normalizeQwenCompatibleBaseUrl(endpointOverride);
-      if (qwenBaseUrl) {
-        url = `${qwenBaseUrl}/v1/models`;
-      } else {
-        this.logger.warn('Ignoring invalid Qwen endpoint override');
-      }
-    } else if (endpointOverride && configKey === 'zai-subscription') {
-      const zaiBaseUrl = normalizeZaiCodingPlanBaseUrl(endpointOverride);
-      if (zaiBaseUrl) {
-        url = `${zaiBaseUrl}/models`;
-      } else {
-        this.logger.warn('Ignoring invalid Z.ai subscription endpoint override');
-      }
-    } else if (endpointOverride && configKey === 'xiaomi-subscription') {
-      const xiaomiBaseUrl = normalizeXiaomiTokenPlanBaseUrl(endpointOverride);
-      if (xiaomiBaseUrl) {
-        url = `${xiaomiBaseUrl}/v1/models`;
-      } else {
-        this.logger.warn('Ignoring invalid Xiaomi MiMo Token Plan endpoint override');
-      }
-    }
-
-    if (options?.accountBaseUrl) {
-      url = rebaseUrl(url, options.accountBaseUrl.official, options.accountBaseUrl.base);
-      try {
-        await validatePublicUrl(url, {
-          allowPrivate: options.accountBaseUrl.allowPrivate !== false,
-        });
-      } catch (err) {
-        this.logger.warn(
-          `Ignoring model discovery on a blocked base URL: ${(err as Error).message}`,
-        );
-        return [];
-      }
-    }
+    const url =
+      modelsUrl?.url ??
+      regionalModelsUrl(configKey, apiKey, endpointOverride, (m) => this.logger.warn(m))!;
 
     const headers = config.buildHeaders(apiKey, authType);
 
     if (configKey === 'bedrock') {
       // Mantle lists no CRIS profiles, so they come from the control plane of
-      // the same region (the Mantle host is `bedrock-mantle.<region>.api.aws`).
-      const region = new URL(url).hostname.split('.')[1];
+      // the connection's own region (never parsed back from a possibly
+      // overridden Mantle host).
       const [mantleModels, crisProfiles] = await Promise.all([
-        this.fetchModelList(url, headers, config, apiKey, providerId, configKey),
-        this.fetchBedrockCrisProfiles(apiKey, region, providerId, options?.previousModels ?? []),
+        this.fetchModelList(url, headers, config, apiKey, providerId, configKey, modelsUrl),
+        this.fetchBedrockCrisProfiles(
+          apiKey,
+          options?.urls?.cris_profiles ??
+            builtInProviderUrl(
+              bedrockCrisProfilesUrl(bedrockCrisRegion(options, endpointOverride)),
+            ),
+          providerId,
+          options?.previousModels ?? [],
+        ),
       ]);
       // Mantle stays the primary source: when it returns nothing, discovery
       // falls back to models.dev or the cache as before, instead of keeping
@@ -1374,17 +1786,7 @@ export class ProviderModelFetcherService {
       return this.fetchLmStudioModels(config, url, apiKey, providerId);
     }
 
-    return this.fetchModelList(
-      url,
-      headers,
-      config,
-      apiKey,
-      providerId,
-      configKey,
-      options?.accountBaseUrl
-        ? { allowPrivate: options.accountBaseUrl.allowPrivate !== false }
-        : undefined,
-    );
+    return this.fetchModelList(url, headers, config, apiKey, providerId, configKey, modelsUrl);
   }
 
   private async fetchModelList(
@@ -1394,9 +1796,9 @@ export class ProviderModelFetcherService {
     apiKey: string,
     providerId: string,
     configKey: string,
-    userBaseUrl?: { allowPrivate: boolean },
+    resolved?: ResolvedProviderUrl,
   ): Promise<DiscoveredModel[]> {
-    const body = await this.requestModelsJson(url, headers, apiKey, providerId, userBaseUrl);
+    const body = await this.requestModelsJson(url, headers, apiKey, providerId, resolved);
     if (body === undefined) return [];
     return filterNonChatModels(config.parse(body, providerId), configKey);
   }
@@ -1407,19 +1809,16 @@ export class ProviderModelFetcherService {
     headers: Record<string, string>,
     apiKey: string,
     providerId: string,
-    userBaseUrl?: { allowPrivate: boolean },
+    resolved?: ResolvedProviderUrl,
   ): Promise<unknown> {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      // A base URL the user typed gets the proxy's SSRF guard: the connection
-      // is pinned to the validated address (cloud metadata refused at connect
-      // time) and redirects are refused, like provider-client does.
+      // A URL the connection set gets the proxy's SSRF guard: revalidated,
+      // pinned to the validated address and no redirects (fetchProviderUrl).
       const init: RequestInit = { headers, signal: controller.signal };
-      const res = userBaseUrl
-        ? await ssrfSafeFetch(url, { ...init, redirect: 'error' }, userBaseUrl)
-        : await outboundFetch(url, init);
+      const res = await fetchProviderUrl(resolved ?? builtInProviderUrl(url), init, url);
       clearTimeout(timeout);
 
       if (!res.ok) {
@@ -1475,15 +1874,12 @@ export class ProviderModelFetcherService {
    */
   private async fetchBedrockCrisProfiles(
     apiKey: string,
-    region: string,
+    profiles: ResolvedProviderUrl,
     providerId: string,
     previousModels: readonly DiscoveredModel[],
   ): Promise<DiscoveredModel[]> {
-    const url =
-      `${getBedrockControlPlaneBaseUrl(region)}/inference-profiles` +
-      '?type=SYSTEM_DEFINED&maxResults=1000';
     try {
-      const res = await outboundFetch(url, {
+      const res = await fetchProviderUrl(profiles, {
         headers: bearerHeaders(apiKey),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -1509,8 +1905,10 @@ export class ProviderModelFetcherService {
     config: FetcherConfig,
     apiKey: string,
     providerId: string,
+    modelsUrl?: ResolvedProviderUrl,
   ): Promise<DiscoveredModel[]> {
     const headers = config.buildHeaders(apiKey);
+    const listing = modelsUrl ?? builtInProviderUrl(FIREWORKS_MODELS_URL);
     const all: DiscoveredModel[] = [];
     let pageToken: string | undefined;
     let pageCount = 0;
@@ -1528,10 +1926,10 @@ export class ProviderModelFetcherService {
           seenPageTokens.add(pageToken);
         }
 
-        const url = this.buildFireworksModelsUrl(pageToken);
+        const url = this.buildFireworksModelsUrl(listing.url, pageToken);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-        const res = await outboundFetch(url, { headers, signal: controller.signal });
+        const res = await fetchProviderUrl(listing, { headers, signal: controller.signal }, url);
         clearTimeout(timeout);
         pageCount += 1;
 
@@ -1561,13 +1959,13 @@ export class ProviderModelFetcherService {
     }
   }
 
-  private buildFireworksModelsUrl(pageToken?: string): string {
+  private buildFireworksModelsUrl(base: string, pageToken?: string): string {
     const params = new URLSearchParams({
       filter: 'supports_serverless=true',
       pageSize: String(FIREWORKS_MODELS_PAGE_SIZE),
     });
     if (pageToken) params.set('pageToken', pageToken);
-    return `${FIREWORKS_MODELS_URL}?${params.toString()}`;
+    return `${base}${base.includes('?') ? '&' : '?'}${params.toString()}`;
   }
 
   private async fetchPioneerModels(
@@ -1575,27 +1973,28 @@ export class ProviderModelFetcherService {
     apiKey: string,
     providerId: string,
     authType?: string,
+    modelsUrl?: ResolvedProviderUrl,
+    baseCatalogUrl?: ResolvedProviderUrl,
   ): Promise<DiscoveredModel[]> {
     const headers = config.buildHeaders(apiKey, authType);
+    const listing = modelsUrl ?? builtInProviderUrl(PIONEER_MODELS_URL);
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-      const res = await outboundFetch(PIONEER_MODELS_URL, {
+      const res = await fetchProviderUrl(listing, {
         headers,
         signal: controller.signal,
       });
       clearTimeout(timeout);
 
       if (!res.ok) {
-        this.logger.warn(
-          `Provider ${providerId} returned ${res.status} from ${PIONEER_MODELS_URL}`,
-        );
+        this.logger.warn(`Provider ${providerId} returned ${res.status} from ${listing.url}`);
         return [];
       }
 
       const models = config.parse(await res.json(), providerId);
-      const catalog = await this.fetchPioneerBaseCatalog();
+      const catalog = await this.fetchPioneerBaseCatalog(baseCatalogUrl);
       return filterNonChatModels(enrichPioneerModels(models, catalog), 'pioneer');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1604,11 +2003,13 @@ export class ProviderModelFetcherService {
     }
   }
 
-  private async fetchPioneerBaseCatalog(): Promise<Map<string, PioneerBaseModelEntry>> {
+  private async fetchPioneerBaseCatalog(
+    catalogUrl: ResolvedProviderUrl = builtInProviderUrl(PIONEER_BASE_MODELS_URL),
+  ): Promise<Map<string, PioneerBaseModelEntry>> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await outboundFetch(PIONEER_BASE_MODELS_URL, { signal: controller.signal });
+      const res = await fetchProviderUrl(catalogUrl, { signal: controller.signal });
       if (!res.ok) {
         this.logger.warn(`Pioneer base model catalog returned ${res.status}`);
         return new Map();
@@ -1643,7 +2044,36 @@ export class ProviderModelFetcherService {
       .map((entry) => opencodeDiscoveredModel(provider, entry));
   }
 
-  private async fetchKiroModels(apiKey: string): Promise<DiscoveredModel[]> {
+  /** A connection's own catalog URL (the inference host's `/v1/models` shape). */
+  private async fetchOpencodeModelsFrom(
+    provider: OpencodeCatalogProvider,
+    apiKey: string,
+    listing: ResolvedProviderUrl,
+  ): Promise<DiscoveredModel[]> {
+    try {
+      const res = await fetchProviderUrl(listing, {
+        headers: { 'user-agent': OPENCODE_USER_AGENT },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Provider ${provider} returned ${res.status} from ${listing.url}`);
+        return [];
+      }
+      const freeOnly = provider === 'opencode' && apiKey === OPENCODE_FREE_KEY;
+      return parseOpencodeCatalog(await res.json())
+        .filter((entry) => !freeOnly || entry.free)
+        .map((entry) => opencodeDiscoveredModel(provider, entry));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to fetch models from ${provider}: ${message}`);
+      return [];
+    }
+  }
+
+  private async fetchKiroModels(
+    apiKey: string,
+    modelsUrl: ResolvedProviderUrl = builtInProviderUrl(KIRO_BASE_URL),
+  ): Promise<DiscoveredModel[]> {
     const models: DiscoveredModel[] = [];
     let nextToken: string | undefined;
 
@@ -1653,7 +2083,7 @@ export class ProviderModelFetcherService {
         const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         let res: Response;
         try {
-          res = await outboundFetch(KIRO_BASE_URL, {
+          res = await fetchProviderUrl(modelsUrl, {
             method: 'POST',
             headers: buildKiroHeaders(apiKey, KIRO_MODELS_TARGET),
             body: JSON.stringify({
@@ -1668,7 +2098,7 @@ export class ProviderModelFetcherService {
         }
 
         if (!res.ok) {
-          this.logger.warn(`Provider kiro returned ${res.status} from ${KIRO_BASE_URL}`);
+          this.logger.warn(`Provider kiro returned ${res.status} from ${modelsUrl.url}`);
           return [];
         }
 
@@ -1693,7 +2123,9 @@ export class ProviderModelFetcherService {
     }
   }
 
-  private async fetchClinePassModels(): Promise<DiscoveredModel[]> {
+  private async fetchClinePassModels(
+    recommendedUrl?: ResolvedProviderUrl,
+  ): Promise<DiscoveredModel[]> {
     const contextFields = contextWindowFields(
       getSubscriptionCapabilities('cline-pass')?.maxContextWindow,
     );
@@ -1709,7 +2141,7 @@ export class ProviderModelFetcherService {
       qualityScore: 3,
     });
 
-    const live = await this.fetchClinePassRecommendedModels();
+    const live = await this.fetchClinePassRecommendedModels(recommendedUrl);
     if (live.length > 0) return live.map(toDiscovered);
 
     // Fall back to the bundled list when the recommended-models endpoint is
@@ -1723,11 +2155,13 @@ export class ProviderModelFetcherService {
    * endpoint on its own API host. The response is unauthenticated, so the
    * operator's key is not sent.
    */
-  private async fetchClinePassRecommendedModels(): Promise<string[]> {
+  private async fetchClinePassRecommendedModels(
+    recommendedUrl: ResolvedProviderUrl = builtInProviderUrl(CLINE_PASS_RECOMMENDED_MODELS_URL),
+  ): Promise<string[]> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await outboundFetch(CLINE_PASS_RECOMMENDED_MODELS_URL, {
+      const res = await fetchProviderUrl(recommendedUrl, {
         signal: controller.signal,
       });
       if (!res.ok) {

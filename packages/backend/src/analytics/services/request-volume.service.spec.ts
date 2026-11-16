@@ -173,6 +173,19 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
     expect(lastParams()).toEqual(['t1', '2026-01-01', '2026-01-15', 'demo', '2026-01-08']);
   });
 
+  it('scopes the window totals to one connection by its terminal attempt', async () => {
+    messageRepo.query.mockResolvedValue([]);
+    await service.getDispositionTotalsForWindows({
+      tenantId: 't1',
+      from: '2026-01-01',
+      splitAt: '2026-01-08',
+      to: '2026-01-15',
+      connection: { tenantProviderId: 'tp-1' },
+    });
+    expect(lastSql()).toContain('WHERE t.tenant_provider_id = $5');
+    expect(lastParams()).toEqual(['t1', '2026-01-01', '2026-01-15', '2026-01-08', 'tp-1']);
+  });
+
   it('returns empty current and previous windows without a tenant, never querying', async () => {
     await expect(
       service.getDispositionTotalsForWindows({

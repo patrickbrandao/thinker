@@ -41,7 +41,18 @@ vi.mock('../../src/services/theme.js', () => ({
   getHslA: (name: string, alpha: number) => `hsla(var(${name}), ${alpha})`,
 }));
 
-vi.mock('../../src/services/chart-utils.js', () => ({
+vi.mock('../../src/services/chart-utils.js', async () => ({
+  // The real axis formatters: they are pure and the assertions read them.
+  formatAxisKTokens: (
+    await vi.importActual<typeof import('../../src/services/chart-utils.js')>(
+      '../../src/services/chart-utils.js'
+    )
+  ).formatAxisKTokens,
+  formatAxisDollars: (
+    await vi.importActual<typeof import('../../src/services/chart-utils.js')>(
+      '../../src/services/chart-utils.js'
+    )
+  ).formatAxisDollars,
   useChartLifecycle: (opts: any) => {
     capturedLifecycleOpts = opts;
   },
@@ -93,7 +104,11 @@ import GlobalOverviewSkeleton from '../../src/components/GlobalOverviewSkeleton'
 import MultiAgentTokenChart, { AGENT_COLORS } from '../../src/components/MultiAgentTokenChart';
 import ProviderChartCard from '../../src/components/ProviderChartCard';
 import UnifiedChartCard from '../../src/components/UnifiedChartCard';
-import ReliabilityKpiCards from '../../src/components/ReliabilityKpiCards';
+import ReliabilityKpiCards, {
+  applyKpiFilter,
+  kpiChartTab,
+  kpiDetailsHref,
+} from '../../src/components/ReliabilityKpiCards';
 import ErrorClassCard from '../../src/components/ErrorClassCard';
 import ReliabilityChart from '../../src/components/ReliabilityChart';
 
@@ -120,7 +135,7 @@ const buildLazyChart = async () => {
 };
 
 describe('analytics chart surface components', () => {
-  it('renders the recovered requests tab from the request-status timeseries', async () => {
+  it('renders the recovered series without stat tabs', async () => {
     const onTabChange = vi.fn();
     const recoveredTimeseries = {
       range: '7d',
@@ -132,27 +147,17 @@ describe('analytics chart surface components', () => {
       <UnifiedChartCard
         activeTab="recovered"
         onTabChange={onTabChange}
-        requestsValue={10}
-        requestsTrendPct={0}
-        recoveredValue={15}
-        recoveredTrendPct={20}
         recoveredTimeseries={recoveredTimeseries}
+        costValue={1}
         tokensValue={100}
         tokensTrendPct={0}
         range="7d"
       />,
     );
 
-    expect(
-      screen
-        .getAllByText('Recovered requests')[0]!
-        .closest('button')
-        ?.classList.contains('is-active'),
-    ).toBe(true);
-    expect(screen.getByText('15')).toBeDefined();
-    expect(screen.getByText('+20%')).toBeDefined();
-    fireEvent.click(screen.getAllByText('Requests')[0]!);
-    expect(onTabChange).toHaveBeenCalledWith('requests');
+    // The KPI cards pick the chart view: the card has no stat tabs.
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(onTabChange).not.toHaveBeenCalled();
     await buildLazyChart();
     // Stacked series are reversed (top-of-stack first).
     const labels = capturedChartOpts.series.slice(1).map((s: { label: string }) => s.label);
@@ -335,19 +340,26 @@ describe('analytics chart surface components', () => {
         }}
       />,
     );
-    expect(screen.getByText('Success rate')).toBeDefined();
+    expect(screen.getByText('Successful requests')).toBeDefined();
     expect(screen.getByText('80.0%')).toBeDefined();
     // Recovered share = 3 / 100.
     expect(screen.getByText('Recovered requests')).toBeDefined();
     expect(screen.getByText('3.0%')).toBeDefined();
     expect(screen.getByText('Failed requests')).toBeDefined();
-    expect(screen.getByText('Recovered by Fallback')).toBeDefined();
-    expect(screen.getByText('3')).toBeDefined();
+    // One recovered tile (no duplicate "Recovered by Fallback"), in the
+    // warning color since it is above zero.
+    expect(screen.queryByText('Recovered by Fallback')).toBeNull();
+    expect(screen.getByText('3').className).toContain('text-warn');
+    // Successful requests = total - failed, with the rate beside it.
+    expect(screen.getByText('100')).toBeDefined();
+    // Zero failures keep the neutral color.
+    expect(screen.getByText('0').className).toContain('text-ink');
     expect(document.body.textContent).not.toContain('Autofix');
     // Four cards use the base responsive grid; an inline grid-template-columns
     // would override the phone breakpoints.
-    const grid = screen.getByText('Success rate').closest('.stat-tiles') as HTMLElement;
-    expect(grid.querySelectorAll('.stat-tile')).toHaveLength(4);
+    const grid = screen.getByText('Successful requests').closest('.stat-tiles') as HTMLElement;
+    // Without cost/tokens the usage cards are hidden.
+    expect(grid.querySelectorAll('.stat-tile')).toHaveLength(3);
     expect(grid.style.gridTemplateColumns).toBe('');
     unmount();
 
@@ -361,7 +373,7 @@ describe('analytics chart surface components', () => {
         }}
       />,
     );
-    expect(screen.getAllByText('-50%').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('-50%')).toHaveLength(1);
   });
 
   it('colors the fallback and failed KPI values only when they are above zero', () => {
@@ -374,79 +386,110 @@ describe('analytics chart surface components', () => {
       errors_remaining: { value: errors, previous: 0 },
     });
     const { unmount } = render(<ReliabilityKpiCards stats={stats(0, 0)} />);
-    expect(valueOf('Recovered by Fallback').className).toContain('text-ink');
+    expect(valueOf('Recovered requests').className).toContain('text-ink');
     expect(valueOf('Failed requests').className).toContain('text-ink');
     unmount();
 
     render(<ReliabilityKpiCards stats={stats(2, 1)} />);
-    expect(valueOf('Recovered by Fallback').className).toContain('text-warn');
+    expect(valueOf('Recovered requests').className).toContain('text-warn');
     expect(valueOf('Failed requests').className).toContain('text-danger');
   });
 
-  it('deep-links the recovered KPI cards when an agent scope is given', () => {
-    const base = {
+  it('renders cost and token cards after Successful requests and selects views', () => {
+    const onSelect = vi.fn();
+    const stats = {
       success_rate: { value: 0.8, previous: 0.7 },
-      errors_remaining: { value: 0, previous: 0 },
+      errors_remaining: { value: 2, previous: 1 },
+      fallback_saves: { value: 3, previous: 0 },
+      total_requests: { value: 100, previous: 0 },
     };
-    render(
-      <ReliabilityKpiCards
-        stats={{
-          ...base,
-          fallback_saves: { value: 3, previous: 0 },
-          total_requests: { value: 100, previous: 0 },
-        }}
-        agentName="demo-agent"
+    const props = {
+      stats,
+      cost: { value: 2.71, trendPct: -5 },
+      tokens: { value: 5000, trendPct: 12 },
+      onSelect,
+    };
+    const { rerender } = render(<ReliabilityKpiCards {...props} selected="requests" />);
+    const labels = [...document.querySelectorAll('.stat-tile .stat-label')].map(
+      (el) => el.textContent,
+    );
+    expect(labels).toEqual([
+      'Successful requests',
+      'Cost',
+      'Token usage',
+      'Recovered requests',
+      'Failed requests',
+    ]);
+    expect(screen.getByText('$2.71')).toBeDefined();
+    expect(screen.getByText('-5%')).toBeDefined();
+    expect(screen.getByText('+12%')).toBeDefined();
+    // No "new" badge, info icon or "View more" link.
+    expect(document.body.textContent).not.toMatch(/\bnew\b|View more/i);
+    expect(document.querySelector('[data-testid="info-tooltip"]')).toBeNull();
+
+    const tile = (label: string) => screen.getByText(label).closest('.stat-tile')!;
+    expect(tile('Successful requests').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(tile('Cost'));
+    expect(onSelect).toHaveBeenLastCalledWith('cost');
+    fireEvent.click(tile('Failed requests'));
+    expect(onSelect).toHaveBeenLastCalledWith('failed');
+    expect(routerNavigate).not.toHaveBeenCalled();
+
+    rerender(<ReliabilityKpiCards {...props} selected="failed" />);
+    expect(tile('Failed requests').classList.contains('is-selected')).toBe(true);
+    expect(tile('Successful requests').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('shows the usage cards with dashes while reliability stats load', () => {
+    render(<ReliabilityKpiCards stats={undefined} cost={{ value: 1, trendPct: 0 }} />);
+    expect(screen.getByText('$1.00')).toBeDefined();
+    expect(screen.getAllByText('—')).toHaveLength(3);
+  });
+
+  it('links each chart to the report behind it, beside the title', () => {
+    expect(kpiDetailsHref('recovered', { agentName: 'demo agent', range: '7d' })).toBe(
+      '/messages?agent=demo%20agent&range=7d&status=ok&trigger=fallback',
+    );
+    expect(kpiDetailsHref('failed', { connectionId: 'conn-1', range: '30d' })).toBe(
+      '/messages?connections=conn-1&range=30d&status=failed',
+    );
+    expect(kpiDetailsHref('cost', { range: '24h' })).toBe('/messages?range=24h');
+    expect(kpiDetailsHref('requests')).toBe('/messages');
+
+    const { unmount } = render(
+      <UnifiedChartCard
+        activeTab="requests"
+        onTabChange={vi.fn()}
+        title="Failed requests"
+        detailsHref="/messages?status=failed"
+        tokensValue={0}
+        tokensTrendPct={0}
         range="7d"
       />,
     );
-    fireEvent.click(screen.getByText('Failed requests').closest('.stat-tile')!);
-    expect(routerNavigate).toHaveBeenCalledWith(
-      '/messages?agent=demo-agent&range=7d&status=failed',
-    );
-    fireEvent.click(screen.getByText('Recovered by Fallback').closest('.stat-tile')!);
-    expect(routerNavigate).toHaveBeenCalledWith(
-      '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback',
-    );
-    routerNavigate.mockClear();
-    fireEvent.click(screen.getByText('Recovered requests').closest('.stat-tile')!);
-    expect(routerNavigate).toHaveBeenCalledWith(
-      '/messages?agent=demo-agent&range=7d&status=ok&trigger=fallback',
-    );
-
-    const failedCard = screen.getByText('Failed requests').closest('.stat-tile')!;
-    expect(failedCard.getAttribute('role')).toBe('link');
-    expect((failedCard as HTMLElement).tabIndex).toBe(0);
-    fireEvent.keyDown(failedCard, { key: 'Enter' });
-    expect(routerNavigate).toHaveBeenLastCalledWith(
-      '/messages?agent=demo-agent&range=7d&status=failed',
-    );
-
-    const recoveredCard = screen.getByText('Recovered requests').closest('.stat-tile')!;
-    const tooltip = recoveredCard.querySelector('[data-testid="info-tooltip"]')!;
-    const navigationCount = routerNavigate.mock.calls.length;
-    fireEvent.keyDown(tooltip, { key: 'Enter' });
-    fireEvent.click(tooltip);
-    expect(routerNavigate).toHaveBeenCalledTimes(navigationCount);
+    expect(screen.getByText('Failed requests')).toBeDefined();
+    fireEvent.click(screen.getByText('View details'));
+    expect(routerNavigate).toHaveBeenCalledWith('/messages?status=failed');
+    unmount();
   });
 
-  it('describes global KPI links as covering all harnesses', () => {
-    render(
-      <ReliabilityKpiCards
-        stats={{
-          success_rate: { value: 0.8, previous: 0.7 },
-          errors_remaining: { value: 2, previous: 1 },
-          fallback_saves: { value: 3, previous: 0 },
-          total_requests: { value: 100, previous: 0 },
-        }}
-      />,
-    );
-
-    expect(
-      screen.getByText('Recovered requests').closest('.stat-tile')?.getAttribute('title'),
-    ).toBe('View recovered requests across all harnesses');
-    expect(screen.getByText('Failed requests').closest('.stat-tile')?.getAttribute('title')).toBe(
-      'View failed requests across all harnesses',
-    );
+  it('narrows the request-status series to the selected KPI', () => {
+    const ts = {
+      range: '7d',
+      by: 'disposition',
+      keys: ['success', 'fallback', 'error'],
+      buckets: [{ bucket: 'b', counts: [5, 2, 1] }],
+    };
+    // Successful requests opens the whole Requests chart.
+    expect(applyKpiFilter(ts, 'requests')).toBe(ts);
+    expect(applyKpiFilter(ts, 'cost')).toBe(ts);
+    expect(applyKpiFilter(ts, 'recovered')).toMatchObject({
+      keys: ['fallback'],
+      buckets: [{ bucket: 'b', counts: [2] }],
+    });
+    expect(applyKpiFilter(ts, 'failed')?.keys).toEqual(['error']);
+    expect(kpiChartTab('failed')).toBe('requests');
+    expect(kpiChartTab('tokens')).toBe('tokens');
   });
 
   it('renders and sorts error classes, then renders the empty state', async () => {
@@ -697,7 +740,12 @@ describe('analytics chart surface components', () => {
     expect(hover).toHaveBeenCalledWith({ openai: 10, anthropic: 5 });
 
     // Tooltip rows render after a hover with non-zero values.
-    expect(screen.getByText('openai')).toBeDefined();
+    expect(screen.getAllByText('openai').length).toBeGreaterThanOrEqual(2);
+    // The legend lists every series, so each view keeps the same height.
+    const legend = [...document.querySelectorAll('.rel-chart__legend-item')].map(
+      (e) => e.textContent,
+    );
+    expect(legend).toEqual(['openai', 'anthropic']);
     expect(screen.getByText('Total')).toBeDefined();
   });
 
@@ -713,7 +761,14 @@ describe('analytics chart surface components', () => {
 
     buildCapturedChart();
     // Token axis uses formatLegendTokens (mocked to String()).
-    expect(capturedChartOpts.axes[1].values({}, [1234])).toEqual(['1234']);
+    // Token axis in thousands; "m" above 999k.
+    expect(capturedChartOpts.axes[1].values({}, [0, 1234, 250_000, 999_000])).toEqual([
+      '0',
+      '1.2k',
+      '250k',
+      '999k',
+    ]);
+    expect(capturedChartOpts.axes[1].values({}, [1_000_000, 1_500_000])).toEqual(['1m', '1.5m']);
     expect(
       capturedChartOpts.cursor.move(
         { posToIdx: () => 0, data: [[1700000000]], valToPos: () => 5 },
@@ -739,11 +794,10 @@ describe('analytics chart surface components', () => {
 
     buildCapturedChart();
     expect(capturedChartData[1][0]).toBe(0);
-    // Cost y-axis uses formatCost: whole/cent values render normally, but a
-    // sub-cent value surfaces as "< $0.01" instead of rounding to "$0.00".
-    expect(capturedChartOpts.axes[1].values({}, [1.23])).toEqual(['$1.23']);
-    expect(capturedChartOpts.axes[1].values({}, [0.004])).toEqual(['< $0.01']);
-    expect(capturedChartOpts.axes[1].values({}, [0])).toEqual(['$0.00']);
+    // Cost y-axis: plain dollars, no currency prefix (the title says "US $").
+    expect(capturedChartOpts.axes[1].values({}, [1.23])).toEqual(['1.23']);
+    expect(capturedChartOpts.axes[1].values({}, [0.004])).toEqual(['0.004']);
+    expect(capturedChartOpts.axes[1].values({}, [0, 1500])).toEqual(['0', '1,500']);
     expect(
       capturedChartOpts.cursor.move({ posToIdx: () => null, data: [[]], valToPos: () => 0 }, 42, 9),
     ).toEqual([42, 9]);

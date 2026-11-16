@@ -12,6 +12,7 @@ const ptBR: Catalog<typeof en> = {
   requests: 'Requisições',
   harnesses: 'Harnesses',
   createHarness: 'Criar harness',
+  sectionObservability: 'OBSERVABILIDADE',
   sectionClients: 'CLIENTES',
   sectionProviders: 'PROVEDORES',
   local: 'Locais',

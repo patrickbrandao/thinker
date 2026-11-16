@@ -280,9 +280,23 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     },
     models: [],
   },
+  atlascloud: {
+    initial: 'AC',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.atlascloud');
+    },
+    models: [],
+  },
   deepseek: {
     initial: 'D',
     subtitle: 'DeepSeek V4 Pro, V4 Flash, V3.2, R1',
+    models: [],
+  },
+  edenai: {
+    initial: 'E',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.edenai');
+    },
     models: [],
   },
   fireworks: {
@@ -599,6 +613,13 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     freeKey: 'public',
     models: [],
   },
+  requesty: {
+    initial: 'R',
+    get subtitle() {
+      return t('providerSetup.catalog.subtitles.requesty');
+    },
+    models: [],
+  },
   openrouter: {
     initial: 'OR',
     get subtitle() {
@@ -666,12 +687,14 @@ export function buildProviderDef(shared: SharedProviderEntry): ProviderDef {
 const PROVIDER_ORDER = [
   'qwen',
   'anthropic',
+  'atlascloud',
   'bedrock',
   'byteplus',
   'cerebras',
   'cline-pass',
   'commandcode',
   'deepseek',
+  'edenai',
   'pioneer',
   'fireworks',
   'copilot',
@@ -695,6 +718,7 @@ const PROVIDER_ORDER = [
   'opencode',
   'opencode-go',
   'openrouter',
+  'requesty',
   'xai',
   'xiaomi',
   'zai',

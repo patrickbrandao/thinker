@@ -38,7 +38,13 @@ import { PROVIDERS } from '../services/providers.js';
 import { AGENT_COLORS } from '../components/MultiAgentTokenChart.js';
 import InfoTooltip from '../components/InfoTooltip.js';
 import UnifiedChartCard, { type ChartTab } from '../components/UnifiedChartCard.js';
-import ReliabilityKpiCards from '../components/ReliabilityKpiCards.js';
+import ReliabilityKpiCards, {
+  applyKpiFilter,
+  kpiChartTab,
+  kpiChartTitle,
+  kpiDetailsHref,
+  type KpiView,
+} from '../components/ReliabilityKpiCards.js';
 import Sparkline from '../components/Sparkline.js';
 import FilterSelect from '../components/FilterSelect.js';
 import Select from '../components/Select.js';
@@ -271,7 +277,9 @@ export default function GlobalOverview() {
     setGroupByRaw(v);
     persist('local', GROUP_STORAGE_KEY, v);
   };
-  const [chartView, setChartView] = useState<ChartTab>('requests');
+  // The selected KPI card drives the chart (tab + status filter).
+  const [kpiView, setKpiView] = useState<KpiView>('requests');
+  const chartView: ChartTab = kpiChartTab(kpiView);
 
   // ── Data ─────────────────────────────────────────────────────────────
   const overviewRes = useResource(
@@ -355,20 +363,10 @@ export default function GlobalOverview() {
     [chartRange, aPing],
   );
   const requestStatusTs = requestStatusRes.data;
-  const recoveredTs = useMemo(() => {
-    if (!requestStatusTs) return undefined;
-    const picked = requestStatusTs.keys
-      .map((k, i) => ({ k, i }))
-      .filter(({ k }) => k === 'fallback');
-    return {
-      ...requestStatusTs,
-      keys: picked.map(({ k }) => k),
-      buckets: requestStatusTs.buckets.map((b) => ({
-        bucket: b.bucket,
-        counts: picked.map(({ i }) => b.counts[i] ?? 0),
-      })),
-    };
-  }, [requestStatusTs]);
+  const filteredStatusTs = useMemo(
+    () => applyKpiFilter(requestStatusTs, kpiView),
+    [requestStatusTs, kpiView],
+  );
 
   // Harness table usage follows the page range selector (the workspace agents
   // endpoint is a fixed window).
@@ -547,21 +545,24 @@ export default function GlobalOverview() {
     agents !== undefined &&
     providers !== undefined;
 
-  const requestsGroup = groupBy === 'agent' ? 'agent' : 'status';
+  // A KPI card filters by request status, so it forces the status grouping.
+  const statusOnly = kpiView === 'recovered' || kpiView === 'failed';
+  const requestsGroup = groupBy === 'agent' && !statusOnly ? 'agent' : 'status';
   const usageGroup = groupBy === 'provider' ? 'provider' : 'agent';
-  const recoveredTrendPct = (() => {
-    const s = reliabilityStats;
-    if (!s) return 0;
-    const cur = s.fallback_saves?.value ?? 0;
-    const prev = s.fallback_saves?.previous ?? 0;
-    if (prev === 0) return 0;
-    return Math.max(-999, Math.min(999, Math.round(((cur - prev) / prev) * 100)));
-  })();
 
   const segmented = (options: Array<{ key: string; label: string; active: boolean }>) => (
     <div className="segmented" role="group">
       {options.map((o) => (
-        <button key={o.key} type="button" aria-pressed={o.active} onClick={() => setGroupBy(o.key)}>
+        <button
+          key={o.key}
+          type="button"
+          aria-pressed={o.active}
+          onClick={() => {
+            setGroupBy(o.key);
+            // Grouping requests by harness drops the status-only card filter.
+            if (o.key === 'agent' && statusOnly) setKpiView('requests');
+          }}
+        >
           {o.label}
         </button>
       ))}
@@ -572,26 +573,30 @@ export default function GlobalOverview() {
     const o = overview!;
     return (
       <>
-        <ReliabilityKpiCards stats={reliabilityStats} range={chartRange} />
+        <ReliabilityKpiCards
+          stats={reliabilityStats}
+          cost={{ value: o.summary.cost_today.value, trendPct: o.summary.cost_today.trend_pct }}
+          tokens={{
+            value: o.summary.tokens_today.value,
+            trendPct: o.summary.tokens_today.trend_pct,
+          }}
+          selected={kpiView}
+          onSelect={setKpiView}
+        />
 
         <UnifiedChartCard
           activeTab={chartView}
-          onTabChange={setChartView}
-          requestsValue={o.summary.messages.value}
-          requestsTrendPct={o.summary.messages.trend_pct}
-          recoveredValue={reliabilityStats?.fallback_saves?.value ?? 0}
-          recoveredTrendPct={recoveredTrendPct}
-          recoveredTimeseries={recoveredTs}
+          onTabChange={setKpiView}
+          title={kpiChartTitle(kpiView)}
+          detailsHref={kpiDetailsHref(kpiView, { range: chartRange })}
           costValue={o.summary.cost_today.value}
-          costTrendPct={o.summary.cost_today.trend_pct}
-          costInfoTooltip={t('overview.costInfo')}
           tokensValue={o.summary.tokens_today.value}
-          tokensTrendPct={o.summary.tokens_today.trend_pct}
+          tokensTrendPct={0}
           range={chartRange}
           // A request can touch several providers, so the Requests tab only
           // groups by status or harness; usage tabs only group by provider or
           // harness. One stored groupBy, coerced per tab.
-          requestStatusTimeseries={requestsGroup === 'status' ? requestStatusTs : undefined}
+          requestStatusTimeseries={requestsGroup === 'status' ? filteredStatusTs : undefined}
           agentRequestTimeseries={requestsGroup === 'agent' ? filteredMessageTs : undefined}
           agentTimeseries={filteredTokenTs}
           agentCostTimeseries={filteredCostTs}
@@ -1082,11 +1087,15 @@ export default function GlobalOverview() {
       <AddAgentModal open={addAgentOpen} onClose={dismissAddAgent} />
 
       {!hasNoAgents || !hasNoProviders ? (
-        <div className="page-head justify-end">
-          <div className="page-actions">
-            <div className="w-44">
-              <Select value={chartRange} onChange={setChartRange} options={rangeOptions()} />
-            </div>
+        <div className="overview-filter-bar mb-4 flex min-h-9 flex-wrap items-center justify-start gap-2 rounded-control border border-line bg-elev px-3 py-1.5">
+          <span className="text-xs text-muted">{t('overview.periodFilter')}</span>
+          <div className="w-44">
+            <Select
+              value={chartRange}
+              onChange={setChartRange}
+              options={rangeOptions()}
+              label={t('overview.periodFilter')}
+            />
           </div>
         </div>
       ) : null}

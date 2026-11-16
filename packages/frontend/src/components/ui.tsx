@@ -3,7 +3,9 @@
  * classes in styles/base.css and shell.css; colors only from tokens.
  */
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -221,12 +223,15 @@ export function Tabs<K extends string>({
   onChange,
   className,
   label,
+  end,
 }: {
   items: TabItem<K>[];
   value: K;
   onChange?: (key: K) => void;
   className?: string;
   label?: string;
+  /** Actions on the right end of the tab row (e.g. a Manage button). */
+  end?: ReactNode;
 }) {
   return (
     <div className={cx('tabs', className)} role="tablist" aria-label={label}>
@@ -261,6 +266,7 @@ export function Tabs<K extends string>({
           </button>
         );
       })}
+      {end ? <div className="ml-auto flex shrink-0 items-center gap-2 pb-1">{end}</div> : null}
     </div>
   );
 }
@@ -462,11 +468,61 @@ export function Modal({
 }
 
 /**
+ * In-app confirmation (never `window.confirm`, which embedded browsers such as
+ * the desktop app's pane dismiss silently, returning false).
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel,
+  danger,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: ReactNode;
+  confirmLabel: string;
+  danger?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal open={open} title={title} onClose={onCancel}>
+      <p className="text-sm text-ink">{message}</p>
+      <div className="actions mt-4 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
+          {t('common.cancel')}
+        </Button>
+        <Button variant={danger ? 'danger' : undefined} busy={busy} onClick={onConfirm}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/**
  * A non-modal window: no backdrop, the page behind stays usable and a click
  * outside never closes it. Dragged by its title bar; resized from its corner;
  * closed by its X or Escape. The title bar and `footer` stay put while the
- * body scrolls. `icon` sits left of the title.
+ * body scrolls. `icon` sits left of the title. A form inside the body can put
+ * its buttons in that fixed footer with `WindowFooter`.
  */
+const WindowFooterSlot = createContext<HTMLElement | null>(null);
+
+/**
+ * The action buttons of a form: in a FloatingWindow they render in its fixed
+ * footer (outside the scrolling body); anywhere else, in place.
+ */
+export function WindowFooter({ children }: { children: ReactNode }) {
+  const slot = useContext(WindowFooterSlot);
+  return slot ? createPortal(children, slot) : <>{children}</>;
+}
+
 export function FloatingWindow({
   open,
   title,
@@ -486,6 +542,7 @@ export function FloatingWindow({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [footEl, setFootEl] = useState<HTMLDivElement | null>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   useEffect(() => {
     if (!open) {
@@ -544,8 +601,13 @@ export function FloatingWindow({
           <X />
         </IconButton>
       </div>
-      <div className="modal-body floating-window-body">{children}</div>
-      {footer ? <div className="floating-window-foot">{footer}</div> : null}
+      <div className="modal-body floating-window-body">
+        <WindowFooterSlot.Provider value={footEl}>{children}</WindowFooterSlot.Provider>
+      </div>
+      {/* Empty (no footer, no WindowFooter) collapses through :empty. */}
+      <div className="floating-window-foot" ref={setFootEl}>
+        {footer}
+      </div>
     </div>,
     document.body,
   );

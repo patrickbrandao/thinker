@@ -1,3 +1,4 @@
+import type { ChainRouteStatus } from 'thinker-shared';
 import { fetchJson, fetchMutate, routingPath } from './core.js';
 import type { AuthType, ModelRoute, ResponseMode, OutputModality } from './routing.js';
 
@@ -12,6 +13,8 @@ export interface SpecificityAssignment {
   output_modality?: OutputModality;
   response_mode?: ResponseMode;
   updated_at: string;
+  /** Status of each stored route, computed by the backend on every read. */
+  route_status?: ChainRouteStatus;
 }
 
 export function getSpecificityAssignments(agentName: string) {

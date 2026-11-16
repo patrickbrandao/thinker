@@ -11,6 +11,10 @@ import { AgentMessage } from '../entities/agent-message.entity';
 import { CustomProvider } from '../entities/custom-provider.entity';
 import { ProviderClient } from '../routing/proxy/provider-client';
 import { resolveForwardEndpoint } from '../routing/proxy/forward-endpoint-resolver';
+import {
+  runWithProviderUrls,
+  type ProviderUrlConnection,
+} from '../routing/provider-urls/provider-url-scope';
 import { CustomProviderService } from '../routing/custom-provider/custom-provider.service';
 import {
   isRefreshableOAuthCredential,
@@ -90,8 +94,7 @@ export class PlaygroundService {
     // with the proxy for minimax/qwen/zai/copilot/custom.
     let oauthResourceUrl: string | undefined;
     let providerRegion: string | null | undefined;
-    let providerBaseUrl: string | null | undefined;
-    let providerBaseUrlAllowsPrivate: boolean | undefined;
+    let urls: ProviderUrlConnection | undefined;
     let egressScope: OutboundScope | undefined;
     try {
       // The Playground always runs under the reserved per-tenant "Playground"
@@ -133,24 +136,34 @@ export class PlaygroundService {
       rawApiKey = key.apiKey;
       providerKeyLabel = key.label;
       providerRegion = key.region;
-      providerBaseUrl = key.baseUrl ?? null;
-      providerBaseUrlAllowsPrivate = key.baseUrlAllowsPrivate !== false;
+      // The connection's own URLs (ADR 0012), for the forward and any refresh.
+      urls = {
+        provider: dto.provider,
+        authType: authType ?? 'api_key',
+        region: key.region,
+        urlOverrides: key.urlOverrides ?? null,
+        baseUrl: key.baseUrl ?? null,
+        allowPrivate: key.baseUrlAllowsPrivate !== false,
+      };
+      const keyUrls = urls;
       egressScope = await this.egress?.scopeForConnection(agent.tenant_id, dto.provider, key.id);
       const resolved = await runWithOutboundScope(egressScope, () =>
-        resolveApiKey(
-          dto.provider,
-          rawApiKey,
-          authType,
-          agent.id,
-          agent.tenant_id,
-          this.openaiOauth,
-          this.minimaxOauth,
-          this.anthropicOauth,
-          this.geminiOauth,
-          this.kiroOauth,
-          this.xaiOauth,
-          providerKeyLabel,
-          this.opencodeOauth,
+        runWithProviderUrls(keyUrls, () =>
+          resolveApiKey(
+            dto.provider,
+            rawApiKey,
+            authType,
+            agent.id,
+            agent.tenant_id,
+            this.openaiOauth,
+            this.minimaxOauth,
+            this.anthropicOauth,
+            this.geminiOauth,
+            this.kiroOauth,
+            this.xaiOauth,
+            providerKeyLabel,
+            this.opencodeOauth,
+          ),
         ),
       );
       if (resolved.apiKey === null) {
@@ -216,8 +229,6 @@ export class PlaygroundService {
       authType,
       model: dto.model,
       providerRegion,
-      providerBaseUrl,
-      providerBaseUrlAllowsPrivate,
       resourceUrl: oauthResourceUrl,
       customProvider,
       logger: this.logger,
@@ -235,6 +246,7 @@ export class PlaygroundService {
         authType,
         extraHeaders,
         customEndpoint,
+        urls,
         signal: abort.signal,
         providerResource,
         oauthToken: authType === 'subscription' && isRefreshableOAuthCredential(rawApiKey),
@@ -243,21 +255,23 @@ export class PlaygroundService {
       forward = await this.providerClient.forward(forwardOptions);
       if (forward.response.status === 401 && authType === 'subscription') {
         const refreshed = await runWithOutboundScope(egressScope, () =>
-          refreshRejectedOAuthCredential(
-            dto.provider,
-            rawApiKey,
-            agent.id,
-            agent.tenant_id,
-            providerKeyLabel,
-            {
-              openaiOauth: this.openaiOauth,
-              minimaxOauth: this.minimaxOauth,
-              anthropicOauth: this.anthropicOauth,
-              geminiOauth: this.geminiOauth,
-              kiroOauth: this.kiroOauth,
-              xaiOauth: this.xaiOauth,
-              opencodeOauth: this.opencodeOauth,
-            },
+          runWithProviderUrls(urls, () =>
+            refreshRejectedOAuthCredential(
+              dto.provider,
+              rawApiKey,
+              agent.id,
+              agent.tenant_id,
+              providerKeyLabel,
+              {
+                openaiOauth: this.openaiOauth,
+                minimaxOauth: this.minimaxOauth,
+                anthropicOauth: this.anthropicOauth,
+                geminiOauth: this.geminiOauth,
+                kiroOauth: this.kiroOauth,
+                xaiOauth: this.xaiOauth,
+                opencodeOauth: this.opencodeOauth,
+              },
+            ),
           ),
         );
         if (refreshed?.apiKey && refreshed.apiKey !== apiKey) {

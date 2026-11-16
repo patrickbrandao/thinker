@@ -76,6 +76,18 @@ const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
 const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
 const Topology = lazyReload(() => import('./pages/Topology.jsx'));
 const RequestPage = lazyReload(() => import('./pages/RequestPage.jsx'));
+const LiveAgents = lazyReload(() => import('./pages/LiveAgents.jsx'));
+// Development-only lab (src/pages/lab): `import.meta.env.DEV` is false in
+// `vite build`, so the route and its chunk never reach the product.
+const LiveSessionLab = import.meta.env.DEV
+  ? lazyReload(() => import('./pages/lab/LiveSessionLab.jsx'))
+  : null;
+const LiveAgentsLab = import.meta.env.DEV
+  ? lazyReload(() => import('./pages/lab/LiveAgentsLab.jsx'))
+  : null;
+const LiveAgentsWatch = import.meta.env.DEV
+  ? lazyReload(() => import('./pages/lab/LiveAgentsWatch.jsx'))
+  : null;
 
 const Lazy = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<div className="page" aria-busy="true" />}>{children}</Suspense>
@@ -469,12 +481,47 @@ function AppRoutes() {
       <Route path="cli/auth" element={<GuardedOutlet />}>
         <Route index element={<CliAuth />} />
       </Route>
+      {/* Live agents wall: its own tab, outside the shell and its floating windows. */}
+      <Route path="sessions/live" element={<GuardedOutlet />}>
+        <Route index element={<LiveAgents />} />
+      </Route>
       <Route path="requests/:requestId" element={<GuardedOutlet />}>
         <Route index element={<RequestPage />} />
       </Route>
       <Route path="consent" element={<GuardedOutlet />}>
         <Route index element={<Consent />} />
       </Route>
+      {/* Development-only lab: simulated data, no backend, no auth. */}
+      {LiveSessionLab && (
+        <Route
+          path="lab/live-session"
+          element={
+            <Lazy>
+              <LiveSessionLab />
+            </Lazy>
+          }
+        />
+      )}
+      {LiveAgentsLab && (
+        <Route
+          path="lab/live-agents"
+          element={
+            <Lazy>
+              <LiveAgentsLab />
+            </Lazy>
+          }
+        />
+      )}
+      {LiveAgentsWatch && (
+        <Route
+          path="lab/live-agents/watch/:sessionId"
+          element={
+            <Lazy>
+              <LiveAgentsWatch />
+            </Lazy>
+          }
+        />
+      )}
       <Route
         path="oauth-error"
         element={

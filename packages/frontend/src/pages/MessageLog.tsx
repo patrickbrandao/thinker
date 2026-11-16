@@ -11,7 +11,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Ban, Sprout } from 'lucide-react';
 import ErrorState from '../components/ErrorState.js';
 import MessageTable from '../components/MessageTable.js';
-import RequestDrawer from '../components/RequestDrawer.js';
+import RequestDrawerStack from '../components/RequestDrawerStack.js';
 import Pagination from '../components/Pagination.js';
 import Select, { type SelectOption } from '../components/Select.js';
 import MultiSelect, { type MultiSelectOption } from '../components/MultiSelect.js';
@@ -934,7 +934,7 @@ export default function MessageLog() {
           onClose={() => setSetupOpen(false)}
         />
       ) : null}
-      <RequestDrawer messageId={selectedMessageId} onClose={closeDrawer} />
+      <RequestDrawerStack messageId={selectedMessageId} onClose={closeDrawer} />
     </div>
   );
 }

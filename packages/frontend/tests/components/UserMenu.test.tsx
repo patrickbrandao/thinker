@@ -154,13 +154,13 @@ describe('UserMenu content by role', () => {
     expect(menu.textContent).not.toContain('Administration');
     expect(screen.queryByRole('menuitem', { name: 'Users' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'New organization' })).toBeNull();
-    expect(menu.textContent).not.toContain('instance admin');
+    expect(menu.textContent).not.toContain('superuser');
   });
 
   it('instance admin: sees Users, New organization and the instance-admin tag', () => {
     setProfile('owner', true);
     const menu = open();
-    expect(menu.textContent).toContain('instance admin');
+    expect(menu.textContent).toContain('superuser');
     expect(screen.getByRole('menuitem', { name: 'Users' }).getAttribute('href')).toBe(
       '/admin/users',
     );
@@ -348,7 +348,7 @@ describe('UserMenu in pt-BR', () => {
     const menu = screen.getByRole('menu');
     expect(menu.textContent).toContain('Organização');
     expect(menu.textContent).toContain('Seu papel:');
-    expect(menu.textContent).toContain('admin da instância');
+    expect(menu.textContent).toContain('super usuário');
     expect(screen.getByRole('menuitem', { name: 'Nova organização' })).toBeTruthy();
     expect(screen.queryByRole('menuitem', { name: 'New organization' })).toBeNull();
   });

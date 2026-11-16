@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ChevronLeft, Monitor, Moon, Sun } from 'lucide-react';
 import { authClient } from '../services/auth-client.js';
 import { toast } from '../services/toast-store.js';
@@ -8,7 +8,9 @@ import { setThemePreference, themePreference, type ThemePreference } from '../li
 import { useSignal } from '../lib/signal.js';
 import { useResource } from '../lib/use-resource.js';
 import CopyButton from '../components/CopyButton.js';
-import { Button, Field, Panel } from '../components/ui.js';
+import { Button, Field, Panel, Tabs, type TabItem } from '../components/ui.js';
+
+type AccountTab = 'profile' | 'security' | 'workspace' | 'appearance' | 'language';
 
 const THEMES: Array<{ value: ThemePreference; label: () => string; icon: ReactNode }> = [
   { value: 'light', label: () => t('account.appearance.light'), icon: <Sun aria-hidden="true" /> },
@@ -40,6 +42,32 @@ export default function Account() {
   const userEmail = user?.email ?? '';
   const userId = user?.id ?? '';
   const currentLocale = useLocale();
+
+  // One tab per section, kept in the URL (?tab=) like the Organization page.
+  const tabs: TabItem<AccountTab>[] = [
+    { key: 'profile', label: t('account.profile.title') },
+    ...(hasCredentialAccount
+      ? [{ key: 'security' as const, label: t('account.security.title') }]
+      : []),
+    { key: 'workspace', label: t('account.workspace.title') },
+    { key: 'appearance', label: t('account.appearance.title') },
+    { key: 'language', label: t('account.language.title') },
+  ];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get('tab');
+  const tab: AccountTab = tabs.some((i) => i.key === requested)
+    ? (requested as AccountTab)
+    : 'profile';
+  const switchTab = (next: AccountTab) =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === 'profile') params.delete('tab');
+        else params.set('tab', next);
+        return params;
+      },
+      { replace: true },
+    );
 
   const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault();
@@ -91,28 +119,38 @@ export default function Account() {
         {t('common.back')}
       </Button>
 
-      <div className="flex flex-col gap-4">
-        <Panel title={t('account.profile.title')}>
-          <div className="flex flex-col gap-4">
-            <Field
-              label={t('account.profile.displayName')}
-              hint={t('account.profile.displayNameDesc')}
-              htmlFor="account-name"
-            >
-              <input id="account-name" className="field" type="text" value={userName} readOnly />
-            </Field>
-            <Field
-              label={t('account.profile.email')}
-              hint={t('account.profile.emailDesc')}
-              htmlFor="account-email"
-            >
-              <input id="account-email" className="field" type="email" value={userEmail} readOnly />
-            </Field>
-            <p className="text-xs text-faint">{t('account.profile.managedBy')}</p>
-          </div>
-        </Panel>
+      <Tabs items={tabs} value={tab} onChange={switchTab} label={t('account.title')} />
 
-        {hasCredentialAccount ? (
+      <div className="flex flex-col gap-4">
+        {tab === 'profile' ? (
+          <Panel title={t('account.profile.title')}>
+            <div className="flex flex-col gap-4">
+              <Field
+                label={t('account.profile.displayName')}
+                hint={t('account.profile.displayNameDesc')}
+                htmlFor="account-name"
+              >
+                <input id="account-name" className="field" type="text" value={userName} readOnly />
+              </Field>
+              <Field
+                label={t('account.profile.email')}
+                hint={t('account.profile.emailDesc')}
+                htmlFor="account-email"
+              >
+                <input
+                  id="account-email"
+                  className="field"
+                  type="email"
+                  value={userEmail}
+                  readOnly
+                />
+              </Field>
+              <p className="text-xs text-faint">{t('account.profile.managedBy')}</p>
+            </div>
+          </Panel>
+        ) : null}
+
+        {tab === 'security' && hasCredentialAccount ? (
           <Panel title={t('account.security.title')}>
             <form className="flex flex-col gap-4" onSubmit={handleChangePassword}>
               <Field
@@ -174,48 +212,56 @@ export default function Account() {
           </Panel>
         ) : null}
 
-        <Panel title={t('account.workspace.title')}>
-          <p className="mb-3 text-sm text-dim">{t('account.workspace.desc')}</p>
-          <div className="well flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">{userId}</code>
-            <CopyButton text={userId} />
-          </div>
-        </Panel>
+        {tab === 'workspace' ? (
+          <Panel title={t('account.workspace.title')}>
+            <p className="mb-3 text-sm text-dim">{t('account.workspace.desc')}</p>
+            <div className="well flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">
+                {userId}
+              </code>
+              <CopyButton text={userId} />
+            </div>
+          </Panel>
+        ) : null}
 
-        <Panel title={t('account.appearance.title')}>
-          <p className="mb-3 text-sm text-dim">{t('account.appearance.desc')}</p>
-          <div className="segmented" role="group" aria-label={t('account.appearance.title')}>
-            {THEMES.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className="inline-flex items-center gap-1.5 [&>svg]:size-[15px]"
-                aria-pressed={theme === option.value}
-                onClick={() => setThemePreference(option.value)}
-              >
-                {option.icon}
-                {option.label()}
-              </button>
-            ))}
-          </div>
-        </Panel>
+        {tab === 'appearance' ? (
+          <Panel title={t('account.appearance.title')}>
+            <p className="mb-3 text-sm text-dim">{t('account.appearance.desc')}</p>
+            <div className="segmented" role="group" aria-label={t('account.appearance.title')}>
+              {THEMES.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="inline-flex items-center gap-1.5 [&>svg]:size-[15px]"
+                  aria-pressed={theme === option.value}
+                  onClick={() => setThemePreference(option.value)}
+                >
+                  {option.icon}
+                  {option.label()}
+                </button>
+              ))}
+            </div>
+          </Panel>
+        ) : null}
 
-        <Panel title={t('account.language.title')}>
-          <p className="mb-3 text-sm text-dim">{t('account.language.desc')}</p>
-          <div className="segmented" role="group" aria-label={t('account.language.label')}>
-            {LOCALES.map((l) => (
-              <button
-                key={l}
-                type="button"
-                aria-pressed={currentLocale === l}
-                lang={l}
-                onClick={() => setLocale(l)}
-              >
-                {LOCALE_NAMES[l]}
-              </button>
-            ))}
-          </div>
-        </Panel>
+        {tab === 'language' ? (
+          <Panel title={t('account.language.title')}>
+            <p className="mb-3 text-sm text-dim">{t('account.language.desc')}</p>
+            <div className="segmented" role="group" aria-label={t('account.language.label')}>
+              {LOCALES.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  aria-pressed={currentLocale === l}
+                  lang={l}
+                  onClick={() => setLocale(l)}
+                >
+                  {LOCALE_NAMES[l]}
+                </button>
+              ))}
+            </div>
+          </Panel>
+        ) : null}
       </div>
     </div>
   );

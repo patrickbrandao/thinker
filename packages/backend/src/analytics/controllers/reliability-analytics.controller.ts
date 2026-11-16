@@ -10,7 +10,14 @@ import { TenantCtx, TenantContext } from '../../common/decorators/tenant-context
 import { UserCacheInterceptor } from '../../common/interceptors/user-cache.interceptor';
 import { DASHBOARD_CACHE_TTL_MS } from '../../common/constants/cache.constants';
 
-class ReliabilityTimeseriesQueryDto extends RangeQueryDto {
+class ReliabilityScopedQueryDto extends RangeQueryDto {
+  /** Scopes to ONE provider connection (`tenant_providers.id`), terminal attribution. */
+  @IsOptional()
+  @IsString()
+  connection_id?: string;
+}
+
+class ReliabilityTimeseriesQueryDto extends ReliabilityScopedQueryDto {
   @IsOptional()
   @IsString()
   @IsIn([...RELIABILITY_TS_DIMENSIONS])
@@ -32,11 +39,12 @@ export class ReliabilityAnalyticsController {
   constructor(private readonly reliabilityStats: ReliabilityStatsService) {}
 
   @Get('stats')
-  async getStats(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
+  async getStats(@Query() query: ReliabilityScopedQueryDto, @TenantCtx() ctx: TenantContext) {
     return this.reliabilityStats.getStats({
       tenantId: ctx.tenantId,
       range: query.range,
       agentName: query.agent_name,
+      connectionId: query.connection_id,
     });
   }
 
@@ -51,6 +59,7 @@ export class ReliabilityAnalyticsController {
       by: query.by,
       agentName: query.agent_name,
       failedOnly: query.failed_only === 'true',
+      connectionId: query.connection_id,
     });
   }
 

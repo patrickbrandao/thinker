@@ -1,16 +1,17 @@
 import { useCallback, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router';
 import ErrorState from '../components/ErrorState.js';
-import TemporaryPasswordBox from '../components/TemporaryPasswordBox.js';
 import ApiKeysPanel from '../components/ApiKeysPanel.js';
-import { Badge, Button, ButtonLink, Field, Modal, Panel } from '../components/ui.js';
+import { ApiError } from '../services/api/core.js';
+import { Badge, Button, Field, Modal, Panel, Tabs, type TabItem } from '../components/ui.js';
 import { retentionOptions } from '../components/LogRetentionSelect.js';
 import {
   addMember,
   deleteOrganization,
+  listAdminUsers,
   listMembers,
   removeMember,
   renameOrganization,
-  updateMemberRole,
   type OrgRole,
   getLogRetention,
   updateLogRetention,
@@ -23,10 +24,14 @@ import { useSignal } from '../lib/signal.js';
 import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 
+type OrgTab = 'general' | 'retention' | 'apiKeys' | 'members' | 'danger';
+
 /**
- * Settings of the active organization: name, members and roles, and deletion.
- * Owners rename/delete; owners and admins manage members (admins never touch
- * owners); everyone else gets a read-only view.
+ * Settings of the active organization, one tab per section: name, log
+ * retention, API keys, members and deletion. Owners rename/delete; owners and
+ * admins add existing accounts as members or remove them (admins never touch
+ * owners); everyone else gets a read-only view. Accounts are created only by
+ * a superuser on the Users page.
  */
 export default function Organization() {
   const profile = useSignal(me);
@@ -39,6 +44,33 @@ export default function Organization() {
   const members = useResource(async () => (await listMembers(orgId!)).members, [orgId], {
     enabled: !!orgId,
   });
+  // Superusers see every account, so they get suggestions of who isn't a member yet.
+  const accounts = useResource(async () => (await listAdminUsers()).users, [], {
+    enabled: canManageMembers && profile?.isInstanceAdmin === true,
+  });
+
+  const tabs: TabItem<OrgTab>[] = [
+    { key: 'general', label: t('org.page.general') },
+    { key: 'retention', label: t('org.page.logRetention') },
+    ...(canManageMembers && orgId
+      ? [{ key: 'apiKeys' as const, label: t('org.apiKeys.title') }]
+      : []),
+    { key: 'members', label: t('org.page.members'), count: members.data?.length },
+    ...(canManageOrg ? [{ key: 'danger' as const, label: t('org.page.dangerZone') }] : []),
+  ];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get('tab');
+  const tab: OrgTab = tabs.some((i) => i.key === requested) ? (requested as OrgTab) : 'general';
+  const switchTab = (next: OrgTab) =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === 'general') params.delete('tab');
+        else params.set('tab', next);
+        return params;
+      },
+      { replace: true },
+    );
 
   // ── Rename ───────────────────────────────────────────
   const [name, setName] = useState(org?.name ?? '');
@@ -95,12 +127,8 @@ export default function Organization() {
 
   // ── Members ──────────────────────────────────────────
   const [email, setEmail] = useState('');
-  const [memberName, setMemberName] = useState('');
   const [newRole, setNewRole] = useState<OrgRole>('member');
   const [adding, setAdding] = useState(false);
-  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(
-    null,
-  );
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [busyMember, setBusyMember] = useState<string | null>(null);
 
@@ -109,44 +137,22 @@ export default function Organization() {
     if (!org) return;
     setAdding(true);
     try {
-      const trimmedName = memberName.trim();
-      const res = await addMember(org.id, {
-        email: email.trim(),
-        ...(trimmedName ? { name: trimmedName } : {}),
-        role: newRole,
-      });
-      if (res.temporaryPassword) {
-        setTempPassword({ email: res.member.email, password: res.temporaryPassword });
-      } else {
-        setTempPassword(null);
-        toast.success(t('org.page.existingAdded', { email: res.member.email }));
-      }
+      const res = await addMember(org.id, { email: email.trim(), role: newRole }, { silent: true });
+      toast.success(t('org.page.memberAdded', { email: res.member.email }));
       setEmail('');
-      setMemberName('');
       setNewRole('member');
       await members.reload();
-    } catch {
-      // toasted by fetchMutate
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      toast.error(
+        status === 404
+          ? t('org.page.accountNotFound')
+          : status === 409
+            ? t('org.page.alreadyMember')
+            : (err as Error).message,
+      );
     } finally {
       setAdding(false);
-    }
-  };
-
-  const handleRoleChange = async (userId: string, next: OrgRole) => {
-    if (!org) return;
-    setBusyMember(userId);
-    try {
-      await updateMemberRole(org.id, userId, next);
-      if (userId === me()?.userId) {
-        // Our own role changed: reload so the whole UI follows it.
-        window.location.reload();
-        return;
-      }
-    } catch {
-      // toasted (e.g. 409 when demoting the last owner)
-    } finally {
-      setBusyMember(null);
-      await members.reload();
     }
   };
 
@@ -170,248 +176,227 @@ export default function Organization() {
   };
 
   const roleOptions = assignableRoles(role);
+  const memberIds = new Set((members.data ?? []).map((m) => m.userId));
+  const candidates = (accounts.data ?? []).filter((u) => !memberIds.has(u.id));
 
   return (
     <div className="page">
       <title>{t('common.pageTitle', { page: t('org.page.title') })}</title>
       <meta name="description" content={t('org.page.metaDescription')} />
 
+      <Tabs items={tabs} value={tab} onChange={switchTab} label={t('org.page.title')} />
+
       <div className="flex flex-col gap-4">
-        <Panel title={t('org.page.general')}>
-          <form className="flex flex-wrap items-end gap-3" onSubmit={handleRename}>
-            <Field
-              className="min-w-[220px] flex-1"
-              label={t('org.gate.orgName')}
-              hint={canManageOrg ? t('org.page.nameDesc') : t('org.page.nameReadOnly')}
-              htmlFor="org-name"
-            >
-              <input
-                id="org-name"
-                className="field"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                readOnly={!canManageOrg}
-                required
-              />
-            </Field>
-            {canManageOrg ? (
-              <Button
-                type="submit"
-                className="mb-[22px]"
-                disabled={renaming || !name.trim() || name.trim() === org?.name}
+        {tab === 'general' ? (
+          <Panel title={t('org.page.general')}>
+            <form className="flex flex-wrap items-end gap-3" onSubmit={handleRename}>
+              <Field
+                className="min-w-[220px] flex-1"
+                label={t('org.gate.orgName')}
+                hint={canManageOrg ? t('org.page.nameDesc') : t('org.page.nameReadOnly')}
+                htmlFor="org-name"
               >
-                {t('common.save')}
-              </Button>
-            ) : null}
-          </form>
-        </Panel>
-
-        <Panel title={t('org.page.logRetention')}>
-          <Field
-            className="max-w-[320px]"
-            label={t('org.page.logRetention')}
-            hint={
-              canManageOrg ? t('org.page.logRetentionDesc') : t('org.page.logRetentionReadOnly')
-            }
-            htmlFor="org-log-retention"
-          >
-            <select
-              id="org-log-retention"
-              className="field"
-              value={retention.data?.retention_days ?? ''}
-              disabled={!canManageOrg || savingRetention || !retention.data}
-              onChange={(e) =>
-                void changeRetention(e.currentTarget.value ? Number(e.currentTarget.value) : null)
-              }
-            >
-              <option value="">
-                {t('org.page.logRetentionDefault')}
-                {retention.data
-                  ? ` (${t('harnesses.retention.days', retention.data.default_days)})`
-                  : ''}
-              </option>
-              {retentionOptions(retention.data?.retention_days).map((days) => (
-                <option key={days} value={days}>
-                  {t('harnesses.retention.days', days)}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </Panel>
-
-        {canManageMembers && orgId ? <ApiKeysPanel orgId={orgId} /> : null}
-
-        <Panel title={t('triggers.org.title')}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-dim">{t('triggers.org.body')}</p>
-            <ButtonLink to="/triggers" variant="ghost" size="sm">
-              {t('triggers.org.open')}
-            </ButtonLink>
-          </div>
-        </Panel>
-
-        <Panel title={t('org.page.members')} bodyClassName="flex flex-col gap-4">
-          {canManageMembers ? (
-            <>
-              <form
-                className="grid gap-3 sm:grid-cols-[1fr_1fr_160px_auto] sm:items-end"
-                onSubmit={handleAdd}
-                aria-label={t('org.page.addMember')}
-              >
-                <Field label={t('common.email')} htmlFor="org-add-email">
-                  <input
-                    id="org-add-email"
-                    className="field"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </Field>
-                <Field label={t('org.page.nameNewAccounts')} htmlFor="org-add-name">
-                  <input
-                    id="org-add-name"
-                    className="field"
-                    type="text"
-                    value={memberName}
-                    onChange={(e) => setMemberName(e.target.value)}
-                  />
-                </Field>
-                <Field label={t('common.role')} htmlFor="org-add-role">
-                  <select
-                    id="org-add-role"
-                    className="field"
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value as OrgRole)}
-                  >
-                    {roleOptions.map((r) => (
-                      <option key={r} value={r}>
-                        {roleLabel(r)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Button type="submit" busy={adding}>
-                  {t('org.page.addMember')}
-                </Button>
-              </form>
-              {tempPassword ? (
-                <TemporaryPasswordBox
-                  email={tempPassword.email}
-                  password={tempPassword.password}
-                  onDismiss={() => setTempPassword(null)}
+                <input
+                  id="org-name"
+                  className="field"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  readOnly={!canManageOrg}
+                  required
                 />
+              </Field>
+              {canManageOrg ? (
+                <Button
+                  type="submit"
+                  className="mb-[22px]"
+                  disabled={renaming || !name.trim() || name.trim() === org?.name}
+                >
+                  {t('common.save')}
+                </Button>
               ) : null}
-            </>
-          ) : null}
+            </form>
+          </Panel>
+        ) : null}
 
-          {members.error ? (
-            <ErrorState error={members.error} onRetry={() => void members.reload()} />
-          ) : (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('org.page.member')}</th>
-                    <th>{t('common.role')}</th>
-                    <th>{t('common.status')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.loading && !members.data ? (
+        {tab === 'retention' ? (
+          <Panel title={t('org.page.logRetention')}>
+            <Field
+              className="max-w-[320px]"
+              label={t('org.page.logRetention')}
+              hint={
+                canManageOrg ? t('org.page.logRetentionDesc') : t('org.page.logRetentionReadOnly')
+              }
+              htmlFor="org-log-retention"
+            >
+              <select
+                id="org-log-retention"
+                className="field"
+                value={retention.data?.retention_days ?? ''}
+                disabled={!canManageOrg || savingRetention || !retention.data}
+                onChange={(e) =>
+                  void changeRetention(e.currentTarget.value ? Number(e.currentTarget.value) : null)
+                }
+              >
+                <option value="">
+                  {t('org.page.logRetentionDefault')}
+                  {retention.data
+                    ? ` (${t('harnesses.retention.days', retention.data.default_days)})`
+                    : ''}
+                </option>
+                {retentionOptions(retention.data?.retention_days).map((days) => (
+                  <option key={days} value={days}>
+                    {t('harnesses.retention.days', days)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </Panel>
+        ) : null}
+
+        {tab === 'apiKeys' && canManageMembers && orgId ? <ApiKeysPanel orgId={orgId} /> : null}
+
+        {tab === 'members' ? (
+          <Panel title={t('org.page.members')} bodyClassName="flex flex-col gap-4">
+            {canManageMembers ? (
+              <>
+                <form
+                  className="grid gap-3 sm:grid-cols-[1fr_160px_auto] sm:items-end"
+                  onSubmit={handleAdd}
+                  aria-label={t('org.page.addMember')}
+                >
+                  <Field label={t('org.page.existingAccount')} htmlFor="org-add-email">
+                    <input
+                      id="org-add-email"
+                      className="field"
+                      type="email"
+                      list={candidates.length > 0 ? 'org-add-candidates' : undefined}
+                      placeholder={t('common.email')}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                    {candidates.length > 0 ? (
+                      <datalist id="org-add-candidates">
+                        {candidates.map((u) => (
+                          <option key={u.id} value={u.email}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </datalist>
+                    ) : null}
+                  </Field>
+                  <Field label={t('common.role')} htmlFor="org-add-role">
+                    <select
+                      id="org-add-role"
+                      className="field"
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value as OrgRole)}
+                    >
+                      {roleOptions.map((r) => (
+                        <option key={r} value={r}>
+                          {roleLabel(r)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Button type="submit" busy={adding}>
+                    {t('org.page.addMember')}
+                  </Button>
+                </form>
+                <p className="hint -mt-2">{t('org.page.existingAccountHint')}</p>
+              </>
+            ) : null}
+
+            {members.error ? (
+              <ErrorState error={members.error} onRetry={() => void members.reload()} />
+            ) : (
+              <div className="table-wrap">
+                <table className="data">
+                  <thead>
                     <tr>
-                      <td colSpan={4} className="text-muted">
-                        {t('org.page.loadingMembers')}
-                      </td>
+                      <th>{t('org.page.member')}</th>
+                      <th>{t('common.role')}</th>
+                      <th>{t('common.status')}</th>
+                      <th />
                     </tr>
-                  ) : null}
-                  {(members.data ?? []).map((member) => {
-                    const editable = canManageMembers && canEditMember(role, member.role);
-                    const isSelf = member.userId === profile?.userId;
-                    return (
-                      <tr key={member.userId}>
-                        <td>
-                          <div className="row-title">
-                            {member.name || member.email}
-                            {isSelf ? (
-                              <span className="font-normal text-muted"> {t('org.page.you')}</span>
-                            ) : null}
-                          </div>
-                          <div className="row-sub">{member.email}</div>
-                        </td>
-                        <td>
-                          {editable ? (
-                            <select
-                              className="field h-[30px] w-auto"
-                              aria-label={t('org.page.roleOf', { email: member.email })}
-                              value={member.role}
-                              disabled={busyMember === member.userId}
-                              onChange={(e) =>
-                                void handleRoleChange(member.userId, e.target.value as OrgRole)
-                              }
-                            >
-                              {roleOptions.map((r) => (
-                                <option key={r} value={r}>
-                                  {roleLabel(r)}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <Badge>{roleLabel(member.role)}</Badge>
-                          )}
-                        </td>
-                        <td>
-                          {member.mustChangePassword ? (
-                            <Badge tone="warn">{t('org.page.pendingPassword')}</Badge>
-                          ) : (
-                            <span className="text-muted">{t('org.page.active')}</span>
-                          )}
-                        </td>
-                        <td>
-                          {editable ? (
-                            <div className="row-actions gap-1.5">
-                              {confirmRemove === member.userId ? (
-                                <>
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    disabled={busyMember === member.userId}
-                                    onClick={() => void handleRemove(member.userId)}
-                                  >
-                                    {t('org.page.confirmRemove')}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setConfirmRemove(null)}
-                                  >
-                                    {t('common.cancel')}
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button
-                                  variant="quiet"
-                                  size="sm"
-                                  onClick={() => setConfirmRemove(member.userId)}
-                                >
-                                  {t('common.remove')}
-                                </Button>
-                              )}
-                            </div>
-                          ) : null}
+                  </thead>
+                  <tbody>
+                    {members.loading && !members.data ? (
+                      <tr>
+                        <td colSpan={4} className="text-muted">
+                          {t('org.page.loadingMembers')}
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Panel>
+                    ) : null}
+                    {(members.data ?? []).map((member) => {
+                      const editable = canManageMembers && canEditMember(role, member.role);
+                      const isSelf = member.userId === profile?.userId;
+                      return (
+                        <tr key={member.userId}>
+                          <td>
+                            <div className="row-title">
+                              {member.name || member.email}
+                              {isSelf ? (
+                                <span className="font-normal text-muted"> {t('org.page.you')}</span>
+                              ) : null}
+                            </div>
+                            <div className="row-sub">{member.email}</div>
+                          </td>
+                          <td>
+                            <Badge>{roleLabel(member.role)}</Badge>
+                          </td>
+                          <td>
+                            {member.mustChangePassword ? (
+                              <Badge tone="warn">{t('org.page.pendingPassword')}</Badge>
+                            ) : (
+                              <span className="text-muted">{t('org.page.active')}</span>
+                            )}
+                          </td>
+                          <td>
+                            {editable ? (
+                              <div className="row-actions gap-1.5">
+                                {confirmRemove === member.userId ? (
+                                  <>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      disabled={busyMember === member.userId}
+                                      onClick={() => void handleRemove(member.userId)}
+                                    >
+                                      {t('org.page.confirmRemove')}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setConfirmRemove(null)}
+                                    >
+                                      {t('common.cancel')}
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button
+                                    variant="quiet"
+                                    size="sm"
+                                    onClick={() => setConfirmRemove(member.userId)}
+                                  >
+                                    {t('common.remove')}
+                                  </Button>
+                                )}
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        ) : null}
 
-        {canManageOrg ? (
+        {tab === 'danger' && canManageOrg ? (
           <Panel title={<span className="text-danger">{t('org.page.dangerZone')}</span>}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">

@@ -56,7 +56,9 @@ function makeDeps(overrides: {
   const retagAuthType = jest.fn().mockResolvedValue(undefined);
   const recalculateTiersForTenant = jest.fn().mockResolvedValue(undefined);
   const getProviders = jest.fn().mockResolvedValue([]);
+  const clearApiKey = jest.fn().mockResolvedValue(undefined);
   const providerService = {
+    clearApiKey,
     upsertProvider,
     removeProvider,
     retagAuthType,
@@ -97,6 +99,7 @@ function makeDeps(overrides: {
     save,
     remove,
     upsertProvider,
+    clearApiKey,
     removeProvider,
     retagAuthType,
     recalculateTiersForTenant,
@@ -1096,6 +1099,17 @@ describe('CustomProviderService', () => {
         'Account A',
         undefined,
       );
+    });
+
+    it.each(['', null])('removes the stored key when apiKey is %p', async (apiKey) => {
+      const existing = { id: 'cp1', name: 'n' } as CustomProvider;
+      const { svc, upsertProvider, getProviders, clearApiKey } = makeDeps({
+        findOneResults: [existing],
+      });
+      getProviders.mockResolvedValueOnce([connection({ id: 'a', label: 'Main' })]);
+      await svc.update('cp1', 'tenant-1', { apiKey });
+      expect(clearApiKey).toHaveBeenCalledWith('tenant-1', 'a');
+      expect(upsertProvider).not.toHaveBeenCalled();
     });
   });
 

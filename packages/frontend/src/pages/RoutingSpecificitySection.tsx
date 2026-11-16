@@ -267,6 +267,7 @@ export default function RoutingSpecificitySection(props: RoutingSpecificitySecti
               <RoutingTierCard
                 key={stage.id}
                 stage={stage}
+                statusChain="specificity"
                 tier={toTierAssignment(getAssignment(stage.id))}
                 models={props.models}
                 customProviders={props.customProviders}

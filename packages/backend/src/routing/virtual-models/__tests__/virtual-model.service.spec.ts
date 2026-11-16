@@ -588,10 +588,19 @@ describe('VirtualModelService', () => {
       expect(out).toEqual([{ ...route('openai', 'gpt-4o-mini'), keyLabel: 'Work' }]);
     });
 
-    it('re-validates previously stored fallbacks', async () => {
+    it('keeps previously stored fallbacks the catalog no longer lists (out of service)', async () => {
+      repo.findOne.mockResolvedValue(
+        row({ fallback_routes: [{ ...route('gone', 'old-model'), disabled: true }] }),
+      );
+      await expect(svc.setFallbacks('agent-1', 'tenant-1', 'vm-1', ['old-model'])).resolves.toEqual(
+        [{ ...route('gone', 'old-model'), disabled: true }],
+      );
+    });
+
+    it('still rejects a new fallback the catalog does not offer', async () => {
       repo.findOne.mockResolvedValue(row({ fallback_routes: [route('gone', 'old-model')] }));
       await expect(
-        svc.setFallbacks('agent-1', 'tenant-1', 'vm-1', ['old-model']),
+        svc.setFallbacks('agent-1', 'tenant-1', 'vm-1', ['old-model', 'never-listed']),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 

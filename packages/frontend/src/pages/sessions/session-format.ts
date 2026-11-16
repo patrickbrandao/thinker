@@ -2,6 +2,9 @@ import { formatCost } from '../../services/formatters.js';
 
 const MINUTE = 60_000;
 
+/** The live agents wall: a page of its own outside the shell, opened in a new tab. */
+export const LIVE_AGENTS_PATH = '/sessions/live';
+
 /** "45s", "12m", "2h 14m", "3d 5h". */
 export function spanLabel(fromIso: string, toIso: string): string {
   const ms = Math.max(0, Date.parse(toIso) - Date.parse(fromIso));

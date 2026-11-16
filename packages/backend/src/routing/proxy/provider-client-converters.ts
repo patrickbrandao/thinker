@@ -27,6 +27,7 @@ import {
   normalizeOpenAiReasoningDelta,
   type OpenAiReasoningStreamFormat,
 } from './reasoning-format';
+import { hasFunctionTools } from '../function-tools';
 
 /** Convert a ChatGPT Responses API response to OpenAI format. */
 export function convertChatGptResponse(
@@ -134,9 +135,13 @@ const OPENAI_ONLY_FIELDS = new Set([
 
 /**
  * Non-passthrough endpoints that implement `reasoning_effort` (api-huggingface
- * G1, api-mistral G1, local-ollama G1, plus xAI, DeepSeek and MiniMax).
+ * G1, api-mistral G1, local-ollama G1, plus xAI, DeepSeek, MiniMax and the
+ * Atlas Cloud, Eden AI and Requesty gateways).
  */
 const REASONING_EFFORT_ENDPOINTS = new Set([
+  'atlascloud',
+  'edenai',
+  'requesty',
   'xai',
   'deepseek',
   'minimax',
@@ -542,8 +547,7 @@ export function sanitizeOpenAiBody(
   if (
     options.forwardReasoningEffort &&
     cleaned.reasoning_effort === undefined &&
-    Array.isArray(cleaned.tools) &&
-    cleaned.tools.some((tool) => (tool as { type?: unknown } | null)?.type === 'function')
+    hasFunctionTools(cleaned.tools)
   ) {
     cleaned.reasoning_effort = 'none';
   }

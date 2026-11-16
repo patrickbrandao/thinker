@@ -12,7 +12,8 @@ import {
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { usePageWake } from '../lib/use-page-wake.js';
-import { Button, IconButton } from './ui.js';
+import { Button, IconButton, WindowFooter } from './ui.js';
+import { collectUrlOverrides, useUrlsScope } from './ConnectionUrlsScope.js';
 
 type Phase = 'idle' | 'loading' | 'awaiting' | 'success' | 'error';
 
@@ -44,6 +45,7 @@ export default function CopilotDeviceLogin(props: Props) {
   // The pending poll's device code and interval, and whether a request is out.
   const pollState = useRef<{ code: string; delaySec: number } | null>(null);
   const pollInFlight = useRef(false);
+  const urlsScope = useUrlsScope();
   const latest = useRef(props);
   latest.current = props;
 
@@ -121,11 +123,15 @@ export default function CopilotDeviceLogin(props: Props) {
   });
 
   const startLogin = async () => {
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
     setPhase('loading');
     setError('');
     cancelled.current = false;
     try {
-      const result = await copilotDeviceCode(props.agentName);
+      const result = await (urlOverrides
+        ? copilotDeviceCode(props.agentName, urlOverrides)
+        : copilotDeviceCode(props.agentName));
       setUserCode(result.user_code);
       setVerificationUri(result.verification_uri);
       setPhase('awaiting');
@@ -246,9 +252,23 @@ export default function CopilotDeviceLogin(props: Props) {
         <>
           <p className="text-sm text-dim">{t('providerSetup.copilot.requires')}</p>
           {errorBox}
-          <Button block onClick={() => void startLogin()}>
-            {t('providerSetup.copilot.signIn')}
-          </Button>
+          {props.newConnection ? (
+            // A new-connection window: Cancel and Sign in sit in its fixed footer.
+            <WindowFooter>
+              <div className="flex w-full justify-between gap-2">
+                <Button variant="ghost" size="sm" onClick={props.onBack}>
+                  {t('common.cancel')}
+                </Button>
+                <Button size="sm" onClick={() => void startLogin()}>
+                  {t('providerSetup.copilot.signIn')}
+                </Button>
+              </div>
+            </WindowFooter>
+          ) : (
+            <Button block onClick={() => void startLogin()}>
+              {t('providerSetup.copilot.signIn')}
+            </Button>
+          )}
         </>
       ) : null}
 

@@ -34,6 +34,8 @@ export default {
     modelAdded: 'Model added',
     modelRemoved: 'Model removed',
     modelError: 'Model error',
+    routeOutOfService: 'Route out of service',
+    routeRestored: 'Route back in service',
     oauthRefreshFailed: 'OAuth refresh failed',
     triggerFailed: 'Trigger delivery failed',
     auditCreated: 'Audit: created',
@@ -296,10 +298,5 @@ export default {
     manage: 'Manage triggers',
     missing: 'Deleted trigger',
     readOnly: 'Only members, admins and owners can change the triggers of a harness.',
-  },
-  org: {
-    title: 'Triggers',
-    body: 'E-mail, webhook, Telegram, syslog, GELF and RELP targets for harness and workspace events.',
-    open: 'Open triggers',
   },
 };

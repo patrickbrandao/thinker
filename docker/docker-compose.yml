@@ -102,6 +102,8 @@ services:
       # false disables falling back on a 200 with no content and zero tokens.
       - THINKER_EMPTY_RESPONSE_FALLBACK=${THINKER_EMPTY_RESPONSE_FALLBACK:-}
       - CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS=${CODEX_SEMANTIC_OUTPUT_TIMEOUT_MS:-60000}
+      # false keeps Bedrock GPT chat requests with tools + reasoning on Runtime Chat Completions.
+      - THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES=${THINKER_BEDROCK_RUNTIME_CHAT_VIA_RESPONSES:-}
       # Per-tenant concurrent in-flight request limit for this backend process.
       - THINKER_CONCURRENCY_MAX=${THINKER_CONCURRENCY_MAX:-10}
       # Per-tenant (M201) and per-IP (M202) requests/minute for this backend process.
@@ -177,6 +179,7 @@ services:
       # provider exists. Set false for air-gapped installs; costs then come
       # from the bundled data only and most models show $0.
       - THINKER_CATALOG_SYNC=${THINKER_CATALOG_SYNC:-true}
+      - THINKER_DISCOVERY_INTERVAL_HOURS=${THINKER_DISCOVERY_INTERVAL_HOURS:-6}
       - THINKER_ALERTS_RETENTION_DAYS=${THINKER_ALERTS_RETENTION_DAYS:-90}
       - THINKER_GEMINI_STORE=${THINKER_GEMINI_STORE:-false}
       # Dashboard branding: sidebar title, logo URL, hide version/docs link.

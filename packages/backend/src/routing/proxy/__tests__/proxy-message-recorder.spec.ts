@@ -473,6 +473,36 @@ describe('ProxyMessageRecorder', () => {
       });
     });
 
+    it('prices an auto-router request by the model the response says served it', async () => {
+      getByModelMock.mockImplementation((name: string) =>
+        name === 'anthropic/claude-sonnet-4.6'
+          ? {
+              model_name: name,
+              provider: 'Kilo',
+              input_price_per_token: 0.000003,
+              output_price_per_token: 0.000015,
+            }
+          : {
+              model_name: name,
+              provider: 'Kilo',
+              input_price_per_token: null,
+              output_price_per_token: null,
+            },
+      );
+      await recorder.recordFallbackSuccess(ctx, 'kilo-auto/frontier', 'standard', {
+        authType: 'api_key',
+        provider: 'kilo',
+        usage: {
+          prompt_tokens: 1000,
+          completion_tokens: 100,
+          response_model: 'anthropic/claude-sonnet-4.6',
+        },
+      });
+      const inserted = insertMock.mock.calls[0][0];
+      // 1000 * 0.000003 + 100 * 0.000015 = 0.0045
+      expect(inserted.cost_usd).toBeCloseTo(0.0045, 10);
+    });
+
     it('computes cost_usd from pricing cache when usage has tokens', async () => {
       getByModelMock.mockReturnValue({
         model_name: 'gpt-4o',

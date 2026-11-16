@@ -41,6 +41,19 @@ const ptBR: Catalog<typeof en> = {
   auto: 'auto',
   skippedInStream: 'Ignorado em stream',
   skippedWhileStream: 'Ignorado enquanto o modo stream estiver ativo',
+  routeStatus: {
+    outOfService: 'Fora de serviço',
+    disabled: 'Desativada',
+    disabledOutOfService: 'Desativada · fora de serviço',
+    modelMissingTitle:
+      'O provedor não lista mais este modelo. A rota é mantida e volta a servir sozinha quando o modelo voltar.',
+    providerUnavailableTitle:
+      'O provedor não está conectado ou não está habilitado para este harness. A rota é mantida e volta a servir quando estiver.',
+    disabledTitle: 'Desativada por um administrador: fica na cadeia, mas nunca serve.',
+    disable: 'Desativar rota',
+    enable: 'Ativar rota',
+    noRouteLeft: 'Nenhuma rota desta cadeia pode servir agora.',
+  },
   notInCatalog: 'Fora do catálogo',
   notInCatalogTitle:
     'O provedor não lista mais este modelo; as requisições pulam para a próxima rota.',

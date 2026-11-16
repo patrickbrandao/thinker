@@ -266,14 +266,15 @@ describe('Overview - trend badges and status display', () => {
   it('prefers the details payload rows once they load', async () => {
     mockGetOverview.mockResolvedValue(overviewData);
     mockGetOverviewDetails.mockResolvedValue({
-      recent_activity: [{ ...overviewData.recent_activity[0], id: 'msg-from-details' }],
+      recent_activity: [
+        { ...overviewData.recent_activity[0], id: 'msg-from-details', model: 'details-model' },
+      ],
       cost_by_model: [],
     });
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      // The message cell shows the first 8 characters of the row id.
-      expect(container.textContent).toContain('msg-from');
-      expect(container.textContent).not.toContain('msg-1234');
+      // No Request (id) column on the overview: tell the rows apart by model.
+      expect(container.textContent).toContain('details-model');
       expect(container.querySelector('.status-shape[title="Success"]')).not.toBeNull();
     });
   });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { platformIcon } from 'thinker-shared';
 import ErrorState from '../components/ErrorState.js';
@@ -6,15 +6,24 @@ import Select, { type SelectOption } from '../components/Select.js';
 import { ThemedIcon } from '../components/setup-ui.js';
 import { Badge, Button, cx, Skel, Tabs } from '../components/ui.js';
 import SessionsBubbleChart from '../components/sessions/SessionsBubbleChart.js';
+import { LiveDot, WatchLiveButton } from '../components/live-session/WatchLiveButton.js';
 import { t } from '../i18n/index.js';
 import { useResource } from '../lib/use-resource.js';
 import { getAgents } from '../services/api.js';
 import { getSessions, getSessionsTimeline } from '../services/api/sessions.js';
 import { formatDateTime, formatNumber, formatTimeAgo } from '../services/formatters.js';
 import { getModelDisplayName } from '../services/model-display.js';
-import { costLabel, isActive, shortId, spanLabel } from './sessions/session-format.js';
+import {
+  costLabel,
+  isActive,
+  LIVE_AGENTS_PATH,
+  shortId,
+  spanLabel,
+} from './sessions/session-format.js';
 
 const PAGE_SIZE = 50;
+/** While "Running" is on the page polls, so sessions come and go on their own. */
+const RUNNING_REFRESH_MS = 5_000;
 
 interface AgentOption {
   agent_name: string;
@@ -28,12 +37,14 @@ export default function Sessions() {
   const navigate = useNavigate();
   const range = searchParams.get('range') || '7d';
   const agent = searchParams.get('agent') || '';
+  const running = searchParams.get('running') === '1';
   const withErrors = searchParams.get('errors') === '1';
   const withSubagents = searchParams.get('subagents') === '1';
   const view: 'list' | 'chart' = searchParams.get('view') === 'chart' ? 'chart' : 'list';
   const filters = {
     range,
     agent_name: agent || undefined,
+    running: running ? 'true' : undefined,
     has_errors: withErrors ? 'true' : undefined,
     has_subagents: withSubagents ? 'true' : undefined,
   };
@@ -69,14 +80,20 @@ export default function Sessions() {
         limit: String(PAGE_SIZE),
         offset: String(page * PAGE_SIZE),
       }),
-    [range, agent, withErrors, withSubagents, page],
+    [range, agent, running, withErrors, withSubagents, page],
     { enabled: view === 'list' },
   );
   const timeline = useResource(
     () => getSessionsTimeline(filters),
-    [range, agent, withErrors, withSubagents],
+    [range, agent, running, withErrors, withSubagents],
     { enabled: view === 'chart' },
   );
+  const reloadView = view === 'chart' ? timeline.reload : sessions.reload;
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => void reloadView(), RUNNING_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [running, reloadView]);
   const chip = (key: string, on: boolean, label: string) => (
     <button
       type="button"
@@ -117,8 +134,18 @@ export default function Sessions() {
       <title>{t('sessions.pageTitle')}</title>
       <meta name="description" content={t('sessions.metaDescription')} />
       <div className="page-head">
-        <p className="m-0 max-w-2xl text-sm text-muted">{t('sessions.subtitle')}</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="whitespace-nowrap"
+          title={t('sessions.liveAgentsHint')}
+          onClick={() => window.open(LIVE_AGENTS_PATH, '_blank', 'noopener')}
+        >
+          <LiveDot />
+          {t('sessions.liveAgents')}
+        </Button>
         <div className="page-actions w-full lg:w-auto lg:justify-end">
+          {chip('running', running, t('sessions.filter.running'))}
           {chip('errors', withErrors, t('sessions.filter.withErrors'))}
           {chip('subagents', withSubagents, t('sessions.filter.withSubagents'))}
           <div className="w-full sm:w-44">
@@ -185,11 +212,13 @@ export default function Sessions() {
                   <th className="text-right">{t('sessions.col.cost')}</th>
                   <th>{t('sessions.col.models')}</th>
                   <th>{t('sessions.col.lastActivity')}</th>
+                  <th aria-hidden="true" />
                 </tr>
               </thead>
               <tbody>
                 {items.map((s) => {
                   const to = `/sessions/${encodeURIComponent(s.id)}`;
+                  const active = isActive(s.last_at);
                   return (
                     <tr
                       key={`${s.agent_id}:${s.id}`}
@@ -208,9 +237,6 @@ export default function Sessions() {
                           >
                             {shortId(s.id)}
                           </Link>
-                          {isActive(s.last_at) ? (
-                            <Badge tone="ok">{t('sessions.active')}</Badge>
-                          ) : null}
                           {s.subagents > 0 ? (
                             <Badge>{t('sessions.subagents', { count: s.subagents })}</Badge>
                           ) : null}
@@ -260,6 +286,11 @@ export default function Sessions() {
                       </td>
                       <td className="whitespace-nowrap text-xs text-muted">
                         {formatTimeAgo(s.last_at) ?? formatDateTime(s.last_at)}
+                      </td>
+                      <td className="whitespace-nowrap text-right">
+                        {active ? (
+                          <WatchLiveButton sessionId={s.id} live inFlight={s.in_flight > 0} />
+                        ) : null}
                       </td>
                     </tr>
                   );

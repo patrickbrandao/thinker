@@ -51,3 +51,6 @@ docs/plans/
 
 # Local-only docs (production runbook, not published)
 *.local.md
+
+# Pure simulation runtime state (docs/dev/simulacao-pura.md)
+sim/.state/

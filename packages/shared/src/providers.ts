@@ -103,6 +103,19 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPlaceholder: 'sk-ant-...',
   },
   {
+    id: 'atlascloud',
+    displayName: 'Atlas Cloud',
+    aliases: ['atlas-cloud', 'atlas cloud'],
+    openRouterPrefixes: [],
+    requiresApiKey: true,
+    localOnly: false,
+    color: '#111827',
+    // Atlas Cloud docs: keys begin with `apikey-` (api-atlascloud dossier).
+    keyPrefix: 'apikey-',
+    minKeyLength: 20,
+    keyPlaceholder: 'apikey-...',
+  },
+  {
     id: 'bedrock',
     displayName: 'AWS Bedrock',
     aliases: ['aws-bedrock', 'aws bedrock', 'amazon-bedrock', 'amazon bedrock'],
@@ -173,6 +186,19 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPrefix: 'sk-',
     minKeyLength: 30,
     keyPlaceholder: 'sk-...',
+  },
+  {
+    id: 'edenai',
+    displayName: 'Eden AI',
+    aliases: ['eden-ai', 'eden ai'],
+    openRouterPrefixes: [],
+    requiresApiKey: true,
+    localOnly: false,
+    color: '#5646FF',
+    // Docs show `sk-eden-` keys only in a masked example, so it is not enforced.
+    keyPrefix: '',
+    minKeyLength: 20,
+    keyPlaceholder: 'sk-eden-...',
   },
   {
     id: 'fireworks',
@@ -472,6 +498,18 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPrefix: 'sk-or-',
     minKeyLength: 60,
     keyPlaceholder: 'sk-or-...',
+  },
+  {
+    id: 'requesty',
+    displayName: 'Requesty',
+    aliases: [],
+    openRouterPrefixes: [],
+    requiresApiKey: true,
+    localOnly: false,
+    color: '#2563EB',
+    keyPrefix: '',
+    minKeyLength: 10,
+    keyPlaceholder: 'Requesty API key',
   },
   {
     id: 'xai',

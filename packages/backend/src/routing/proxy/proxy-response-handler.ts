@@ -843,7 +843,11 @@ export async function handleNonStreamResponse(
   }
 
   const body = responseBody as Record<string, unknown> | undefined;
-  const streamUsage = parseUsageObject(body?.usage);
+  const parsedUsage = parseUsageObject(body?.usage);
+  const streamUsage =
+    parsedUsage && typeof body?.model === 'string' && body.model
+      ? { ...parsedUsage, response_model: body.model }
+      : parsedUsage;
 
   if (recordedResponse && capture) {
     const raw = await recordedResponse.text();

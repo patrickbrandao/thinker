@@ -72,6 +72,7 @@ describe('GeminiOauthController', () => {
         'tenant-1',
         'http://localhost:2099',
         'user-1',
+        undefined,
       );
       expect(result).toEqual({ url: 'https://accounts.google.com/o/oauth2/v2/auth?...' });
     });
@@ -155,6 +156,7 @@ describe('GeminiOauthController', () => {
         'tenant-1',
         'https://thinker.example.com',
         'user-1',
+        undefined,
       );
     });
   });
@@ -192,8 +194,8 @@ describe('GeminiOauthController', () => {
         'gemini',
         'subscription',
       );
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-tok');
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-tok');
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('access-tok', expect.anything());
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('refresh-tok', expect.anything());
       expect(providerService.removeProvider).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',
@@ -261,7 +263,7 @@ describe('GeminiOauthController', () => {
       } as never);
 
       expect(oauthService.revokeToken).toHaveBeenCalledTimes(1);
-      expect(oauthService.revokeToken).toHaveBeenCalledWith('selected-access');
+      expect(oauthService.revokeToken).toHaveBeenCalledWith('selected-access', expect.anything());
       expect(providerService.removeProvider).toHaveBeenCalledWith(
         'agent-id-1',
         'tenant-1',

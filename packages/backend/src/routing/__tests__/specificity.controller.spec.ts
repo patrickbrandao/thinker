@@ -39,6 +39,7 @@ describe('SpecificityController', () => {
     controller = new SpecificityController(
       mockSpecificityService as unknown as SpecificityService,
       mockResolveAgentService as unknown as ResolveAgentService,
+      { withStatus: async (_t: string, _a: string, rows: unknown[]) => rows } as never,
     );
   });
 

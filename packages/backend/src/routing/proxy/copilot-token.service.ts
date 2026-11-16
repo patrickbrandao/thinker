@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
-import { outboundFetch } from '../../common/outbound/outbound-proxy';
-
-const TOKEN_ENDPOINT = 'https://api.github.com/copilot_internal/v2/token';
+import { COPILOT_URLS } from '../provider-urls/provider-url-constants';
+import {
+  builtInProviderUrl,
+  fetchProviderUrl,
+  type ResolvedProviderUrl,
+} from '../provider-urls/provider-url-scope';
 
 /** Safety margin: refresh 2 minutes before actual expiry. */
 const EXPIRY_BUFFER_MS = 2 * 60 * 1000;
@@ -26,22 +29,27 @@ interface CachedToken {
 export class CopilotTokenService {
   private readonly logger = new Logger(CopilotTokenService.name);
 
-  /** Cache keyed by the GitHub OAuth token. */
+  /** Cache keyed by the exchange URL and the GitHub OAuth token. */
   private readonly cache = new Map<string, CachedToken>();
 
   /**
    * Get a valid Copilot API token for the given GitHub OAuth token.
    * Returns the cached token if still valid, otherwise exchanges a new one.
    */
-  async getCopilotToken(githubToken: string): Promise<string> {
-    const cached = this.cache.get(githubToken);
+  async getCopilotToken(
+    githubToken: string,
+    /** The connection's `token_exchange` slot (ADR 0012); the GitHub endpoint otherwise. */
+    endpoint: ResolvedProviderUrl = builtInProviderUrl(COPILOT_URLS.tokenExchange),
+  ): Promise<string> {
+    const cacheKey = `${endpoint.url}\u0000${githubToken}`;
+    const cached = this.cache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt - EXPIRY_BUFFER_MS) {
       return cached.token;
     }
 
     this.evictExpired();
-    const result = await this.exchange(githubToken);
-    this.cache.set(githubToken, result);
+    const result = await this.exchange(githubToken, endpoint);
+    this.cache.set(cacheKey, result);
     return result.token;
   }
 
@@ -53,8 +61,8 @@ export class CopilotTokenService {
     }
   }
 
-  private async exchange(githubToken: string): Promise<CachedToken> {
-    const res = await outboundFetch(TOKEN_ENDPOINT, {
+  private async exchange(githubToken: string, endpoint: ResolvedProviderUrl): Promise<CachedToken> {
+    const res = await fetchProviderUrl(endpoint, {
       method: 'GET',
       headers: {
         Authorization: `token ${githubToken}`,

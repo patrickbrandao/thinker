@@ -15,8 +15,9 @@ import { t } from '../i18n/index.js';
 import AuthUrlFallback from './AuthUrlFallback.js';
 import { usePageWake } from '../lib/use-page-wake.js';
 import Select from './Select.js';
-import { Button, cx } from './ui.js';
+import { Button, WindowFooter, cx } from './ui.js';
 import { SubscriptionAccountList, renameSubscriptionKey } from './OAuthDetailView.js';
+import { collectUrlOverrides, useUrlsScope } from './ConnectionUrlsScope.js';
 
 interface Props {
   provDef: ProviderDef;
@@ -100,6 +101,7 @@ export default function DeviceCodeDetailView(props: Props) {
   const [addingAccount, setAddingAccount] = useState(false);
   // Set when the browser blocked the sign-in tab: the URL to open by hand.
   const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
+  const urlsScope = useUrlsScope();
   const latest = useRef(props);
   latest.current = props;
   // The poll loop spans renders, so it reads the flow and its bookkeeping
@@ -118,6 +120,11 @@ export default function DeviceCodeDetailView(props: Props) {
   const api = () => getDeviceCodeApi(latest.current.provId);
   const isKiro = props.provId === 'kiro';
   const hasRegion = api().hasRegion;
+  // The URLs tab shows the defaults of the chosen region.
+  const scopeRegion = hasRegion ? selectedRegion : isKiro ? kiroRegion.trim().toLowerCase() : '';
+  useEffect(() => {
+    urlsScope?.setRegion(scopeRegion || undefined);
+  }, [urlsScope, scopeRegion]);
   const activeKeys = props.activeKeys ?? [];
   const isMultiKey = activeKeys.length > 1;
   const showConnectFlow = props.newConnection || !props.connected || addingAccount;
@@ -136,6 +143,8 @@ export default function DeviceCodeDetailView(props: Props) {
       setAltError(result.error!);
       return;
     }
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
     props.setBusy(true);
     try {
       const label = suggestNextProviderKeyLabel(
@@ -152,6 +161,7 @@ export default function DeviceCodeDetailView(props: Props) {
         // the proxy fallback honors CN tokens.
         ...(hasRegion && { region: selectedRegion }),
         ...(label && { label }),
+        ...(urlOverrides && { urlOverrides }),
       });
       toast.success(t('providerSetup.shared.subscriptionConnected', { name: props.provDef.name }));
       setAddingAccount(false);
@@ -290,6 +300,8 @@ export default function DeviceCodeDetailView(props: Props) {
   const handleStart = async () => {
     const startOptions = buildStartOptions();
     if (startOptions === null) return;
+    const urlOverrides = collectUrlOverrides(urlsScope);
+    if (urlOverrides === null) return;
     // Open the popup synchronously inside the click handler to keep the
     // user-gesture flag alive; without this, browsers block the post-await
     // window.open as a "programmatic popup". noopener can't be used here
@@ -308,7 +320,10 @@ export default function DeviceCodeDetailView(props: Props) {
     clearPollTimer();
     setStatusMessage(null);
     try {
-      const nextFlow = await api().start(latest.current.agentName, startOptions);
+      const nextFlow = await api().start(
+        latest.current.agentName,
+        urlOverrides ? { ...startOptions, urlOverrides } : startOptions,
+      );
       if (isStale(flowGeneration)) {
         popup?.close();
         return;
@@ -491,9 +506,11 @@ export default function DeviceCodeDetailView(props: Props) {
                     ) : null}
                   </>
                 ) : null}
-                <Button block busy={props.busy} onClick={() => void handleStart()}>
-                  {t('providerSetup.device.connectWith', { name: props.provDef.name })}
-                </Button>
+                {props.newConnection ? null : (
+                  <Button block busy={props.busy} onClick={() => void handleStart()}>
+                    {t('providerSetup.device.connectWith', { name: props.provDef.name })}
+                  </Button>
+                )}
               </div>
             ) : null}
             {alt && method === 'token' ? (
@@ -521,18 +538,44 @@ export default function DeviceCodeDetailView(props: Props) {
                   }}
                 />
                 {altError ? <div className="form-error">{altError}</div> : null}
+                {props.newConnection ? null : (
+                  <Button
+                    block
+                    busy={props.busy}
+                    disabled={!altToken.trim()}
+                    onClick={() => void handleAltConnect()}
+                  >
+                    {t('providerSetup.device.connectWithToken')}
+                  </Button>
+                )}
+              </div>
+            ) : null}
+          </>
+        )}
+        {props.newConnection ? (
+          // A new-connection window: Cancel and the next step sit in its fixed footer.
+          <WindowFooter>
+            <div className="flex w-full justify-between gap-2">
+              <Button variant="ghost" size="sm" disabled={props.busy} onClick={props.onClose}>
+                {t('common.cancel')}
+              </Button>
+              {flow ? null : alt && method === 'token' ? (
                 <Button
-                  block
+                  size="sm"
                   busy={props.busy}
                   disabled={!altToken.trim()}
                   onClick={() => void handleAltConnect()}
                 >
                   {t('providerSetup.device.connectWithToken')}
                 </Button>
-              </div>
-            ) : null}
-          </>
-        )}
+              ) : showLogin ? (
+                <Button size="sm" busy={props.busy} onClick={() => void handleStart()}>
+                  {t('providerSetup.device.connectWith', { name: props.provDef.name })}
+                </Button>
+              ) : null}
+            </div>
+          </WindowFooter>
+        ) : null}
         {addingAccount ? (
           <Button variant="ghost" block disabled={props.busy} onClick={cancelAddAccount}>
             {t('common.cancel')}

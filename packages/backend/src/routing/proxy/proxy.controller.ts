@@ -93,6 +93,7 @@ import {
   type ModelListRouting,
 } from '../virtual-models/model-list-routing.service';
 import { listedCatalogModels } from '../virtual-models/model-list';
+import { LiveSessionHubService } from '../../live-session/live-session-hub.service';
 
 const MAX_SEEN_TENANTS = 10_000;
 const SEEN_TENANT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -252,6 +253,10 @@ export class ProxyController {
     // unit tests that build the controller by hand keep the plain listing.
     @Optional()
     private readonly modelListRouting?: ModelListRoutingService,
+    // The live session window's hub (live-session/). Optional for hand-built
+    // controllers in unit tests.
+    @Optional()
+    private readonly liveSessions?: LiveSessionHubService,
   ) {}
 
   @Get('models')
@@ -629,6 +634,19 @@ export class ProxyController {
       }
     }
 
+    // Live session window: only requests that name a harness session get a
+    // capture; without one every `live?.` call below is a no-op.
+    const live =
+      this.liveSessions?.openRequest({
+        tenantId,
+        agentName: req.ingestionContext.agentName ?? null,
+        headers: req.headers,
+        requestId,
+        apiMode,
+        body,
+        recording: recordingEnabled,
+      }) ?? null;
+
     let attemptSequence = 0;
     // Every attempt that inserted a pending row, so a caller disconnect can
     // finish the ones no terminal writer will reach.
@@ -645,6 +663,7 @@ export class ProxyController {
       currentAttempt = attempt;
       currentAttemptStart = start;
       timelineAttempts.push({ ref: attempt, start });
+      live?.attemptStarted(attempt, start);
       // Cooldown skips still need a unique position in the routing chain, but
       // must not look like an in-flight provider call or trigger provider-call
       // accounting before their terminal policy row is written.
@@ -686,6 +705,18 @@ export class ProxyController {
           .save(tenantId, requestId, attempt.id, capture.buildRecording())
           .catch((e) => this.logger.warn(`Failed to finish Provider Attempt recording: ${e}`));
       };
+      if (live) {
+        const startRecording = attempt.startRecording;
+        attempt.startRecording = (recording) => {
+          live.attemptRequest(attempt, recording);
+          startRecording(recording);
+        };
+        const finishRecording = attempt.finishRecording;
+        attempt.finishRecording = (response) => {
+          live.attemptResponse(attempt, response);
+          return finishRecording(response);
+        };
+      }
       attempt.pendingWrite = this.recorder
         .recordPendingProviderAttempt(req.ingestionContext, requestId, attempt, start)
         .catch((e) => {
@@ -734,11 +765,14 @@ export class ProxyController {
 
       const metaHeaders = buildMetaHeaders(meta);
       const providerResponse = forward.response;
-      const responseCapture = forward.attempt?.recordingCapture;
+      const responseCapture = live
+        ? live.responseCapture(forward.attempt, forward.attempt?.recordingCapture)
+        : forward.attempt?.recordingCapture;
 
       if (!providerResponse.ok) {
         const errorBody = await providerResponse.text();
         await forward.attempt?.finishRecording?.(recordingResponseFromText(errorBody));
+        live?.failed(forward.attempt ?? meta.attempt, providerResponse.status, errorBody);
         await handleProviderError(
           res,
           req.ingestionContext,
@@ -804,6 +838,22 @@ export class ProxyController {
       }
 
       await forward.attempt?.finishRecording?.();
+      if (live && !meta.thinker_error_code) {
+        const ref = meta.attempt ?? forward.attempt;
+        const start = timelineAttempts.find((t) => t.ref === ref)?.start;
+        live.completed(
+          ref,
+          streamUsage,
+          ref && start && streamUsage
+            ? this.recorder.estimateAttemptCost(
+                req.ingestionContext,
+                start,
+                streamUsage,
+                ref.startedAt,
+              )
+            : null,
+        );
+      }
 
       // A friendly stub (no provider key, no providers, usage limit) leaves the
       // proxy as an HTTP 200 assistant message, so it lands here — but it is a
@@ -839,6 +889,11 @@ export class ProxyController {
         );
       }
     } catch (err: unknown) {
+      if (live) {
+        const ref = currentMeta?.attempt ?? currentAttempt;
+        if (clientAbort.signal.aborted) live.cancelled(ref, partialUsageOf(err));
+        else live.failed(ref, this.errorStatusOf(err), this.extractErrorMessage(err));
+      }
       await this.handleProxyError(
         err,
         req,
@@ -866,7 +921,19 @@ export class ProxyController {
       }
     } finally {
       if (slotAcquired) this.rateLimiter.releaseSlot(tenantId);
+      live?.close();
     }
+  }
+
+  /** HTTP status a thrown proxy error reports (as handleProxyError reads it). */
+  private errorStatusOf(err: unknown): number {
+    return err instanceof StreamFailure
+      ? err.status
+      : err instanceof ResponsesSseError
+        ? err.status
+        : err instanceof HttpException
+          ? err.getStatus()
+          : 500;
   }
 
   /**
