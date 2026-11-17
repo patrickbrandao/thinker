@@ -4,6 +4,8 @@ import type { DataSource } from 'typeorm';
 import {
   applyLiveEvent,
   emptyLiveState,
+  liveGlance,
+  type LiveGlance,
   type LiveAttempt,
   type LiveEvent,
   type LiveEventType,
@@ -51,6 +53,16 @@ export interface LiveSubscriber {
   close(): void;
 }
 
+/** One session in `GET /live-sessions/glance`. */
+export interface LiveGlanceItem extends LiveGlance {
+  id: string;
+  /** Main session of a subagent session; null for a main session. */
+  parentId: string | null;
+  agentName: string | null;
+  /** Time since the session's last activity. */
+  idleMs: number;
+}
+
 export class LiveSessionEntry {
   readonly createdAtMs = Date.now();
   lastActivityMs = Date.now();
@@ -73,6 +85,8 @@ export class LiveSessionEntry {
   hadReset = false;
   /** Requests whose attempts are still on the wire. */
   inFlight = 0;
+  /** Session that spawned this one (a subagent's main session), once a request named it. */
+  parentId: string | null = null;
 
   constructor(
     readonly key: string,
@@ -147,6 +161,7 @@ export class LiveSessionHubService implements OnModuleDestroy {
         harness: harnessName(input.headers),
       });
       if (!entry.meta.harness) entry.meta.harness = harnessName(input.headers);
+      if (session.parentId) entry.parentId = session.parentId;
       entry.requestIds.add(input.requestId);
       entry.lastActivityMs = Date.now();
       this.refreshCustomNames(input.tenantId);
@@ -236,6 +251,26 @@ export class LiveSessionHubService implements OnModuleDestroy {
 
   find(tenantId: string, sessionId: string): LiveSessionEntry | undefined {
     return this.entries.get(liveKey(tenantId, sessionId));
+  }
+
+  /**
+   * One-icon summary of every session the tenant has in memory: what its
+   * conversation ends with and whether that is streaming now. Carries no
+   * content, only the kind.
+   */
+  glance(tenantId: string, now = Date.now()): LiveGlanceItem[] {
+    const out: LiveGlanceItem[] = [];
+    for (const entry of this.entries.values()) {
+      if (entry.tenantId !== tenantId) continue;
+      out.push({
+        id: entry.sessionId,
+        parentId: entry.parentId,
+        agentName: entry.meta.agentName,
+        idleMs: Math.max(0, now - entry.lastActivityMs),
+        ...liveGlance(entry.state),
+      });
+    }
+    return out;
   }
 
   /** The session's entry, created (empty) when it has none. */

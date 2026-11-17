@@ -16,11 +16,24 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
-import { Moon, Settings2, Sun, X } from 'lucide-react';
-import { platformIcon } from 'thinker-shared';
+import {
+  Bot,
+  BotMessageSquare,
+  Brain,
+  CircleDashed,
+  EyeOff,
+  FaceSlightlySmiling,
+  Moon,
+  RobotArm,
+  Settings2,
+  Sun,
+  Wrench,
+  X,
+} from 'lucide-react';
+import { platformIcon, type LiveGlance, type LiveGlanceKind } from 'thinker-shared';
 import Select, { type SelectOption } from '../components/Select.js';
 import { ThemedIcon } from '../components/setup-ui.js';
-import { cx } from '../components/ui.js';
+import { Switch, cx } from '../components/ui.js';
 import HexLiveWindow from '../components/live-session/HexLiveWindow.js';
 import '../components/live-session/hex-live.css';
 import {
@@ -42,10 +55,110 @@ import { t } from '../i18n/index.js';
 import { useSignal } from '../lib/signal.js';
 import { effectiveTheme, themePreference, toggleTheme } from '../lib/theme.js';
 import { getAgents } from '../services/api.js';
-import { getSessions, type SessionSummary } from '../services/api/sessions.js';
+import {
+  getLiveGlance,
+  getSessions,
+  type LiveGlanceItem,
+  type SessionSummary,
+} from '../services/api/sessions.js';
+import { shortId } from './sessions/session-format.js';
 import { LiveSessionFeed, useLiveFeed } from '../services/live-session-feed.js';
 
 export const WALL_POLL_MS = 5_000;
+/** How often the session chips refresh what each session ends with. */
+export const WALL_GLANCE_MS = 2_000;
+/** The dot grid's cell, px (hex-live.css `.live-wall`). */
+const GRID = 24;
+/**
+ * A session leaves the running set five minutes after its last activity (the
+ * backend's rule). A chip the user dragged stays that long again, so it takes
+ * twice as long to disappear.
+ */
+export const WALL_CHIP_LINGER_MS = 5 * 60_000;
+
+interface ChipPos {
+  x: number;
+  y: number;
+}
+
+/**
+ * The line from a main session's chip to a subagent's, in right angles and
+ * always over the free cells between chips (a chip is one cell wide and two
+ * tall; the flow leaves a free column and a free row between chips):
+ *
+ * - side by side: a horizontal line between the facing edges;
+ * - one right above the other: a vertical line;
+ * - far apart on the same row: out of the top, along the free row above, and
+ *   down into the other's top;
+ * - on different rows: out of the bottom of the upper one, along the free row
+ *   below it, down the free column beside the lower one and into its top.
+ *
+ * Returns the corner points, from `from` to `to`.
+ */
+export function chipLinkPoints(from: ChipPos, to: ChipPos): [number, number][] {
+  const W = GRID;
+  const H = 2 * GRID;
+  const half = GRID / 2;
+  if (from.y === to.y) {
+    const dx = to.x - from.x;
+    if (Math.abs(dx) <= 2 * GRID) {
+      const mid = from.y + H / 2;
+      return dx >= 0
+        ? [
+            [from.x + W, mid],
+            [to.x, mid],
+          ]
+        : [
+            [from.x, mid],
+            [to.x + W, mid],
+          ];
+    }
+    const lane = from.y - half;
+    return [
+      [from.x + half, from.y],
+      [from.x + half, lane],
+      [to.x + half, lane],
+      [to.x + half, to.y],
+    ];
+  }
+  const down = from.y < to.y;
+  const a = down ? from : to;
+  const b = down ? to : from;
+  let pts: [number, number][];
+  if (a.x === b.x && b.y - a.y <= 3 * GRID) {
+    pts = [
+      [a.x + half, a.y + H],
+      [a.x + half, b.y],
+    ];
+  } else {
+    const laneA = a.y + H + half;
+    const laneB = b.y - half;
+    pts = [
+      [a.x + half, a.y + H],
+      [a.x + half, laneA],
+    ];
+    if (laneB > laneA) {
+      // Rows in between: go down the free column beside the lower chip.
+      const col = b.x + (a.x < b.x ? -half : W + half);
+      pts.push([col, laneA], [col, laneB]);
+    }
+    pts.push([b.x + half, Math.max(laneA, laneB)], [b.x + half, b.y]);
+  }
+  return down ? pts : pts.reverse();
+}
+
+/** What a chip (and a window) needs from its session: a main session or a subagent's. */
+type ChipSession = Pick<SessionSummary, 'id' | 'agent_name' | 'in_flight' | 'last_at'>;
+
+/** A chip being dragged: where it started and where it is now. */
+interface ChipDrag {
+  id: string;
+  from: ChipPos;
+  to: ChipPos;
+}
+
+/** Nearest grid position (chip edges run over the dots, which sit half a cell in). */
+const snapToGrid = (v: number) => GRID / 2 + Math.max(0, Math.round((v - GRID / 2) / GRID)) * GRID;
 
 /** Viewer preferences of the wall, kept in this browser. */
 export interface WallPrefs {
@@ -58,6 +171,8 @@ export interface WallPrefs {
   closeAfterAnswerSec: number;
   /** Seconds a window stays while the last item is a tool call (0: never closes). */
   closeAfterToolSec: number;
+  /** Open a window by itself for every running session (off: only the ones the user asks for). */
+  autoShow: boolean;
 }
 
 export const DEFAULT_WALL_PREFS: WallPrefs = {
@@ -66,6 +181,7 @@ export const DEFAULT_WALL_PREFS: WallPrefs = {
   defaultTab: 'chat',
   closeAfterAnswerSec: 10,
   closeAfterToolSec: 60,
+  autoShow: false,
 };
 const PREFS_KEY = 'thinker.liveWall.prefs';
 const TABS: LiveTab[] = ['chat', 'details', 'inspector'];
@@ -88,6 +204,7 @@ export function readWallPrefs(raw: string | null): WallPrefs {
     defaultTab: TABS.includes(o.defaultTab as LiveTab) ? (o.defaultTab as LiveTab) : d.defaultTab,
     closeAfterAnswerSec: clampInt(o.closeAfterAnswerSec, 0, 3600, d.closeAfterAnswerSec),
     closeAfterToolSec: clampInt(o.closeAfterToolSec, 0, 3600, d.closeAfterToolSec),
+    autoShow: o.autoShow === true,
   };
 }
 
@@ -160,6 +277,8 @@ export interface ReconcileOptions {
   maxTiles?: number;
   /** Last user interaction per tile (scroll, click, keys). */
   touchedAt?: ReadonlyMap<string, number>;
+  /** Sessions the user opened by hand: they keep their slot like pinned ones. */
+  keep?: ReadonlySet<string>;
 }
 
 /** Busy sessions first, then the most recent activity. */
@@ -209,7 +328,10 @@ export function reconcileWall(
 
   // 2. The sessions that should hold the running slots.
   const runningTile = (t: WallTile) => t.endedAt == null;
-  const pinned = next.filter((t) => runningTile(t) && t.pinned).map((t) => t.id);
+  const keep = opts.keep;
+  const pinned = next
+    .filter((t) => runningTile(t) && (t.pinned || keep?.has(t.id)))
+    .map((t) => t.id);
   const wanted = new Set(pinned);
   for (const s of [...running].sort(byPriority)) {
     if (wanted.size >= Math.max(maxTiles, pinned.length)) break;
@@ -294,8 +416,67 @@ export default function LiveAgents({
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [runningTotal, setRunningTotal] = useState(0);
+  /** The running sessions that pass the filters (one chip each). */
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const itemsRef = useRef<SessionSummary[]>([]);
+  /** Where the user dropped each chip they dragged. */
+  const [chipPos, setChipPos] = useState<Map<string, ChipPos>>(() => new Map());
+  const chipPosRef = useRef(chipPos);
+  chipPosRef.current = chipPos;
+  /** Dragged chips whose session left the running set: they stay until `until`. */
+  const [lingering, setLingering] = useState<
+    Map<string, { session: SessionSummary; until: number }>
+  >(() => new Map());
+  const lingeringRef = useRef(lingering);
+  lingeringRef.current = lingering;
+  const [glance, setGlance] = useState<Map<string, LiveGlanceItem>>(() => new Map());
+  /** Running subagent sessions of the sessions on the wall, by main session. */
+  const kidsOf = useMemo(() => {
+    const roots = new Map(sessions.map((s) => [s.id, s]));
+    const map = new Map<string, ChipSession[]>();
+    for (const g of glance.values()) {
+      const parent = g.parentId ? roots.get(g.parentId) : undefined;
+      if (!parent || roots.has(g.id) || (g.idleMs ?? 0) > WALL_CHIP_LINGER_MS) continue;
+      const list = map.get(parent.id) ?? [];
+      list.push({
+        id: g.id,
+        agent_name: g.agentName ?? parent.agent_name,
+        in_flight: g.streaming ? 1 : 0,
+        last_at: new Date(Date.now() - (g.idleMs ?? 0)).toISOString(),
+      });
+      map.set(parent.id, list);
+    }
+    for (const list of map.values()) list.sort((x, y) => x.id.localeCompare(y.id));
+    return map;
+  }, [sessions, glance]);
+  const kidsRef = useRef(kidsOf);
+  kidsRef.current = kidsOf;
+  const allKids = () => [...kidsRef.current.values()].flat();
+  /** The chip under drag (its subagents follow it), and the family under the mouse. */
+  const [chipDrag, setChipDrag] = useState<ChipDrag | null>(null);
+  const [focusRoot, setFocusRoot] = useState<string | null>(null);
   const dismissed = useRef(new Set<string>());
+  /** A chip landed: it stays there, and its subagents the user placed move along. */
+  const dropChip = useCallback((d: ChipDrag) => {
+    setChipPos((prev) => {
+      const next = new Map(prev).set(d.id, d.to);
+      for (const kid of kidsRef.current.get(d.id) ?? []) {
+        const at = prev.get(kid.id);
+        if (at) next.set(kid.id, { x: at.x + d.to.x - d.from.x, y: at.y + d.to.y - d.from.y });
+      }
+      return next;
+    });
+    setChipDrag(null);
+  }, []);
+  /** Sessions the user opened by hand (chip or the "not shown" pill). */
+  const manual = useRef(new Set<string>());
+  /** Cascade wave of tiles opened by the "not shown" pill (0: the base cascade). */
+  const pendingWave = useRef(new Map<string, number>());
+  const waveCounter = useRef(0);
+  /** When each session last got a window, so the pill cycles through all of them. */
+  const shownAt = useRef(new Map<string, number>());
+  const autoShowRef = useRef(prefs.autoShow);
+  autoShowRef.current = prefs.autoShow;
   const touchedAt = useRef(new Map<string, number>());
   const touch = useCallback((id: string) => touchedAt.current.set(id, Date.now()), []);
   const feeds = useRef(new Map<string, LiveSessionFeed>());
@@ -320,6 +501,37 @@ export default function LiveAgents({
       alive = false;
     };
   }, []);
+
+  // The next wall from the running sessions. With "show automatically" off,
+  // only the windows already open and the ones the user asked for take part.
+  const applyItems = useCallback(
+    (items: SessionSummary[]) => {
+      const now = Date.now();
+      setTiles((prev) => {
+        const have = new Set(prev.map((tile) => tile.id));
+        // Subagent sessions never open by themselves: only the ones the user asked for.
+        const asked = (x: ChipSession) => manual.current.has(x.id) || have.has(x.id);
+        const candidates: ChipSession[] = [
+          ...(autoShowRef.current ? items : items.filter(asked)),
+          ...allKids().filter(asked),
+        ];
+        const next = reconcileWall(prev, candidates, {
+          dismissed: dismissed.current,
+          now,
+          maxTiles: budget,
+          touchedAt: touchedAt.current,
+          keep: manual.current,
+        });
+        if (next === prev) return prev;
+        return next.map((tile) => {
+          if (tile.addedAt !== now || tile.prefs.tab) return tile;
+          shownAt.current.set(tile.id, now);
+          return { ...tile, prefs: { ...tile.prefs, tab: newTab.current } };
+        });
+      });
+    },
+    [budget],
+  );
 
   // Poll the running sessions; each answer reconciles the wall.
   useEffect(() => {
@@ -346,21 +558,31 @@ export default function LiveAgents({
         const items = provider ? all.filter((s) => s.providers?.includes(provider)) : all;
         const ids = new Set(items.map((s) => s.id));
         // A closed session that stopped may open again when it restarts.
-        for (const id of dismissed.current) if (!ids.has(id)) dismissed.current.delete(id);
-        const now = Date.now();
-        setTiles((prev) =>
-          reconcileWall(prev, items, {
-            dismissed: dismissed.current,
-            now,
-            maxTiles: budget,
-            touchedAt: touchedAt.current,
-          }).map((tile) =>
-            tile.addedAt === now && !tile.prefs.tab
-              ? { ...tile, prefs: { ...tile.prefs, tab: newTab.current } }
-              : tile,
-          ),
-        );
-        setRunningTotal(items.length);
+        const known = new Set([...ids, ...allKids().map((k) => k.id)]);
+        for (const id of dismissed.current) if (!known.has(id)) dismissed.current.delete(id);
+        for (const id of manual.current) if (!known.has(id)) manual.current.delete(id);
+        // A dragged chip outlives its session's stay in the running set.
+        const gone = itemsRef.current.filter((s) => !ids.has(s.id) && chipPosRef.current.has(s.id));
+        const nowMs = Date.now();
+        setLingering((prev) => {
+          const next = new Map(prev);
+          for (const s of gone) next.set(s.id, { session: s, until: nowMs + WALL_CHIP_LINGER_MS });
+          for (const [id, l] of next) if (ids.has(id) || l.until <= nowMs) next.delete(id);
+          return next.size === prev.size && gone.length === 0 ? prev : next;
+        });
+        setChipPos((prev) => {
+          const keep = new Set([...known, ...gone.map((s) => s.id)]);
+          const stale = [...prev.keys()].filter(
+            (id) => !keep.has(id) && !((lingeringRef.current.get(id)?.until ?? 0) > nowMs),
+          );
+          if (!stale.length) return prev;
+          const next = new Map(prev);
+          for (const id of stale) next.delete(id);
+          return next;
+        });
+        itemsRef.current = items;
+        setSessions(items);
+        applyItems(items);
         setLoaded(true);
         setFailed(false);
       } catch {
@@ -375,7 +597,29 @@ export default function LiveAgents({
       alive = false;
       clearInterval(timer);
     };
-  }, [agent, provider, budget]);
+  }, [agent, provider, budget, applyItems]);
+
+  // Turning "show automatically" on opens the windows right away.
+  useEffect(() => {
+    if (prefs.autoShow) applyItems(itemsRef.current);
+  }, [prefs.autoShow, applyItems]);
+
+  // What each session ends with, for the chips.
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      getLiveGlance()
+        .then((res) => {
+          if (alive) setGlance(new Map((res.items ?? []).map((g) => [g.id, g])));
+        })
+        .catch(() => undefined);
+    void load();
+    const timer = setInterval(() => void load(), WALL_GLANCE_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   // One feed per tile: opened when the tile appears, closed when it goes.
   const [, setFeedsVersion] = useState(0);
@@ -420,6 +664,7 @@ export default function LiveAgents({
 
   const closeTile = useCallback((id: string) => {
     dismissed.current.add(id);
+    manual.current.delete(id);
     setTiles((prev) => prev.filter((tile) => tile.id !== id));
   }, []);
 
@@ -456,6 +701,8 @@ export default function LiveAgents({
   // A harness change keeps only that harness's tiles.
   const changeProvider = (value: string) => {
     setProvider(value);
+    itemsRef.current = [];
+    setLingering(new Map());
     if (value)
       setTiles((prev) =>
         prev.filter((tile) => providerOf.current.get(tile.id)?.includes(value) ?? false),
@@ -468,6 +715,8 @@ export default function LiveAgents({
 
   const changeAgent = (value: string) => {
     setAgent(value);
+    itemsRef.current = [];
+    setLingering(new Map());
     if (value) setTiles((prev) => prev.filter((tile) => tile.agentName === value));
   };
 
@@ -519,12 +768,19 @@ export default function LiveAgents({
   }, [loaded]);
   const winW = Math.max(240, Math.min(prefs.winW, area.w - 2 * CASCADE_GAP));
   const maxSize: Size = { w: area.w, h: area.h };
-  const slots = useRef(new Map<string, number>());
+  const slots = useRef(new Map<string, { wave: number; slot: number }>());
   for (const id of [...slots.current.keys()])
     if (!tiles.some((tile) => tile.id === id)) slots.current.delete(id);
-  for (const tile of tiles)
-    if (!slots.current.has(tile.id)) slots.current.set(tile.id, freeSlot(slots.current.values()));
+  for (const tile of tiles) {
+    if (slots.current.has(tile.id)) continue;
+    const wave = pendingWave.current.get(tile.id) ?? 0;
+    pendingWave.current.delete(tile.id);
+    const taken = [...slots.current.values()].filter((v) => v.wave === wave).map((v) => v.slot);
+    slots.current.set(tile.id, { wave, slot: freeSlot(taken) });
+  }
   const [stack, setStack] = useState<string[]>([]);
+  const stackRef = useRef(stack);
+  stackRef.current = stack;
   useEffect(() => {
     setStack((prev) => {
       const ids = new Set(tiles.map((tile) => tile.id));
@@ -538,8 +794,144 @@ export default function LiveAgents({
       setStack((prev) => (prev.at(-1) === id ? prev : [...prev.filter((x) => x !== id), id])),
     [],
   );
+  // Session chips: one grid cell wide, two tall, a free column and row between them.
+  const chipSessions = useMemo(
+    () =>
+      [...sessions].sort(
+        (a, b) =>
+          (a.agent_name ?? '').localeCompare(b.agent_name ?? '') ||
+          (a.started_at ?? '').localeCompare(b.started_at ?? '') ||
+          a.id.localeCompare(b.id),
+      ),
+    [sessions],
+  );
+  const chipCols = Math.max(1, Math.floor((area.w - GRID) / (2 * GRID)));
+  // Chips flow left to right, a main session followed by its subagents. The
+  // ones the user dragged stay where they were dropped (a subagent not placed
+  // by hand sits to the right of its dragged parent), and the flow skips the
+  // places they cover.
+  const parentOf = new Map<string, string>();
+  for (const [root, kids] of kidsOf) for (const k of kids) parentOf.set(k.id, root);
+  const fixedOf = (id: string): ChipPos | undefined => {
+    if (chipDrag?.id === id) return chipDrag.to;
+    const at = chipPos.get(id);
+    if (at && chipDrag && parentOf.get(id) === chipDrag.id)
+      return {
+        x: at.x + chipDrag.to.x - chipDrag.from.x,
+        y: at.y + chipDrag.to.y - chipDrag.from.y,
+      };
+    return at;
+  };
+  const blocked: ChipPos[] = [];
+  const under = new Map<string, ChipPos>();
+  for (const s of chipSessions) {
+    const rf = fixedOf(s.id);
+    if (rf) blocked.push(rf);
+    (kidsOf.get(s.id) ?? []).forEach((k, n) => {
+      const kf = fixedOf(k.id);
+      if (kf) return blocked.push(kf);
+      if (!rf) return;
+      // Under a dragged parent: the first right below it, the next ones to the right.
+      const at = { x: rf.x + n * 2 * GRID, y: rf.y + 3 * GRID };
+      under.set(k.id, at);
+      blocked.push(at);
+    });
+  }
+  for (const id of lingering.keys()) {
+    const at = chipPos.get(id);
+    if (at) blocked.push(at);
+  }
+  const covered = (at: ChipPos) =>
+    blocked.some((d) => Math.abs(d.x - at.x) < GRID && Math.abs(d.y - at.y) < 2 * GRID);
+  const slotAt = (col: number, row: number): ChipPos => ({
+    x: GRID / 2 + col * 2 * GRID,
+    y: GRID / 2 + row * 3 * GRID,
+  });
+  // The flow: main sessions left to right; a session's subagents go on the row
+  // below it, the first right under it (that row is then theirs alone).
+  let col = 0;
+  let row = 0;
+  /** Rows under the current one taken by subagents. */
+  let kidRows = 0;
+  let flowRows = 0;
+  const newRow = () => {
+    row += 1 + kidRows;
+    col = 0;
+    kidRows = 0;
+  };
+  const chipPlaces: {
+    session: ChipSession;
+    x: number;
+    y: number;
+    gone: boolean;
+    /** Main session of a subagent chip. */
+    parent: string | null;
+  }[] = [];
+  for (const s of chipSessions) {
+    const kids = kidsOf.get(s.id) ?? [];
+    const rf = fixedOf(s.id);
+    if (rf) {
+      chipPlaces.push({ session: s, ...rf, gone: false, parent: null });
+      for (const k of kids)
+        chipPlaces.push({
+          session: k,
+          ...(fixedOf(k.id) ?? under.get(k.id)!),
+          gone: false,
+          parent: s.id,
+        });
+      continue;
+    }
+    const flowKids = kids.filter((k) => !fixedOf(k.id));
+    // The family's width: its subagents side by side on the row below.
+    const width = Math.min(chipCols, Math.max(1, flowKids.length));
+    let at: ChipPos;
+    for (;;) {
+      if (col > 0 && col + width > chipCols) newRow();
+      at = slotAt(col, row);
+      if (!covered(at)) break;
+      col += 1;
+    }
+    const first = col;
+    col += width;
+    chipPlaces.push({ session: s, ...at, gone: false, parent: null });
+    flowRows = Math.max(flowRows, row + 1);
+    let n = 0;
+    for (const k of kids) {
+      const kf = fixedOf(k.id);
+      if (kf) {
+        chipPlaces.push({ session: k, ...kf, gone: false, parent: s.id });
+        continue;
+      }
+      const down = 1 + Math.floor(n / width);
+      let spot = slotAt(first + (n % width), row + down);
+      n += 1;
+      if (covered(spot)) {
+        // No room below: beside the family, on its own row.
+        spot = slotAt(col, row);
+        col += 1;
+      } else {
+        kidRows = Math.max(kidRows, down);
+        flowRows = Math.max(flowRows, row + down + 1);
+      }
+      chipPlaces.push({ session: k, ...spot, gone: false, parent: s.id });
+    }
+  }
+  for (const [id, l] of lingering) {
+    const at = chipPos.get(id);
+    if (at && !chipSessions.some((s) => s.id === id))
+      chipPlaces.push({ session: l.session, ...at, gone: true, parent: null });
+  }
+  const placeOf = new Map(chipPlaces.map((c) => [c.session.id, c]));
+  const chipLinks = chipPlaces.flatMap((c) => {
+    const from = c.parent ? placeOf.get(c.parent) : undefined;
+    return from ? [{ from, to: c }] : [];
+  });
+  const chipsHeight = flowRows ? GRID / 2 + flowRows * 3 * GRID : 0;
+  // The cascade starts below a free band one window tall; more chips than that push it down.
+  const chipsPush = Math.max(0, chipsHeight - (CASCADE_GAP + prefs.winH));
   const placed = tiles.map((tile) => {
-    const auto = cascadePosition(slots.current.get(tile.id) ?? 0, {
+    const at = slots.current.get(tile.id) ?? { wave: 0, slot: 0 };
+    const auto = cascadePosition(at.slot, {
       width: winW,
       height: prefs.winH,
       areaWidth: area.w,
@@ -547,7 +939,12 @@ export default function LiveAgents({
     });
     const moved = tile.prefs.x != null && tile.prefs.y != null;
     const size = windowSize(tile.prefs, { w: winW, h: prefs.winH }, maxSize);
-    return { tile, size, x: moved ? tile.prefs.x! : auto.x, y: moved ? tile.prefs.y! : auto.y };
+    return {
+      tile,
+      size,
+      x: moved ? tile.prefs.x! : auto.x + at.wave * GRID,
+      y: moved ? tile.prefs.y! : auto.y + at.wave * GRID + chipsPush,
+    };
   });
   const layerHeight = Math.max(0, ...placed.map((p) => p.y + p.size.h + CASCADE_GAP));
   const dark = effectiveTheme() === 'dark';
@@ -555,27 +952,132 @@ export default function LiveAgents({
     () => ({ answerMs: prefs.closeAfterAnswerSec * 1000, toolMs: prefs.closeAfterToolSec * 1000 }),
     [prefs.closeAfterAnswerSec, prefs.closeAfterToolSec],
   );
-  const shownRunning = tiles.filter((tile) => tile.endedAt == null).length;
-  const waiting = Math.max(0, runningTotal - shownRunning - dismissed.current.size);
+  const tileIds = new Set(tiles.map((tile) => tile.id));
+  const hiddenCount = sessions.filter((s) => !tileIds.has(s.id)).length;
+
+  const newTile = (s: ChipSession, now: number): WallTile => {
+    shownAt.current.set(s.id, now);
+    return {
+      id: s.id,
+      agentName: s.agent_name,
+      endedAt: null,
+      pinned: false,
+      prefs: { tab: newTab.current },
+      addedAt: now,
+      busyAt: s.in_flight > 0 ? now : null,
+    };
+  };
+
+  /** A chip click: brings the session's window to the front, opening it when hidden. */
+  const openSession = (id: string) => {
+    const s: ChipSession | undefined =
+      itemsRef.current.find((x) => x.id === id) ?? allKids().find((x) => x.id === id);
+    if (!s) return;
+    dismissed.current.delete(id);
+    manual.current.add(id);
+    if (tileIds.has(id)) return toFront(id);
+    const now = Date.now();
+    setTiles((prev) => {
+      if (prev.some((tile) => tile.id === id)) return prev;
+      let next = prev;
+      const live = prev.filter((tile) => tile.endedAt == null);
+      if (live.length >= budget) {
+        // No free connection: the window furthest back gives its place.
+        const order = stackRef.current;
+        const victim = live
+          .filter((tile) => !tile.pinned)
+          .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))[0];
+        if (!victim) return prev;
+        manual.current.delete(victim.id);
+        next = prev.filter((tile) => tile.id !== victim.id);
+      }
+      // Beside its chip: one cell of gap to the right, the window's middle at the chip's.
+      const chip = placeOf.get(id);
+      const tile = newTile(s, now);
+      if (!chip) return [...next, tile];
+      const right = chip.x + 2 * GRID;
+      const x =
+        right + winW <= area.w || chip.x - GRID - winW < 0
+          ? Math.max(0, Math.min(right, area.w - winW))
+          : chip.x - GRID - winW;
+      const y = Math.max(0, Math.round(chip.y + GRID - prefs.winH / 2));
+      return [...next, { ...tile, prefs: { ...tile.prefs, x, y } }];
+    });
+  };
+
+  /**
+   * The "not shown" pill: opens the hidden sessions, as many as there are free
+   * connections. With none free, the unpinned windows give way to the next
+   * hidden ones, so repeated clicks walk through every session. Each click
+   * cascades one grid cell further right and down than the previous windows.
+   */
+  const showHidden = () => {
+    const hidden = itemsRef.current
+      .filter((s) => !tileIds.has(s.id))
+      .sort(
+        (a, b) =>
+          (shownAt.current.get(a.id) ?? 0) - (shownAt.current.get(b.id) ?? 0) || byPriority(a, b),
+      );
+    if (!hidden.length) return;
+    const wave = tiles.length === 0 ? 0 : (waveCounter.current = (waveCounter.current % 5) + 1);
+    const now = Date.now();
+    setTiles((prev) => {
+      const live = prev.filter((tile) => tile.endedAt == null);
+      let free = budget - live.length;
+      let next = prev;
+      if (free <= 0) {
+        // Only as many as there are hidden sessions, the longest-shown first.
+        const out = new Set(
+          live
+            .filter((tile) => !tile.pinned)
+            .sort((x, y) => (shownAt.current.get(x.id) ?? 0) - (shownAt.current.get(y.id) ?? 0))
+            .slice(0, hidden.length)
+            .map((tile) => tile.id),
+        );
+        if (!out.size) return prev;
+        for (const id of out) manual.current.delete(id);
+        next = prev.filter((tile) => !out.has(tile.id));
+        free = out.size;
+      }
+      const add = hidden.filter((s) => !next.some((tile) => tile.id === s.id)).slice(0, free);
+      for (const s of add) {
+        dismissed.current.delete(s.id);
+        manual.current.add(s.id);
+        pendingWave.current.set(s.id, wave);
+      }
+      return [...next, ...add.map((s) => newTile(s, now))];
+    });
+  };
 
   return (
-    <main className="lab-hex live-wall flex min-h-screen flex-col text-ink">
+    <main className="lab-hex flex min-h-screen flex-col text-ink">
       <header className="flex flex-wrap items-center gap-2.5 border-b border-line bg-elev px-3 py-1">
         <h1 className="m-0 flex items-center gap-2 text-sm font-semibold">
           <LiveDot />
           {t('sessions.wall.title')}
         </h1>
-        <span className="text-xs text-muted" aria-live="polite">
-          {t('sessions.wall.count', { count: Math.max(runningTotal, shownRunning) })}
+        <span className="wall-pill" aria-live="polite">
+          <i className="wall-pill__dot" aria-hidden="true" />
+          {t('sessions.wall.shown', { count: tiles.length })}
         </span>
-        {waiting > 0 ? (
-          <span
-            className="text-xs text-muted"
-            title={t('sessions.wall.waitingHint', { max: budget })}
-          >
-            {t('sessions.wall.waiting', { count: waiting })}
-          </span>
-        ) : null}
+        <button
+          type="button"
+          className="wall-pill wall-pill--action"
+          disabled={hiddenCount === 0}
+          title={t('sessions.wall.hiddenHint', { max: budget })}
+          onClick={showHidden}
+        >
+          <EyeOff size={12} aria-hidden="true" />
+          {t('sessions.wall.hidden', { count: hiddenCount })}
+        </button>
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-dim">
+          <Switch
+            checked={prefs.autoShow}
+            onChange={(autoShow) => patchPrefs({ autoShow })}
+            label={t('sessions.wall.autoShow')}
+          />
+          <span title={t('sessions.wall.autoShowHint')}>{t('sessions.wall.autoShow')}</span>
+        </label>
         {failed ? <span className="text-xs text-warn">{t('sessions.wall.loadError')}</span> : null}
         <span className="flex-1" />
         <div className="w-full sm:w-48">
@@ -608,13 +1110,67 @@ export default function LiveAgents({
         <WallPrefsPanel prefs={prefs} onChange={patchPrefs} onClose={() => setPrefsOpen(false)} />
       ) : null}
 
-      {loaded && tiles.length === 0 ? (
-        <div className="empty m-auto">
-          <h3>{t('sessions.wall.emptyTitle')}</h3>
-          <p className="max-w-md text-sm">{t('sessions.wall.emptyBody')}</p>
+      {loaded && tiles.length === 0 && sessions.length === 0 && lingering.size === 0 ? (
+        <div className="live-wall flex flex-1">
+          <div className="empty m-auto">
+            <h3>{t('sessions.wall.emptyTitle')}</h3>
+            <p className="max-w-md text-sm">{t('sessions.wall.emptyBody')}</p>
+          </div>
         </div>
       ) : (
-        <div ref={layer} className="relative flex-1" style={{ minHeight: layerHeight }}>
+        <div
+          ref={layer}
+          className="live-wall relative flex-1"
+          style={{ minHeight: Math.max(layerHeight, chipsHeight) }}
+        >
+          <svg className="wall-links" aria-hidden="true">
+            {chipLinks.map(({ from, to }) => {
+              const g = glance.get(to.session.id) ?? IDLE_GLANCE;
+              const d = chipLinkPoints(from, to)
+                .map(([x, y], n) => `${n ? 'L' : 'M'} ${x} ${y}`)
+                .join(' ');
+              return (
+                <path
+                  key={to.session.id}
+                  className={cx(
+                    'wall-link',
+                    g.streaming && 'wall-link--live',
+                    focusRoot != null && focusRoot !== from.session.id && 'wall-link--dim',
+                    focusRoot === from.session.id && 'wall-link--focus',
+                  )}
+                  data-kind={g.last}
+                  data-link={`${from.session.id}>${to.session.id}`}
+                  d={d}
+                />
+              );
+            })}
+          </svg>
+          {chipPlaces.map(({ session: s, x, y, gone, parent }) => {
+            const root = parent ?? s.id;
+            return (
+              <SessionChip
+                key={s.id}
+                session={s}
+                glance={glance.get(s.id) ?? IDLE_GLANCE}
+                iconSrc={iconOf(s.agent_name) ?? null}
+                shown={tileIds.has(s.id)}
+                gone={gone}
+                sub={parent != null}
+                dim={focusRoot != null && focusRoot !== root}
+                dragging={chipDrag?.id === s.id}
+                left={x}
+                top={y}
+                layer={layer}
+                onOpen={() => openSession(s.id)}
+                onDrag={(to, from) => setChipDrag({ id: s.id, from, to })}
+                onDrop={(to, from) => dropChip({ id: s.id, from, to })}
+                // A family lights up only when there is one (a session with subagents).
+                onHover={(over) =>
+                  setFocusRoot(over && (kidsOf.get(root)?.length ?? 0) > 0 ? root : null)
+                }
+              />
+            );
+          })}
           {placed.map(({ tile, size, x, y }) => {
             const feed = feeds.current.get(tile.id);
             if (!feed) return null;
@@ -646,6 +1202,141 @@ export default function LiveAgents({
 }
 
 const CASCADE_GAP = 12;
+
+const IDLE_GLANCE: LiveGlance = { last: 'idle', streaming: false };
+
+const GLANCE_ICON: Record<LiveGlanceKind, typeof Bot> = {
+  assistant: BotMessageSquare,
+  thinking: Brain,
+  tool_call: Wrench,
+  tool_result: RobotArm,
+  user: FaceSlightlySmiling,
+  idle: CircleDashed,
+};
+
+/**
+ * One running session on the dot grid: a card one cell wide and two tall. The
+ * top cell is the harness icon; the bottom one is what the conversation ends
+ * with (answer, thinking, tool call, tool result, user prompt), blinking while
+ * the provider streams it. A click opens the session's window.
+ */
+function SessionChip({
+  session,
+  glance,
+  iconSrc,
+  shown,
+  gone,
+  sub,
+  dim,
+  dragging,
+  left,
+  top,
+  layer,
+  onOpen,
+  onDrag,
+  onDrop,
+  onHover,
+}: {
+  session: ChipSession;
+  glance: LiveGlance;
+  iconSrc: string | null;
+  shown: boolean;
+  /** The session left the running set; the chip stays because the user dragged it. */
+  gone: boolean;
+  /** A subagent session (linked to its main session's chip). */
+  sub: boolean;
+  /** Another family is under the mouse. */
+  dim: boolean;
+  dragging: boolean;
+  left: number;
+  top: number;
+  layer: RefObject<HTMLDivElement | null>;
+  onOpen: () => void;
+  /** The chip is being dragged: where it is now (on the grid) and where it started. */
+  onDrag: (to: ChipPos, from: ChipPos) => void;
+  /** The user dropped the chip. */
+  onDrop: (to: ChipPos, from: ChipPos) => void;
+  onHover: (over: boolean) => void;
+}) {
+  /** A drag just ended: the click that follows it does not open the window. */
+  const dragged = useRef(false);
+  const startDrag = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const from = { x: left, y: top };
+    let last: ChipPos | null = null;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - sx;
+      const dy = ev.clientY - sy;
+      if (!last && Math.hypot(dx, dy) < 4) return;
+      const maxX = Math.max(GRID / 2, (layer.current?.clientWidth || Infinity) - GRID * 1.5);
+      last = {
+        x: Math.min(snapToGrid(from.x + dx), snapToGrid(maxX)),
+        y: snapToGrid(from.y + dy),
+      };
+      onDrag(last, from);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (!last) return;
+      dragged.current = true;
+      setTimeout(() => (dragged.current = false), 0);
+      onDrop(last, from);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+  const Icon = GLANCE_ICON[glance.last];
+  const label = [
+    (sub ? `${t('sessions.wall.subagent')} · ` : '') + (session.agent_name ?? shortId(session.id)),
+    shortId(session.id),
+    t(`sessions.wall.glance.${glance.last}` as 'sessions.wall.glance.idle') +
+      (glance.streaming ? ` (${t('sessions.wall.glance.streaming')})` : ''),
+  ].join(' · ');
+  return (
+    <button
+      type="button"
+      className={cx(
+        'wall-chip',
+        shown && 'wall-chip--shown',
+        session.in_flight > 0 && !gone && 'wall-chip--busy',
+        gone && 'wall-chip--gone',
+        sub && 'wall-chip--sub',
+        dim && 'wall-chip--dim',
+        dragging && 'wall-chip--dragging',
+      )}
+      style={{ left, top }}
+      onPointerDown={startDrag}
+      onPointerEnter={() => onHover(true)}
+      onPointerLeave={() => onHover(false)}
+      data-kind={glance.last}
+      data-session={session.id}
+      aria-pressed={shown}
+      title={label}
+      aria-label={label}
+      onClick={() => {
+        if (!dragged.current) onOpen();
+      }}
+    >
+      <span className="wall-chip__cell">
+        {iconSrc ? (
+          <ThemedIcon src={iconSrc} size={15} className="platform-icon rounded-[3px]" />
+        ) : (
+          <Bot size={14} />
+        )}
+      </span>
+      <span
+        className={cx('wall-chip__cell wall-chip__state', glance.streaming && 'wall-chip--blink')}
+      >
+        <Icon size={14} />
+      </span>
+    </button>
+  );
+}
 
 /**
  * One floating window of the wall: absolute position (its cascade slot or

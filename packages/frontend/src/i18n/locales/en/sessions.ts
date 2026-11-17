@@ -35,6 +35,23 @@ export default {
     unpin: 'Let this tile close when the session ends',
     loadError: 'Could not load the running sessions. Retrying…',
     allProviders: 'All providers',
+    shown: '{{ count }} shown',
+    hidden: '{{ count }} not shown',
+    hiddenHint:
+      'Open the sessions that have no window. At most {{ max }} windows stay live at once (each keeps a connection to the server); with none free, the unpinned windows give way to the next sessions.',
+    autoShow: 'Show automatically',
+    autoShowHint:
+      'Open a window by itself for every running session. Off: windows open only when you click a session or the "not shown" pill.',
+    subagent: 'Subagent',
+    glance: {
+      assistant: 'Assistant answer',
+      thinking: 'Thinking',
+      tool_call: 'Tool call',
+      tool_result: 'Tool result',
+      user: 'User message',
+      idle: 'No activity seen yet',
+      streaming: 'streaming',
+    },
     prefs: {
       open: 'Preferences',
       title: 'Live agents preferences',

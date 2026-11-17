@@ -86,7 +86,7 @@ describe('LiveSessionWindowsProvider', () => {
     // Switch the tab and the mode: both are saved per session.
     fireEvent.click(s2.querySelector('[role="tab"]:nth-child(3)')!);
     expect(s2.textContent).toContain('Recording is off for this harness');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Short view (last 3 items)' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Minimize' })[0]!);
 
     const saved = JSON.parse(localStorage.getItem(LIVE_WINDOWS_KEY)!);
     expect(saved.open.map((e: { sessionId: string }) => e.sessionId)).toEqual([
@@ -96,7 +96,7 @@ describe('LiveSessionWindowsProvider', () => {
       's5',
     ]);
     expect(saved.prefs.s2.tab).toBe('inspector');
-    expect(saved.prefs.s2.mode).toBe('compact');
+    expect(saved.prefs.s2.mode).toBe('minimized');
 
     view.unmount();
     expect(feed.conn).toBe('closed');

@@ -37,6 +37,23 @@ const ptBR: Catalog<typeof en> = {
     unpin: 'Deixar este quadro fechar quando a sessão terminar',
     loadError: 'Não foi possível carregar as sessões em execução. Tentando de novo…',
     allProviders: 'Todos os provedores',
+    shown: '{{ count }} exibidas',
+    hidden: '{{ count }} não exibidas',
+    hiddenHint:
+      'Abre as sessões que estão sem janela. No máximo {{ max }} janelas ficam ao vivo ao mesmo tempo (cada uma mantém uma conexão com o servidor); sem conexão livre, as janelas não fixadas dão lugar às próximas sessões.',
+    autoShow: 'Exibir automaticamente',
+    autoShowHint:
+      'Abre sozinha uma janela para cada sessão em execução. Desligado: as janelas só abrem quando você clica em uma sessão ou na pílula "não exibidas".',
+    subagent: 'Sub-agente',
+    glance: {
+      assistant: 'Resposta do assistente',
+      thinking: 'Raciocínio',
+      tool_call: 'Chamada de ferramenta',
+      tool_result: 'Retorno de ferramenta',
+      user: 'Mensagem do usuário',
+      idle: 'Sem atividade vista ainda',
+      streaming: 'transmitindo',
+    },
     prefs: {
       open: 'Preferências',
       title: 'Preferências de Agentes ao vivo',

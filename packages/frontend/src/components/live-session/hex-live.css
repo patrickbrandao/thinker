@@ -465,3 +465,254 @@
   background-image: radial-gradient(circle, var(--border-strong) 1px, transparent 1px);
   background-size: 24px 24px;
 }
+
+/* ------------------------------------------------------- wall header pills */
+
+.wall-pill {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--hx-panel-chip);
+  box-shadow: inset 0 0 0 1px var(--hx-panel-chip-line);
+  color: var(--hx-text-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.wall-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-tint);
+}
+
+.wall-pill--action {
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+
+.wall-pill--action:hover:not(:disabled) {
+  background: var(--accent-tint, var(--hx-panel-chip));
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--hx-text);
+}
+
+.wall-pill--action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* ----------------------------------------------------- wall session chips */
+
+/* One cell wide, two tall: its edges run over the grid dots. */
+.wall-chip {
+  --chip-tone: var(--hx-text-faint);
+  position: absolute;
+  display: grid;
+  width: 24px;
+  height: 48px;
+  grid-template-rows: 24px 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--hx-panel);
+  box-shadow:
+    0 0 0 1px var(--hx-panel-ring),
+    0 1px 3px rgba(0, 0, 0, 0.14);
+  color: var(--hx-text-soft);
+  cursor: pointer;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
+  animation: wall-chip-in 0.28s ease-out both;
+}
+
+.wall-chip:hover,
+.wall-chip:focus-visible {
+  z-index: 1;
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1.5px var(--chip-tone),
+    0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
+/* The session has a window open. */
+.wall-chip--shown {
+  box-shadow:
+    0 0 0 1.5px var(--accent),
+    0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.wall-chip__cell {
+  display: grid;
+  place-items: center;
+}
+
+.wall-chip__state {
+  border-top: 1px solid var(--hx-panel-ring);
+  border-radius: 0 0 7px 7px;
+  background: color-mix(in srgb, var(--chip-tone) 14%, transparent);
+  color: var(--chip-tone);
+}
+
+.wall-chip[data-kind='assistant'] {
+  --chip-tone: var(--ok);
+}
+.wall-chip[data-kind='thinking'] {
+  --chip-tone: #a78bfa;
+}
+.wall-chip[data-kind='tool_call'] {
+  --chip-tone: #f59e0b;
+}
+.wall-chip[data-kind='tool_result'] {
+  --chip-tone: #22b8cf;
+}
+.wall-chip[data-kind='user'] {
+  --chip-tone: #60a5fa;
+}
+
+/* A request on the wire: the card breathes in its tone. */
+.wall-chip--busy:not(.wall-chip--shown) {
+  animation:
+    wall-chip-in 0.28s ease-out both,
+    wall-chip-busy 1.8s ease-in-out 0.28s infinite;
+}
+
+/* The provider is streaming this content right now. */
+.wall-chip--blink > svg {
+  animation: wall-chip-blink 0.9s ease-in-out infinite;
+}
+
+@keyframes wall-chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes wall-chip-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes wall-chip-busy {
+  50% {
+    box-shadow:
+      0 0 0 1px var(--chip-tone),
+      0 0 10px color-mix(in srgb, var(--chip-tone) 55%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-chip,
+  .wall-chip--busy:not(.wall-chip--shown),
+  .wall-chip--blink > svg {
+    animation: none;
+  }
+}
+
+/* Chips move by drag and land on the grid. */
+.wall-chip {
+  touch-action: none;
+}
+
+.wall-chip--dragging {
+  z-index: 3000;
+  cursor: grabbing;
+  transform: translateY(-1px);
+  transition: none;
+  box-shadow:
+    0 0 0 1.5px var(--chip-tone),
+    0 10px 22px rgba(0, 0, 0, 0.3);
+}
+
+/* Its session stopped; a dragged chip stays a while longer. */
+.wall-chip--gone {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+/* ------------------------------------------- agent and subagent on the wall */
+
+/* A subagent session: a dot in its tone on the top corner. */
+.wall-chip--sub::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--chip-tone);
+  box-shadow: 0 0 0 1.5px var(--hx-stage);
+}
+
+/* Another family is under the mouse. */
+.wall-chip--dim {
+  opacity: 0.35;
+}
+
+/* The lines from a main session to its subagents, under the chips. */
+.wall-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Dark gray at rest; dark blue while the subagent streams or its family is in focus. */
+.wall-link {
+  fill: none;
+  stroke: #5a626e;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+  transition:
+    opacity 0.15s,
+    stroke 0.15s;
+}
+
+/* The subagent is streaming: dashes run from the parent to it. */
+.wall-link--live {
+  stroke: #2f62c4;
+  stroke-dasharray: 4 5;
+  opacity: 1;
+  animation: wall-link-flow 0.7s linear infinite;
+}
+
+.wall-link--focus {
+  stroke: #2f62c4;
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.wall-link--dim {
+  opacity: 0.12;
+}
+
+@keyframes wall-link-flow {
+  to {
+    stroke-dashoffset: -9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-link--live {
+    animation: none;
+  }
+}

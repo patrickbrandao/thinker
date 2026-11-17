@@ -269,6 +269,8 @@ export default function LiveAgentsLab() {
   const [copied, setCopied] = useState(false);
   const [agentFilter, setAgentFilter] = useState('');
   const [agentNames, setAgentNames] = useState<string[]>([]);
+  const [providerFilter, setProviderFilter] = useState('');
+  const [providerIds, setProviderIds] = useState<string[]>([]);
   const [wallKey, setWallKey] = useState(0);
   const [wallStats, setWallStats] = useState<WallStats>({
     running: 0,
@@ -686,6 +688,20 @@ export default function LiveAgentsLab() {
           </option>
         ))}
       </select>
+      <select
+        className="field h-7 w-auto max-w-[160px] py-0 text-[12px]"
+        aria-label="Provider filter"
+        value={providerFilter}
+        onChange={(e) => setProviderFilter(e.target.value)}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <option value="">All providers</option>
+        {providerIds.map((id) => (
+          <option key={id} value={id}>
+            {id}
+          </option>
+        ))}
+      </select>
       <button
         type="button"
         className="rounded-md p-1.5 text-muted hover:bg-s3 hover:text-ink"
@@ -710,6 +726,8 @@ export default function LiveAgentsLab() {
         onStats={setWallStats}
         hideHeader
         agentFilter={agentFilter}
+        providerFilter={providerFilter}
+        onProviders={setProviderIds}
         theme={settings.theme}
         autoClose={autoClose}
       />

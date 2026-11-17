@@ -91,6 +91,12 @@ export class LiveSessionController {
     return tenantId;
   }
 
+  /** What each in-memory session of the organization ends with (the wall's session chips). */
+  @Get('live-sessions/glance')
+  glance(@TenantCtx() ctx: TenantContext) {
+    return { items: ctx.tenantId ? this.hub.glance(ctx.tenantId) : [] };
+  }
+
   @Get('sessions/:id/live')
   async live(
     @Param('id') id: string,
