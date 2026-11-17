@@ -102,7 +102,7 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `harness-langflow` | Harness | Langflow | `langflow` | [dossiê](harness/harness-langflow.md) | 2026-11-03 | 3 |
 | `harness-chatwoot` | Harness | Chatwoot | `chatwoot` | [dossiê](harness/harness-chatwoot.md) | 2026-11-03 | 2 |
 | `harness-open-webui` | Harness | Open WebUI | `open-webui` | [dossiê](harness/harness-open-webui.md) | 2026-11-03 | 2 |
-| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-03 | 3 |
+| `harness-deepseek-harness` | Harness | DeepSeek Harness | `deepseek-harness` | [dossiê](harness/harness-deepseek-harness.md) | 2026-11-17 | 6 |
 | `harness-pi` | Harness | Agent Pi | `pi` | [dossiê](harness/harness-pi.md) | 2026-11-03 | 2 |
 | `harness-cline` | Harness | Cline | `cline` | [dossiê](harness/harness-cline.md) | 2026-11-03 | 2 |
 | `harness-copilot-cli` | Harness | Copilot CLI | `copilot-cli` | [dossiê](harness/harness-copilot-cli.md) | 2026-11-03 | 2 |
