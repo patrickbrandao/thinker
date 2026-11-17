@@ -218,6 +218,8 @@ export default function LiveAgentsWall({
   onStats,
   hideHeader = false,
   agentFilter,
+  providerFilter = '',
+  onProviders,
   theme = 'thinker',
   autoClose = DEFAULT_AUTO_CLOSE,
 }: {
@@ -233,6 +235,10 @@ export default function LiveAgentsWall({
   hideHeader?: boolean;
   /** Lab: harness filter controlled from outside ('' = all); overrides the header select. */
   agentFilter?: string;
+  /** Lab: provider filter ('' = all), applied client-side. */
+  providerFilter?: string;
+  /** Lab: every provider seen on running sessions (for the provider select). */
+  onProviders?: (ids: string[]) => void;
   /** Window look: the dashboard's live window or the anoma-ly-hex card. */
   theme?: WallTheme;
   /** A window closes by itself this long after its session's last item. */
@@ -262,8 +268,11 @@ export default function LiveAgentsWall({
     () => ({ tab: layout.defaultTab }),
     [layout.defaultTab],
   );
-  const optsRef = useRef({ maxTiles, timing, newPrefs });
-  optsRef.current = { maxTiles, timing, newPrefs };
+  const optsRef = useRef({ maxTiles, timing, newPrefs, providerFilter });
+  optsRef.current = { maxTiles, timing, newPrefs, providerFilter };
+  const seenProviders = useRef(new Set<string>());
+  const onProvidersRef = useRef(onProviders);
+  onProvidersRef.current = onProviders;
 
   // Agents for the harness filter (refreshed: the fleet grows and shrinks).
   useEffect(() => {
@@ -297,7 +306,13 @@ export default function LiveAgentsWall({
           `/api/v1/sessions?${q}`,
         );
         if (!alive) return;
-        const items = res.items ?? [];
+        const all = res.items ?? [];
+        const before = seenProviders.current.size;
+        for (const s of all) for (const p of s.providers ?? []) seenProviders.current.add(p);
+        if (seenProviders.current.size !== before)
+          onProvidersRef.current?.([...seenProviders.current].sort());
+        const pf = optsRef.current.providerFilter;
+        const items = pf ? all.filter((s) => (s.providers ?? []).includes(pf)) : all;
         const ids = new Set(items.map((s) => s.id));
         for (const id of dismissed.current) if (!ids.has(id)) dismissed.current.delete(id);
         lastSeen.current = new Map(items.map((s) => [s.id, s]));
@@ -416,6 +431,9 @@ export default function LiveAgentsWall({
   useEffect(() => {
     if (agentFilter) setTiles((prev) => prev.filter((tile) => tile.agentName === agentFilter));
   }, [agentFilter]);
+  useEffect(() => {
+    pollNow.current();
+  }, [providerFilter]);
 
   const changeAgent = (value: string) => {
     setAgent(value);
@@ -512,12 +530,15 @@ export default function LiveAgentsWall({
 
   return (
     <section
-      className={cx('flex min-h-full flex-col text-ink', theme === 'hex' ? 'lab-hex' : 'bg-bg')}
+      className={cx(
+        'flex min-h-full flex-col text-ink',
+        theme === 'hex' ? 'lab-hex live-wall' : 'bg-bg',
+      )}
     >
       <style>{hideMaximizeCss(`.${HIDE_MAXIMIZE}`)}</style>
       {hideHeader ? null : (
-        <header className="flex flex-wrap items-center gap-3 border-b border-line bg-elev px-4 py-3">
-          <h2 className="m-0 flex items-center gap-2 text-base font-semibold">
+        <header className="flex flex-wrap items-center gap-2.5 border-b border-line bg-elev px-3 py-1">
+          <h2 className="m-0 flex items-center gap-2 text-sm font-semibold">
             <LiveDot />
             {t('sessions.wall.title')}
           </h2>

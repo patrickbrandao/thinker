@@ -1,5 +1,5 @@
 import { getActiveOrganizationId } from '../org-context.js';
-import type { LiveEvent, LiveSessionMeta } from 'thinker-shared';
+import type { LiveEvent, LiveGlance, LiveSessionMeta } from 'thinker-shared';
 import { fetchJson } from './core.js';
 
 /** A harness session (subagent sessions folded into their main session). */
@@ -69,6 +69,23 @@ export type SessionFilters = {
 
 export function getSessions(params: SessionFilters & { limit?: string; offset?: string }) {
   return fetchJson<{ items: SessionSummary[]; has_more: boolean }>('/sessions', params, {
+    cache: false,
+  });
+}
+
+/** One session of the glance: main sessions and their subagent sessions. */
+export interface LiveGlanceItem extends LiveGlance {
+  id: string;
+  /** Main session of a subagent session; null (or absent) for a main session. */
+  parentId?: string | null;
+  agentName?: string | null;
+  /** Time since the session's last activity, ms. */
+  idleMs?: number;
+}
+
+/** What each running session's conversation ends with (`GET /live-sessions/glance`). */
+export function getLiveGlance() {
+  return fetchJson<{ items: LiveGlanceItem[] }>('/live-sessions/glance', undefined, {
     cache: false,
   });
 }

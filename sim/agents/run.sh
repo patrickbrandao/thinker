@@ -9,9 +9,9 @@ mkdir -p "$STATE/agents"
 PIDS="$STATE/agents/pids"
 touch "$PIDS"
 
-agent_loop() { # name key model profile turns think min max ua
-  local name="$1" key="$2" model="$3" profile="$4" turns="$5" think="$6" min="$7" max="$8" ua="$9"
-  local dir="$STATE/agents/$name" n=0 day session rc pause
+agent_loop() { # name key model profile turns think min max subs ua
+  local name="$1" key="$2" model="$3" profile="$4" turns="$5" think="$6" min="$7" max="$8" subs="$9" ua="${10}"
+  local dir="$STATE/agents/$name" n=0 day session rc pause k kids
   mkdir -p "$dir"
   trap 'exit 0' TERM INT
   while :; do
@@ -20,6 +20,22 @@ agent_loop() { # name key model profile turns think min max ua
     day="$(date -u +%Y%m%d-%H%M%S)"
     session="sim-$name-$day-$n"
     rc=0
+    # Subagent sessions: each starts a little after the main one and names it as parent.
+    kids=""
+    k=0
+    while [ "$k" -lt "$subs" ]; do
+      k=$((k + 1))
+      (
+        sleep $((2 + 3 * k))
+        "$WWZ_BIN/wwz-load" agents --target "$SIM_API" --protocol openai --stream \
+          --key "$key" --model "$model" --profile "$profile" --agents 1 --sessions 1 \
+          --turns 2 --max-tool-rounds 4 --think-time "$think" --retries 0 --progress 0 \
+          --header "x-session-key: $session-sub-$k" --header "x-parent-session-id: $session" \
+          --header "user-agent: $ua" --output json --out "$dir/$session-sub-$k.json" \
+          >>"$STATE/agents/$name.err" 2>&1
+      ) &
+      kids="$kids $!"
+    done
     "$WWZ_BIN/wwz-load" agents --target "$SIM_API" --protocol openai --stream \
       --key "$key" --model "$model" --profile "$profile" --agents 1 --sessions 1 \
       --turns "$turns" --max-tool-rounds 4 --think-time "$think" --retries 0 --progress 0 \
@@ -28,13 +44,15 @@ agent_loop() { # name key model profile turns think min max ua
     printf '%s %s rc=%s %s\n' "$(date -u +%FT%TZ)" "$session" "$rc" \
       "$(jq -c '{ok: .total.sessions.completed, failed: .total.sessions.failed, requests: .total.requests, errors: .total.errors, tool_calls: .total.tool_calls}' "$dir/$session.json" 2>/dev/null || echo '{}')" \
       >>"$STATE/agents/$name.log"
+    # shellcheck disable=SC2086
+    [ -z "$kids" ] || wait $kids || true
     pause=$((min + RANDOM % (max - min + 1)))
     sleep "$pause" &
     wait $! || true
   done
 }
 
-while read -r name harness model profile turns think min max ua; do
+while read -r name harness model profile turns think min max subs ua; do
   case "$name" in ''|'#'*) continue ;; esac
   if grep -q "^$name " "$PIDS" 2>/dev/null; then
     pid="$(grep "^$name " "$PIDS" | awk '{print $2}')"
@@ -44,7 +62,7 @@ while read -r name harness model profile turns think min max ua; do
   var="$(printf '%s' "$harness" | tr 'a-z-' 'A-Z_')_KEY"
   key="$(sed -n "s/^$var=//p" "$STATE/keys.env")"
   [ -n "$key" ] || die "no $var in keys.env"
-  agent_loop "$name" "$key" "$model" "$profile" "$turns" "$think" "$min" "$max" "$ua" </dev/null >/dev/null 2>&1 &
+  agent_loop "$name" "$key" "$model" "$profile" "$turns" "$think" "$min" "$max" "$subs" "$ua" </dev/null >/dev/null 2>&1 &
   echo "$name $!" >>"$PIDS"
   log "agent $name started ($!), log sim/.state/agents/$name.log"
 done <"$SIM_DIR/agents/agents.conf"

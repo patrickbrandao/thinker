@@ -90,7 +90,7 @@ enquanto não interrompido:
   dorme entre <pausa mínima> e <pausa máxima>
 ```
 
-- `sim/agents/agents.conf`: uma linha por agente (nome, harness, modelo, perfil `coder`/`pesquisa`/`chat`, turnos, pausa entre turnos, pausas entre sessões, `User-Agent`). Para mais carga, acrescente linhas ou encurte as pausas.
+- `sim/agents/agents.conf`: uma linha por agente (nome, harness, modelo, perfil `coder`/`pesquisa`/`chat`, turnos, pausa entre turnos, pausas entre sessões, sub-agentes por sessão, `User-Agent`). Cada sub-agente é uma sessão própria (`<sessão>-sub-N`) que aponta a principal em `x-parent-session-id`. Para mais carga, acrescente linhas ou encurte as pausas.
 - `sim/agents/run.sh` sobe os laços (PIDs em `sim/.state/agents/pids`, progresso em `sim/.state/agents/<agente>.log`); `sim/agents/stop.sh` encerra.
 - As ferramentas pedidas pelo modelo são executadas pelo catálogo falso do `wwz-tools`, dentro do `wwz-load`; o Thinker vê o ciclo completo.
 - `--retries 0` deixa as falhas visíveis no Thinker (quem tenta de novo é o fallback do gateway).

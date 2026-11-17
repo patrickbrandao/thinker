@@ -303,6 +303,7 @@ export {
   reduceLiveEvents,
   liveProviderFrames,
   liveSessionStatus,
+  liveGlance,
 } from './live-session';
 export type {
   LiveWireFormat,
@@ -321,6 +322,8 @@ export type {
   LiveSnapshotData,
   LiveRequestStartedData,
   LiveSessionStatus,
+  LiveGlanceKind,
+  LiveGlance,
 } from './live-session';
 export { PROVIDER_URL_SLOTS, PROVIDER_URL_MAX_LENGTH, providerUrlSlots } from './provider-urls';
 export type {

@@ -512,3 +512,39 @@ export function liveSessionStatus(state: LiveState): LiveSessionStatus {
   if (last.role === 'tool') return 'tools';
   return 'waiting_request';
 }
+
+// ------------------------------------------------------------------ glance
+
+/** What a session's conversation ends with, for a one-icon summary. */
+export type LiveGlanceKind =
+  'assistant' | 'thinking' | 'tool_call' | 'tool_result' | 'user' | 'idle';
+
+export interface LiveGlance {
+  last: LiveGlanceKind;
+  /** The provider is streaming that content right now. */
+  streaming: boolean;
+}
+
+/**
+ * The last piece of content of the session: the last block of the last
+ * attempt that produced any (text, thinking, tool call), or the last user
+ * message or tool result. System messages and attempts with no content yet
+ * are skipped; `idle` when nothing is left.
+ */
+export function liveGlance(state: LiveState): LiveGlance {
+  for (let i = state.items.length - 1; i >= 0; i -= 1) {
+    const item = state.items[i]!;
+    if (item.kind === 'message') {
+      if (item.role === 'user') return { last: 'user', streaming: false };
+      if (item.role === 'tool') return { last: 'tool_result', streaming: false };
+      continue;
+    }
+    const block = item.blocks.at(-1);
+    if (!block) continue;
+    const streaming = item.status === 'streaming';
+    if (block.type === 'thinking') return { last: 'thinking', streaming };
+    if (block.type === 'tool_use') return { last: 'tool_call', streaming };
+    return { last: 'assistant', streaming };
+  }
+  return { last: 'idle', streaming: false };
+}

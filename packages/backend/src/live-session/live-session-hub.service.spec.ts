@@ -49,6 +49,20 @@ describe('LiveSessionHubService', () => {
     expect(a.lastId).toBe(e2.id);
   });
 
+  it('glance summarizes what each session of the tenant ends with', () => {
+    const a = hub.entryFor('t1', 's1', meta);
+    hub.entryFor('t1', 's2', meta);
+    hub.emit(hub.entryFor('t2', 's3', meta), 'message.appended', { role: 'user', text: 'x' });
+    hub.emit(a, 'message.appended', { role: 'user', text: 'hi' });
+    hub.entryFor('t1', 's2', meta).parentId = 's1';
+    expect(hub.glance('t1').map(({ idleMs, ...g }) => ({ ...g, idle: idleMs >= 0 }))).toEqual([
+      { id: 's1', parentId: null, agentName: 'demo', last: 'user', streaming: false, idle: true },
+      { id: 's2', parentId: 's1', agentName: 'demo', last: 'idle', streaming: false, idle: true },
+    ]);
+    hub.emit(a, 'message.appended', { role: 'tool', text: 'ok' });
+    expect(hub.glance('t1')[0]).toMatchObject({ id: 's1', last: 'tool_result' });
+  });
+
   it('caps the buffer, replays after Last-Event-ID, and asks for a snapshot past the buffer', () => {
     const entry = hub.entryFor('t1', 's1', meta);
     const first = hub.emit(entry, 'message.appended', { role: 'user', text: 'x' }).id;
