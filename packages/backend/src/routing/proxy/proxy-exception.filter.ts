@@ -4,7 +4,11 @@ import { Request, Response as ExpressResponse } from 'express';
 import { formatThinkerError, ThinkerErrorCode } from '../../common/errors/error-codes';
 import { THINKER_CODE_TO_REASON } from '../../common/errors/thinker-error';
 import type { RequestWithThinkerErrorContext } from '../../otlp/interfaces/ingestion-context.interface';
-import { CONFLICTING_API_KEY_HEADERS } from '../../otlp/guards/agent-key-auth.guard';
+import {
+  CONFLICTING_API_KEY_HEADERS,
+  DISABLED_API_KEY,
+  SOURCE_IP_NOT_ALLOWED,
+} from '../../otlp/guards/agent-key-auth.guard';
 import { ProxyMessageRecorder } from './proxy-message-recorder';
 import { recordedRequestHeaders } from './request-headers';
 import { getDashboardUrl, sendFriendlyResponse } from './proxy-friendly-response';
@@ -17,7 +21,12 @@ const AUTH_ERROR_CODES: Record<string, ThinkerErrorCode> = {
   'API key expired': 'M004',
   'Invalid API key': 'M005',
   [CONFLICTING_API_KEY_HEADERS]: 'M006',
+  [DISABLED_API_KEY]: 'M007',
+  [SOURCE_IP_NOT_ALLOWED]: 'M008',
 };
+
+/** Auth rejections that still resolved the harness, so they become message rows. */
+const RECORDED_AUTH_CODES = new Set<ThinkerErrorCode>(['M004', 'M007', 'M008']);
 
 /** Status codes that should pass through as normal HTTP errors. */
 const PASSTHROUGH_STATUSES = new Set([429]);
@@ -62,17 +71,22 @@ export class ProxyExceptionFilter implements ExceptionFilter {
    * `content` is the exact text the caller received, dashboard link included —
    * the row is only useful if it says where to generate a new key.
    */
-  private recordExpiredKey(req: Request, content: string): void {
+  private recordAuthRejection(
+    req: Request,
+    content: string,
+    code: 'M004' | 'M007' | 'M008',
+    httpStatus: number,
+  ): void {
     const ctx = (req as Request & RequestWithThinkerErrorContext).thinkerErrorContext;
     if (!ctx) return;
     const body = req.body as Record<string, unknown> | undefined;
     const model = typeof body?.model === 'string' ? body.model : undefined;
     this.recorder
       .recordThinkerBlockedRequest(ctx, {
-        httpStatus: 401,
+        httpStatus,
         errorMessage: content,
-        errorCode: 'M004',
-        reason: THINKER_CODE_TO_REASON.M004,
+        errorCode: code,
+        reason: THINKER_CODE_TO_REASON[code],
         model,
         requestHeaders: recordedRequestHeaders(req),
       })
@@ -111,12 +125,15 @@ export class ProxyExceptionFilter implements ExceptionFilter {
         errorCode === 'M004'
           ? `${friendly}: ${dashboardUrl}`
           : `${friendly}\n\nDashboard: ${dashboardUrl}`;
-      if (errorCode === 'M004') this.recordExpiredKey(req, content);
+      // Real status — auth errors get 401, a refused source IP 403, validation
+      // errors keep their status.
+      const realStatus = status === 400 ? 400 : status === 403 ? 403 : 401;
+      if (RECORDED_AUTH_CODES.has(errorCode)) {
+        this.recordAuthRejection(req, content, errorCode as 'M004' | 'M007' | 'M008', realStatus);
+      }
       if (isChatClient) {
         sendFriendlyResponse(res, content, isStream);
       } else {
-        // Real status — auth errors get 401, validation errors keep their status.
-        const realStatus = status === 400 ? 400 : 401;
         res.status(realStatus).json({
           error: { message: content, type: 'auth_error', code: 'thinker_auth' },
         });

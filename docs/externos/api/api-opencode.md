@@ -4,8 +4,8 @@ categoria: api
 entidade: OpenCode (API: paid and free models)
 agente: api-opencode
 thinker_ids: [opencode]
-revisado_em: 2026-11-03
-versao_observada: opencode v2.2.5 (9bbb8ce); catálogo /inference/v1/models e docs Zen em 2026-11-03
+revisado_em: 2026-11-18
+versao_observada: opencode v2.3.2 (c0ad18b) e console legado v1.19.6 (f4e363c); docs Console em 2026-11-18 (revisão parcial: chaves de API)
 ---
 
 # OpenCode (API: paid and free models) (acesso por API)
@@ -25,7 +25,8 @@ Especificação mantida pelo agente `api-opencode` conforme [`.claude/external-r
 | Fonte | Link | Última versão vista |
 |---|---|---|
 | OpenCode Zen docs | <https://opencode.ai/docs/zen/> | lida em 2026-11-03 (redireciona 302; sem data de versão) |
-| OpenCode repository | <https://github.com/anomalyco/opencode> | tag `v2.2.5` (9bbb8ce, 2026-10-30) |
+| OpenCode repository | <https://github.com/anomalyco/opencode> | tag `v2.3.2` (c0ad18b, 2026-11-18); backend legado do Console em `packages/console/*` só na linha `v1.19.6` (f4e363c, 2026-11-17) |
+| Docs da Console (API, chaves, orçamentos) | <https://opencode.ai/docs/console/api>, <https://opencode.ai/docs/console/budgets>; fonte em `services/site/src/docs/content/console/` | lidas em 2026-11-18 (`v2.3.2`) |
 | Catálogo pago (API) | <https://opencode.ai/inference/v1/models> | 2026-11-03, 80 modelos |
 | Catálogo Go (API) | <https://opencode.ai/inference/go/v1/models> | 2026-11-03, 28 modelos |
 | ADR 0009 (internal) | [0009-opencode-catalogo-proprio-e-modelos-gratuitos.md](../../adr/0009-opencode-catalogo-proprio-e-modelos-gratuitos.md) | 2026-11-02 |
@@ -91,11 +92,55 @@ Do campo `capabilities` do catálogo (por modelo):
 - Cota gratuita diária por IP, reinicia 00:00 UTC, não publicada. Esgotada: HTTP 429 com corpo `{"type":"error","error":{"type":"FreeUsageLimitError","message":"Free usage limit reached. Free models work in OpenCode ..."}}` (reproduzido em 2026-11-03 com a chave pública).
 - Outros tipos tratados pelo cliente oficial: `GoUsageLimitError` (`to-session-error.ts`). O Thinker ainda reconhece `BudgetLimitError`, `CreditLimitExceeded`, `insufficient_quota`.
 - Modelos gratuitos de outro cliente: 403 ou 429 (ADR 0009); 401 para chave inválida (esperado, não verificado).
+- Orçamento de política atingido: 429 `BudgetLimitError` com `metadata.{coverage, resetsAt}` (ver "Chaves de API do Console").
 - `Retry-After` / `retry-after-ms` são honrados pelo cliente oficial (`ai/src/route/executor.ts`).
 
 ### Headers do cliente oficial (v2.2.5)
 
 `core/src/session/model-request.ts`: `User-Agent: opencode/<channel>/<version>/<name>` (`app.ts`), `x-opencode-client: <name>`, `x-opencode-session`, `x-opencode-session-id`, `x-opencode-parent-session-id` (subagente), `x-opencode-project`, `x-session-affinity`, `X-Session-Id`, `x-parent-session-id` (subagente). Fora de inferência: `x-opencode-org-id` (workspace do Console). Quais são exigidos pelo servidor além de UA/`x-opencode-client` e `x-opencode-session`: (não confirmado).
+
+### Chaves de API do Console (propriedades)
+
+Pesquisa para comparar com as chaves de harness do Thinker. O Console está no meio de uma migração: as chaves novas (`oc_sk_...`) vivem num backend novo que **não está no repositório público**; as chaves antigas (`sk-...`) vivem no backend legado `packages/console/*` (linha `v1.19.6`, f4e363c, 2026-11-17), que hoje só roteia para o novo quando o workspace foi migrado (`migrated_at`). Os docs da Console estão em `services/site/src/docs/content/console/` na tag `v2.3.2` (c0ad18b, 2026-11-18) e batem com <https://opencode.ai/docs/console/api> e `/docs/console/budgets` lidos em 2026-11-18.
+
+Legenda da coluna "Base": **doc** = documentado; **fonte** = lido no código; **observado** = visto em sonda.
+
+| Propriedade | Chave nova `oc_sk_` (Console atual) | Chave legada `sk-` | Base |
+|---|---|---|---|
+| Formato | prefixo `oc_sk_`, depois um identificador, `_` e o segredo (exemplo dos docs: `oc_sk_1a2b3c4d5e6f_...`; tamanho exato não documentado); mostrada inteira uma vez, depois só o prefixo | `sk-` + 64 alfanuméricos, guardada em texto puro (`key` varchar 255, índice único global); a UI mostra `key.slice(0,7)...key.slice(-4)` e só ao dono | doc `console/api/index.mdx`; fonte `console/core/src/key.ts` (`create`, `list`), `schema/key.sql.ts` |
+| Tipos | **Pessoal** (age como o membro, qualquer membro cria para si) e **de conta de serviço** (membro não humano, criada por owner/admin) | só pessoal (`userID` obrigatório) | doc `console/api/index.mdx`; fonte `key.sql.ts` |
+| Campos | nome, workspace (fixo na criação, sem header de workspace), expiração, permissões; conta de serviço tem nome próprio | `id` (`key_...`), `workspaceID`, `name` (1-255), `key`, `userID`, `timeCreated`, `timeUpdated`, `timeDeleted`, `timeUsed` (coluna existe, mas nada no código a atualiza) | doc; fonte `key.sql.ts`, `drizzle/types.ts`, `identifier.ts` |
+| Escopo | uma chave = um workspace; se o workspace exige SSO, a chave pessoal só funciona com sessão SSO ativa (exceto owners) | um workspace | doc `console/api/index.mdx`, `console/sso.mdx` |
+| Expiração | opcional: Never, 1 day, 7 days, 30 days ou Custom (1-365 dias); chave expirada não renova, cria-se outra | não existe | doc |
+| Desativar / revogar | só **revogar** (não há "desativar" e reativar). Dono revoga em Account > Personal API keys; owner/admin pelo membro ou pela conta de serviço. Revogação automática ao sair/ser removido do workspace ou desprovisionado via SCIM (inclui as chaves de conta de serviço que a pessoa criou), ao remover a conta de serviço e ao apagar o workspace | soft delete (`timeDeleted`); só admin remove chave de outro usuário | doc `console/api/index.mdx`, `members.mdx`, `workspaces.mdx`; fonte `key.ts` (`remove`) |
+| Rotação | sem rotação in-place: cria-se nova e revoga-se a antiga. Conta de serviço com permissão "This account's API keys" cria e revoga chaves da própria conta (novas sempre Restricted, sem esse recurso) | não | doc |
+| Edição | owner/admin renomeia chave de conta de serviço e muda permissões ("Edit...") | não | doc |
+| Permissões | **All**, **Restricted** (por recurso: Models Read/Request, Usage, Budgets, Members, Providers, Billing, Workspace settings, SSO, Service accounts, This account's API keys) e **Read only** (lista modelos, não chama). Membro comum só cria chave "lista e chama modelos". Teto: o papel atual de quem a chave representa (rebaixar o membro encolhe a chave). Chaves antigas "Inference only" aparecem como Restricted + Models Request | não | doc |
+| Último uso | não documentado | `timeUsed` sem escrita no código lido | doc (ausente); fonte |
+| Orçamento | **não há orçamento por chave.** Orçamento mensal em USD (até 2 casas) por política em Controls: workspace inteiro, todos os membros (cada um ou compartilhado), membros por tag, membros específicos, todas as contas de serviço ou contas específicas. Uso de chave pessoal conta no membro; de conta de serviço, na conta. Todas as políticas aplicáveis valem (a menor vence). Reset dia 1 às 00:00 UTC; `$0` bloqueia; mudar no meio do mês conta o gasto já feito. Cobertura "All spend" ou modelos escolhidos (um limite para o conjunto ou um por modelo). Não contam: modelos gratuitos e Go dentro do plano; contam BYOK com preço, web search e Go extra | `billing.monthlyLimit` (workspace) e `user.monthlyLimit` (membro), em dólares inteiros, mês calendário UTC | doc `console/budgets.mdx`; fonte `schema/billing.sql.ts`, `user.sql.ts`, `handler.ts` (`validateBilling`) |
+| Leitura do orçamento | `GET {console}/api/policies/current-budgets` com Bearer + `x-org-id`: lista `{ruleID, limitDollars, spentDollars, scope: each\|combined, per: set\|model, coverage: all\|models, models[], vendors[], inputPriceAtLeast?, picked, shared, resetsAt}`; chave de conta de serviço recebe 403 | n/a | sdk `anomalyco/opencode@v2.3.2` `packages/core/src/usage-limits.ts`, `packages/schema/src/usage-limits.ts` |
+| Rate limit | não documentado por chave; só limites por modelo (ex.: LongCat 2.5 Free, 100 req/dia) | por chave e modelo, por minuto: `rateLimit` do modelo ou 1000 req/min, contador em Redis com TTL 60 s; anônimo usa limite por IP | doc `console/models.mdx`; fonte `routes/zen/util/keyRateLimiter.ts`, `ipRateLimiter.ts` |
+| Lista de IPs permitidos | **não existe** (nem por chave nem por workspace) | não existe; o IP (`x-real-ip`, IPv6 truncado em /64) só serve para cota gratuita, trial e rate limit anônimo | doc (ausente em `console/*`); fonte `handler.ts` |
+| Modelos permitidos | por permissão da chave (Models Request ou não), regras de modelo do membro e políticas Providers/Tools do workspace (entregues ao cliente OpenCode como `policies`); não há lista de modelos por chave | por workspace: linha em `model` desliga o modelo (`ModelError` "Model is disabled", HTTP 401) | doc `console/api/index.mdx`, `console/index.mdx`, `policies.mdx`; fonte `schema/model.sql.ts`, `handler.ts` (`validateModelSettings`) |
+| Retenção / privacidade | por workspace, não por chave: Settings > Privacy com regiões permitidas (padrão Europa e EUA; Global para DeepSeek e LongCat) e "Allow paid endpoints that train on request data" (padrão desligado). Retenção por modelo/upstream fixa (0 a 55 dias, tabela Privacy) | `workspace.region` (`us\|eu\|sg\|cn`), `allow_training`, `is_blocked`, flags por upstream | doc `console/go.mdx`, `console/models.mdx#privacy`; fonte `schema/workspace.sql.ts` |
+| Logs | Activity > Logs por requisição (membro vê os seus; owner/admin vê todos), uso por dia/modelo/pessoa, export CSV de 7/30/90 dias; uso legado grava `keyID` e `sessionID` por requisição | `usage.keyID` | doc `console/budgets.mdx`, `members.mdx`; fonte `schema/billing.sql.ts` (`UsageTable`) |
+
+Erros ligados à chave (corpo sempre `{"type":"error","error":{"type","message"}}`, mais `metadata` em 429):
+
+| Situação | Status | Corpo | Base |
+|---|---|---|---|
+| Sem chave em modelo pago | 401 | `error.type: "AuthError"`, `"Missing API key."`; header `x-opencode-log-id` | observado (sonda 2026-11-18: `POST /inference/openai/v1/chat/completions`, `glm-5.3`, sem `Authorization`) |
+| Chave inválida, revogada ou expirada | 401 | legado: `AuthError` "Invalid API key."; novo: só o status documentado | doc `console/api/index.mdx`; fonte `handler.ts` (`authenticate`) |
+| Fora das permissões da chave | 403 | não documentado | doc |
+| Modelo gratuito de cliente que não é OpenCode | 403 | não documentado | doc `console/api/inference.mdx` |
+| Orçamento de política atingido | 429 | `error.type: "BudgetLimitError"`, mensagem "Policy budget exceeded" ou "A budget policy for this model has been reached.", `metadata: {coverage: "all"\|"models", resetsAt}`; no Gemini, envelope Google `RESOURCE_EXHAUSTED` com `ErrorInfo{reason: "BudgetLimitError", domain: "opencode.ai", metadata}`. Não diz qual política | doc `console/budgets.mdx`; sdk `@v2.3.2` `packages/core/test/session-error.test.ts`, `core/src/session/to-session-error.ts` |
+| Limite mensal legado (workspace / membro), sem saldo | 401 | `MonthlyLimitError`, `UserLimitError`, `CreditsError` | fonte `handler.ts` (o legado devolve 401, não 429) |
+| Crédito esgotado (novo) | 402 | `CreditLimitExceeded` "Credit limit exceeded." | sdk `@v2.3.2` `session-error.test.ts` |
+| Região ou política de dados | 403 | `RegionError`, `DataPolicyError` | fonte `handler.ts` |
+
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
 
 ## Como o Thinker implementa hoje
 
@@ -106,7 +151,7 @@ Do campo `capabilities` do catálogo (por modelo):
 - Modo gratuito: chave `public` (`subscription-clients.ts:29`); descoberta mostra só modelos de preço zero quando a chave é `public` (`provider-model-fetcher.service.ts:1401`, `model-discovery.service.ts:258`).
 - Modelos descobertos: `opencode/<id>` com preços, cache, reasoning, imagem; Go grava preço 0 (cota) (`provider-model-fetcher.service.ts:1516-1545`).
 - Custo: `costInputs` usa preço de lista do catálogo, `ignoreReportedCost` só no Go (`opencode-catalog.service.ts:224`).
-- Cota esgotada: regex `freeusagelimiterror|gousagelimiterror|budgetlimiterror|creditlimitexceeded|insufficient_quota` e espera até 24 h (`routing/proxy/proxy-fallback.service.ts:127-132`).
+- Cota esgotada: regex `freeusagelimiterror|gousagelimiterror|budgetlimiterror|creditlimitexceeded|insufficient_quota|credit_balance_exhausted` (`routing/proxy/quota-reset.ts:19-20`); sem prazo no corpo, a rota esfria 1 h (padrão), teto 24 h (`routing/proxy/proxy-fallback.service.ts:165-166`, `:905-932`). `metadata.resetsAt` do `BudgetLimitError` não é lido.
 - Alias `opencode-zen` / `opencodezen` (`packages/shared/src/providers.ts:443-454`).
 
 Pontos no código:
@@ -145,8 +190,10 @@ Arquivos que citam `opencode`:
 | G2 | degradação | `gemini-4-argon` tem multiplicador por data (`when.date.gte 2026-12-01`, fator 2) descartado por `parseMultipliers`; custo ficará 50% abaixo do real a partir de 2026-12-01. | providers | [#319](https://github.com/patrickbrandao/thinker/issues/319) | resolvida (faixa por contexto e multiplicador por data lidos do catálogo) |
 | G3 | oportunidade | O cliente oficial envia também `x-opencode-session-id`, `x-session-affinity`, `X-Session-Id`, `x-opencode-project` (e pai de subagente). Se o servidor usar afinidade para cache, enviar esses headers pode melhorar acerto de cache. (não confirmado) Exige teste real. | backend-dev | — | aberta |
 | G4 | oportunidade | Docs Zen: todo modelo de texto funciona por qualquer API (tradução do Console). A heurística de família (`provider-client.ts:1069`) poderia ser dispensada ou o fallback sem catálogo cair em Chat Completions. Confirmar com chamada real. | providers | — | aberta |
+| G6 | oportunidade | O 429 `BudgetLimitError` do Console traz `metadata.resetsAt` (reset do orçamento, dia 1 00:00 UTC) e `coverage` (`all` pausa o workspace; `models` só aquele modelo). `parseQuotaSignal` só casa o regex genérico, então a rota volta a ser tentada a cada 1 h (`quota-reset.ts:19-20`, `proxy-fallback.service.ts:166`). Sugestão: ler `resetsAt` (também no `ErrorInfo.metadata` do envelope Google), respeitando o teto de 24 h. | backend-dev | — | aberta |
 | G5 | oportunidade | Capacidades por modelo no catálogo (`reasoning.effort`, `cache.explicit` com ttl/breakpoints, parâmetros não aceitos como `temperature: false`) não são usadas no roteamento e na sanitização de parâmetros. | providers | — | aberta |
 
 ## Histórico
 
+- 2026-11-18: revisão parcial, só chaves de API do Console (pedido para planejar várias chaves por harness e listas de IP). Lidos: docs da Console `v2.3.2` (api, budgets, members, workspaces, go, models, policies), backend legado `packages/console/*` em `v1.19.6`, `usage-limits.ts` e `to-session-error.ts` do cliente `v2.3.2`. Nova subseção "Chaves de API do Console". Sonda sem credencial confirmou 401 `AuthError` "Missing API key." e o header `x-opencode-log-id`. Aberta G6 (oportunidade, sem issue). Catálogo, preços e protocolos não foram revistos nesta rodada.
 - 2026-11-03: primeira revisão completa. Fontes lidas: catálogos vivos (80 + 28 modelos), docs Zen, cliente `v2.2.5`, models.dev. Contrato escrito; Thinker alinhado em bases, protocolo por modelo, UA 2.2.5 e erro de cota. Abertas G1, G2 (issues #317, #319); G3-G5 como oportunidade sem issue. Uma chamada com a chave pública a um modelo gratuito confirmou o 429 `FreeUsageLimitError` e que `/zen/v1` ainda responde.

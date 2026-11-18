@@ -12,6 +12,8 @@ export const THINKER_BLOCKED_REQUEST_REASONS = [
   'no_provider_key',
   'subscription_credentials_unusable',
   'key_expired',
+  'key_disabled',
+  'source_ip_not_allowed',
   'limit_exceeded',
   'thinker_rate_limited',
   'thinker_ip_rate_limited',
@@ -48,6 +50,8 @@ export type RecordableThinkerCode = Exclude<ThinkerErrorCode, UnrecordableThinke
  */
 export const THINKER_CODE_TO_REASON: Record<RecordableThinkerCode, ThinkerBlockedRequestReason> = {
   M004: 'key_expired',
+  M007: 'key_disabled',
+  M008: 'source_ip_not_allowed',
   M100: 'no_provider_key',
   M101: 'no_provider',
   M102: 'subscription_credentials_unusable',

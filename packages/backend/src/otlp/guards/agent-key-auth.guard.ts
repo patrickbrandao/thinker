@@ -1,16 +1,19 @@
-import { clientIpLogFields } from '../../common/utils/client-ip';
+import { clientIpInfo, clientIpLogFields } from '../../common/utils/client-ip';
+import { ipRestrictionFor } from '../../ip-prefixes/ip-restriction-cache';
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { AgentApiKey } from '../../entities/agent-api-key.entity';
@@ -56,8 +59,16 @@ function sameKey(a: string, b: string): boolean {
  */
 export const CONFLICTING_API_KEY_HEADERS = 'Conflicting API key headers';
 
+/** Guard message for a disabled or revoked key (M007). */
+export const DISABLED_API_KEY = 'API key disabled';
+
+/** Guard message for a key used from outside its harness's IP prefix lists (M008). */
+export const SOURCE_IP_NOT_ALLOWED = 'Source IP not allowed';
+
 interface CachedKey {
   keyId: string;
+  keyName: string | null;
+  keyIsPrimary: boolean;
   tenantId: string;
   agentId: string;
   agentName: string;
@@ -105,7 +116,9 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
   // The TTL is deliberately much shorter than CACHE_TTL_MS so a key that gets
   // created or reactivated starts working quickly; key mutations also clear
   // this via clearCache()/invalidateCache(), so a created key is never stuck.
-  private static negativeCache = new Map<string, number>();
+  // The rejection message is kept so a disabled key keeps answering M007
+  // (not M005) while it is negative-cached.
+  private static negativeCache = new Map<string, { until: number; message: string }>();
   private readonly NEGATIVE_CACHE_TTL_MS = 30 * 1000;
   private readonly MAX_NEGATIVE_CACHE_SIZE = 10_000;
   private readonly cleanupTimer: ReturnType<typeof setInterval>;
@@ -114,6 +127,9 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     @InjectRepository(AgentApiKey)
     private readonly keyRepo: Repository<AgentApiKey>,
     private readonly configService: ConfigService,
+    // Optional so unit specs can build the guard without a database; without
+    // it the source-IP restriction is not enforced.
+    @Optional() private readonly ds?: DataSource,
   ) {
     this.cleanupTimer = setInterval(() => this.evictExpired(), 60_000);
     if (typeof this.cleanupTimer === 'object' && 'unref' in this.cleanupTimer) {
@@ -255,14 +271,14 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     // Negative cache first: a recently-rejected token short-circuits here
     // without touching the DB or emitting a log line. This is what collapses
     // a wrong/revoked-key storm to one DB lookup + one warn per TTL window.
-    const negativeExpiry = AgentKeyAuthGuard.negativeCache.get(fingerprint);
-    if (negativeExpiry !== undefined && negativeExpiry > now) {
+    const negative = AgentKeyAuthGuard.negativeCache.get(fingerprint);
+    if (negative !== undefined && negative.until > now) {
       // LRU touch — re-insert to move to tail of insertion order.
       AgentKeyAuthGuard.negativeCache.delete(fingerprint);
-      AgentKeyAuthGuard.negativeCache.set(fingerprint, negativeExpiry);
-      throw new UnauthorizedException('Invalid API key');
+      AgentKeyAuthGuard.negativeCache.set(fingerprint, negative);
+      throw new UnauthorizedException(negative.message);
     }
-    if (negativeExpiry !== undefined) {
+    if (negative !== undefined) {
       // Stale negative entry — drop it and re-check against the DB so a key
       // that has since been created/reactivated can authenticate again.
       AgentKeyAuthGuard.negativeCache.delete(fingerprint);
@@ -288,21 +304,28 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
         this.logger.warn(`Agent-key activity recheck failed: ${(err as Error).message}`);
         throw new UnauthorizedException('Invalid API key');
       }
-      if (!stillActive) {
+      if (stillActive) {
+        // LRU touch — re-insert to move to tail of insertion order
         AgentKeyAuthGuard.cache.delete(fingerprint);
-        this.rememberInvalid(fingerprint);
-        throw new UnauthorizedException('Invalid API key');
+        AgentKeyAuthGuard.cache.set(fingerprint, cached);
+        const ctx: IngestionContext = {
+          tenantId: cached.tenantId,
+          agentId: cached.agentId,
+          agentName: cached.agentName,
+          userId: cached.userId,
+          keyId: cached.keyId,
+          keyName: cached.keyName,
+          keyIsPrimary: cached.keyIsPrimary,
+          keyExpiresAt:
+            cached.keyExpiresAt === null ? null : new Date(cached.keyExpiresAt).toISOString(),
+        };
+        await this.authorizeSource(request, ctx);
+        this.setContext(request, ctx);
+        return true;
       }
-      // LRU touch — re-insert to move to tail of insertion order
+      // Disabled, revoked or gone since it was cached: the DB path below says
+      // which (M007 or M005).
       AgentKeyAuthGuard.cache.delete(fingerprint);
-      AgentKeyAuthGuard.cache.set(fingerprint, cached);
-      this.setContext(request, {
-        tenantId: cached.tenantId,
-        agentId: cached.agentId,
-        agentName: cached.agentName,
-        userId: cached.userId,
-      });
-      return true;
     }
 
     const prefix = computePrefix(token);
@@ -314,6 +337,10 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
         'k.tenant_id',
         'k.agent_id',
         'k.expires_at',
+        'k.is_active',
+        'k.name',
+        'k.label',
+        'k.is_primary',
         'a.id',
         'a.name',
         // t.id keeps the tenant hydrated when owner_user_id is NULL, as it is
@@ -323,8 +350,9 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       ])
       .leftJoin('k.agent', 'a')
       .leftJoin('k.tenant', 't')
+      // Inactive keys are fetched too, so a disabled or revoked key answers
+      // M007 instead of "not recognized".
       .where('k.key_prefix = :prefix', { prefix })
-      .andWhere('k.is_active = true')
       .andWhere('a.deleted_at IS NULL')
       .andWhere('t.is_active = true')
       .getMany();
@@ -357,6 +385,25 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       throw new UnauthorizedException('Invalid API key');
     }
 
+    const errorContext: IngestionContext = {
+      tenantId: keyRecord.tenant_id,
+      agentId: keyRecord.agent_id,
+      agentName: keyRecord.agent.name,
+      userId: keyRecord.tenant.owner_user_id,
+      keyId: keyRecord.id,
+      keyName: keyRecord.name ?? (keyRecord.is_primary ? 'Primary key' : keyRecord.label),
+      keyIsPrimary: keyRecord.is_primary,
+      keyExpiresAt: keyRecord.expires_at ? new Date(keyRecord.expires_at).toISOString() : null,
+    };
+
+    if (keyRecord.is_active === false) {
+      // Like M004, a disabled key still identifies its harness: recordable.
+      (request as Request & RequestWithThinkerErrorContext).thinkerErrorContext = errorContext;
+      this.rememberInvalid(fingerprint, DISABLED_API_KEY);
+      this.logger.warn(`Rejected disabled agent key (prefix: ${API_KEY_PREFIX}...)`);
+      throw new UnauthorizedException(DISABLED_API_KEY);
+    }
+
     if (keyRecord.expires_at && new Date(keyRecord.expires_at) < new Date()) {
       // An expired key still identifies its agent, so this rejection is the one
       // auth failure Thinker can attribute and record (M004). The others
@@ -386,8 +433,12 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       AgentKeyAuthGuard.cache.delete(firstKey);
     }
 
+    await this.authorizeSource(request, errorContext);
+
     AgentKeyAuthGuard.cache.set(fingerprint, {
       keyId: keyRecord.id,
+      keyName: errorContext.keyName ?? null,
+      keyIsPrimary: keyRecord.is_primary,
       tenantId: keyRecord.tenant_id,
       agentId: keyRecord.agent_id,
       agentName: keyRecord.agent.name,
@@ -396,14 +447,27 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
       keyExpiresAt: keyRecord.expires_at ? new Date(keyRecord.expires_at).getTime() : null,
     });
 
-    this.setContext(request, {
-      tenantId: keyRecord.tenant_id,
-      agentId: keyRecord.agent_id,
-      agentName: keyRecord.agent.name,
-      userId: keyRecord.tenant.owner_user_id,
-    });
+    this.setContext(request, errorContext);
 
     return true;
+  }
+
+  /**
+   * Source-IP restriction of the key's harness (IP prefix lists). Off by
+   * default; when on, the resolved client address must be in a linked list.
+   * The rejection is attributable, so it is recorded like M004.
+   */
+  private async authorizeSource(request: Request, ctx: IngestionContext): Promise<void> {
+    if (!this.ds) return;
+    const matcher = await ipRestrictionFor(this.ds, ctx.agentId);
+    if (!matcher) return;
+    const { clientIp } = clientIpInfo(request);
+    if (matcher.contains(clientIp)) return;
+    (request as Request & RequestWithThinkerErrorContext).thinkerErrorContext = ctx;
+    this.logger.warn(
+      `Rejected agent key for harness "${ctx.agentName}" from a source IP outside its prefix lists (${clientIpLogFields(request)})`,
+    );
+    throw new ForbiddenException(SOURCE_IP_NOT_ALLOWED);
   }
 
   private async resolveDevContext(): Promise<IngestionContext | null> {
@@ -442,14 +506,17 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     return ctx;
   }
 
-  private rememberInvalid(fingerprint: string): void {
+  private rememberInvalid(fingerprint: string, message = 'Invalid API key'): void {
     this.evictExpired();
     while (AgentKeyAuthGuard.negativeCache.size >= this.MAX_NEGATIVE_CACHE_SIZE) {
       const firstKey = AgentKeyAuthGuard.negativeCache.keys().next().value;
       if (firstKey === undefined) break;
       AgentKeyAuthGuard.negativeCache.delete(firstKey);
     }
-    AgentKeyAuthGuard.negativeCache.set(fingerprint, Date.now() + this.NEGATIVE_CACHE_TTL_MS);
+    AgentKeyAuthGuard.negativeCache.set(fingerprint, {
+      until: Date.now() + this.NEGATIVE_CACHE_TTL_MS,
+      message,
+    });
   }
 
   private evictExpired() {
@@ -457,8 +524,8 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
     for (const [key, entry] of AgentKeyAuthGuard.cache) {
       if (entry.expiresAt <= now) AgentKeyAuthGuard.cache.delete(key);
     }
-    for (const [key, expiresAt] of AgentKeyAuthGuard.negativeCache) {
-      if (expiresAt <= now) AgentKeyAuthGuard.negativeCache.delete(key);
+    for (const [key, entry] of AgentKeyAuthGuard.negativeCache) {
+      if (entry.until <= now) AgentKeyAuthGuard.negativeCache.delete(key);
     }
   }
 }

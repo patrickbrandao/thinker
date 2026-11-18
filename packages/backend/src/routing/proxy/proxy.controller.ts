@@ -259,6 +259,23 @@ export class ProxyController {
     private readonly liveSessions?: LiveSessionHubService,
   ) {}
 
+  /**
+   * The calling key describes itself (like OpenRouter's GET /api/v1/key): its
+   * harness, name and expiry. No secret and no other key is exposed.
+   */
+  @Get('key')
+  key(@Req() req: Request & { ingestionContext: IngestionContext }) {
+    const ctx = req.ingestionContext;
+    return {
+      object: 'key',
+      id: ctx.keyId ?? null,
+      name: ctx.keyName ?? null,
+      harness: ctx.agentName,
+      is_primary: ctx.keyIsPrimary ?? null,
+      expires_at: ctx.keyExpiresAt ?? null,
+    };
+  }
+
   @Get('models')
   async models(
     @Req() req: Request & { ingestionContext: IngestionContext },

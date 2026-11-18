@@ -70,6 +70,8 @@ const Triggers = lazyReload(() => import('./pages/Triggers.jsx'));
 const TriggerTest = lazyReload(() => import('./pages/TriggerTest.jsx'));
 const ProxyServers = lazyReload(() => import('./pages/ProxyServers.jsx'));
 const ProxyServer = lazyReload(() => import('./pages/ProxyServer.jsx'));
+const IpPrefixLists = lazyReload(() => import('./pages/IpPrefixLists.jsx'));
+const IpPrefixList = lazyReload(() => import('./pages/IpPrefixList.jsx'));
 const AgentTriggers = lazyReload(() => import('./pages/AgentTriggers.jsx'));
 const AgentConnection = lazyReload(() => import('./pages/AgentConnection.jsx'));
 const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
@@ -466,6 +468,22 @@ function AppRoutes() {
           element={
             <Lazy>
               <ProxyServer />
+            </Lazy>
+          }
+        />
+        <Route
+          path="ip-prefix-lists"
+          element={
+            <Lazy>
+              <IpPrefixLists />
+            </Lazy>
+          }
+        />
+        <Route
+          path="ip-prefix-lists/:listId"
+          element={
+            <Lazy>
+              <IpPrefixList />
             </Lazy>
           }
         />

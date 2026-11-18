@@ -177,6 +177,8 @@ const THINKER_REASON_TO_CLASSIFICATION: Record<
     errorClass: 'local_provider_unavailable',
   },
   key_expired: { origin: 'config', errorClass: 'auth' },
+  key_disabled: { origin: 'config', errorClass: 'auth' },
+  source_ip_not_allowed: { origin: 'policy', errorClass: 'auth' },
   limit_exceeded: { origin: 'policy', errorClass: 'limit_exceeded' },
   // Three distinct limits (per-user / per-IP / concurrency) that used to
   // collapse into `thinker_rate_limited`. That legacy reason stays mapped so

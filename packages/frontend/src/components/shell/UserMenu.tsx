@@ -5,6 +5,7 @@ import {
   ChevronsUpDown,
   LogOut,
   Network,
+  ListFilter,
   Plus,
   Settings,
   ShieldCheck,
@@ -109,9 +110,14 @@ export default function UserMenu() {
           {t('nav.triggers')}
         </MenuItem>
         {roleCan.manageProviders() ? (
-          <MenuItem icon={<Network />} to="/proxy-servers">
-            {t('nav.proxyServers')}
-          </MenuItem>
+          <>
+            <MenuItem icon={<Network />} to="/proxy-servers">
+              {t('nav.proxyServers')}
+            </MenuItem>
+            <MenuItem icon={<ListFilter />} to="/ip-prefix-lists">
+              {t('nav.ipPrefixLists')}
+            </MenuItem>
+          </>
         ) : null}
         {organizations.length > 1 ? (
           <>

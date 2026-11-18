@@ -4,8 +4,8 @@ categoria: api
 entidade: OpenRouter
 agente: api-openrouter
 thinker_ids: [openrouter]
-revisado_em: 2026-11-04
-versao_observada: docs 2026-11-04 (catálogo /api/v1/models com 455 modelos)
+revisado_em: 2026-11-18
+versao_observada: docs 2026-11-18 (revisão parcial: modelo de chaves de API; catálogo revisado em 2026-11-04)
 ---
 
 # OpenRouter (acesso por API)
@@ -14,7 +14,7 @@ Especificação mantida pelo agente `api-openrouter` conforme [`.claude/external
 
 ## Resumo
 
-O OpenRouter é um agregador: uma chave `Authorization: Bearer` dá acesso a ~455 modelos de dezenas de fornecedores, com roteamento entre provedores, fallback e cobrança unificada sem acréscimo sobre o preço do fornecedor. O Thinker o usa só por Chat Completions (`/api/v1/chat/completions`) e também consome o catálogo público (ADR 0003). O que mudou de relevante: o endpoint serve também Responses e Anthropic Messages nativos para 382 modelos, `usage` agora vem sempre (parâmetros `usage.include` e `stream_options.include_usage` foram descontinuados), `X-OpenRouter-Title` substitui `X-Title` (o antigo segue aceito), há `expiration_date` por modelo e variantes `:batch`. A única lacuna relevante é o `thinking` da Anthropic Messages não virar `reasoning` (G1, issue #432).
+O OpenRouter é um agregador: uma chave `Authorization: Bearer` dá acesso a ~455 modelos de dezenas de fornecedores, com roteamento entre provedores, fallback e cobrança unificada sem acréscimo sobre o preço do fornecedor. O Thinker o usa só por Chat Completions (`/api/v1/chat/completions`) e também consome o catálogo público (ADR 0003). O que mudou de relevante: o endpoint serve também Responses e Anthropic Messages nativos para 382 modelos, `usage` agora vem sempre (parâmetros `usage.include` e `stream_options.include_usage` foram descontinuados), `X-OpenRouter-Title` substitui `X-Title` (o antigo segue aceito), há `expiration_date` por modelo e variantes `:batch`. A única lacuna relevante é o `thinking` da Anthropic Messages não virar `reasoning` (G1, issue #432). Revisão de 2026-11-18: o modelo de chaves (validade imutável, tetos com reset, guardrails por chave, allowlist de IP só por conta no Enterprise) está em "Chaves de API".
 
 ## Fontes da verdade
 
@@ -33,7 +33,17 @@ O OpenRouter é um agregador: uma chave `Authorization: Bearer` dá acesso a ~45
 | Usage accounting | <https://openrouter.ai/docs/guides/administration/usage-accounting> | 2026-11-04 |
 | Atribuição de app | <https://openrouter.ai/docs/app-attribution> | 2026-11-04 |
 | Announcements | <https://openrouter.ai/announcements> | 2026-11-04 (última: 2026-10-30) |
-| OpenAPI | <https://openrouter.ai/openapi.json> | não lido |
+| OpenAPI | <https://openrouter.ai/openapi.json> | lido via páginas da referência (`openapi.yaml` embutido), 2026-11-18 |
+| Índice para LLMs | <https://openrouter.ai/docs/llms.txt> (e `/docs/_llms/docs.txt`, `/docs/_llms/api-reference.txt`); páginas em markdown com sufixo `.md` | 2026-11-18 |
+| Autenticação | <https://openrouter.ai/docs/api_reference/authentication.md> | 2026-11-18 |
+| API Keys (referência) | <https://openrouter.ai/docs/api/api-reference/api-keys/create-a-new-api-key.md> (e list/get/update/delete/get-current) | 2026-11-18 |
+| Chaves de gestão | <https://openrouter.ai/docs/guides/overview/auth/management-api-keys.md> | 2026-11-18 |
+| Security settings (allowlist de IP) | <https://openrouter.ai/docs/guides/overview/auth/security-settings.md> | 2026-11-18 |
+| Guardrails e políticas | <https://openrouter.ai/docs/guides/features/guardrails.md>, <https://openrouter.ai/docs/guides/features/guardrails/policies.md> | 2026-11-18 |
+| Workspaces | <https://openrouter.ai/docs/guides/features/workspaces.md> | 2026-11-18 |
+| Teto de chaves de agente | <https://openrouter.ai/docs/guides/best-practices/capping-shared-agent-keys.md> | 2026-11-18 |
+| Rotação e auditoria | <https://openrouter.ai/docs/cookbook/administration/api-key-rotation.md>, <https://openrouter.ai/docs/cookbook/administration/api-key-audit.md> | 2026-11-18 |
+| Log de entrada/saída | <https://openrouter.ai/docs/guides/features/input-output-logging.md> | 2026-11-18 |
 
 ## Contrato
 
@@ -95,6 +105,107 @@ O OpenRouter é um agregador: uma chave `Authorization: Bearer` dá acesso a ~45
 - Modelos `:free`: 20 req/min; 50 req/dia com menos de 10 créditos comprados, 1.000/dia com 10 ou mais (limite alto concedido a partir de 9 créditos). Modelos pagos não têm teto de plataforma; o Cloudflare bloqueia abuso extremo.
 - Limite de chave e uso diário gratuito: `GET /api/v1/key` (`limit_remaining`, `free_model_daily_requests`, `is_free_tier`).
 
+### Chaves de API (modelo de chave)
+
+Pesquisado para comparar com as chaves de harness do Thinker (várias chaves por agente com validade própria; allowlist de IP/CIDR). Nada aqui exige mudança no adaptador; o uso pelo Thinker como provedor só depende de `GET /api/v1/key` e dos erros. Coluna `Evidência`: `doc` = só documentado (lido em 2026-11-18); `sonda` = visto na rede sem credencial.
+
+**Tipos de credencial** ([authentication](https://openrouter.ai/docs/api_reference/authentication.md), [management-api-keys](https://openrouter.ai/docs/guides/overview/auth/management-api-keys.md)):
+
+| Tipo | O que é | Evidência |
+|---|---|---|
+| Chave de inferência | `sk-or-v1-` + 64 hex minúsculos (73 caracteres). Aceita em `Authorization: Bearer` e, para clientes do SDK Anthropic, em `x-api-key`. Vive num workspace. Criada no painel, via API de gestão ou via OAuth PKCE. | doc |
+| Chave de gestão (antes "provisioning key") | Mesmo formato. Não chama endpoints de inferência; só administração (`/api/v1/keys`, workspaces, guardrails, BYOK, analytics...). Escopo (organização inteira ou um workspace) e nível de acesso (`read/write` ou `read only`) são fixados na criação e não mudam. `GET /api/v1/key` expõe `is_management_key` e o alias legado `is_provisioning_key`. | doc |
+| Access token (federação de identidade) | JWT `at+jwt` emitido por `https://openrouter.ai`, ES256, escopo `inference` ou `management`, validade máxima de 15 min; obtido trocando um JWT do IdP próprio. Tokens OIDC de `https://clerk.openrouter.ai` com escopo `inference` também valem. | doc |
+| Chaves OAuth | Chave comum emitida no fluxo PKCE; a URL de consentimento pode pré-preencher `limit` (USD), `expiration` (`1-hour`, `1-day`, `7-days`, `30-days`, `90-days`, `180-days`, `1-year`, `never`) e `workspace_id`/`required_workspace_id` ([oauth](https://openrouter.ai/docs/guides/overview/auth/oauth.md)). Chaves do OpenRouter MCP (emitidas por consentimento OAuth) têm teto próprio de 7 dias. | doc |
+
+Chaves criadas no onboarding saem com limite de US$ 100 e validade de 180 dias ([authentication](https://openrouter.ai/docs/api_reference/authentication.md)). O texto puro da chave só aparece na resposta de criação; depois a chave é identificada pelo `hash` (SHA-256 em hex) e mostrada como `label` mascarado (`sk-or-v1-0e6...1c96`).
+
+**Endpoints** (todos exigem chave de gestão, exceto `GET /api/v1/key`):
+
+| Método e caminho | Uso | Evidência |
+|---|---|---|
+| `GET /api/v1/keys` | Lista até 100 por página (`offset`); filtros `include_disabled`, `include_expired` (ambos `false` por padrão, valores string `"true"`/`"false"`) e `workspace_id` (padrão: workspace default; chave de escopo workspace só vê o próprio). Não lista chaves de gestão nem chaves OAuth. | doc |
+| `POST /api/v1/keys` | Cria; responde `201 {data:<objeto>, key:"sk-or-v1-..."}`. | doc |
+| `GET /api/v1/keys/{hash}` | Lê uma. | doc |
+| `PATCH /api/v1/keys/{hash}` | Atualiza; campos desconhecidos são ignorados; corpo sem nenhum campo aceito dá `400 No update fields provided`; `409` se o criador não é membro do workspace de destino. | doc |
+| `DELETE /api/v1/keys/{hash}` | Apaga; responde `{deleted:true}`. | doc |
+| `GET /api/v1/key` | A própria chave (qualquer chave): objeto abaixo mais orçamentos efetivos. | doc; sonda 2026-11-18 (sem credencial: `401 {"error":{"message":"No cookie auth credentials found","code":401}}`, cabeçalho `x-openrouter-error-origin: client`, `cache-control: private, no-store`) |
+
+Fontes: [list](https://openrouter.ai/docs/api/api-reference/api-keys/list-api-keys.md), [create](https://openrouter.ai/docs/api/api-reference/api-keys/create-a-new-api-key.md), [get](https://openrouter.ai/docs/api/api-reference/api-keys/get-a-single-api-key.md), [update](https://openrouter.ai/docs/api/api-reference/api-keys/update-an-api-key.md), [delete](https://openrouter.ai/docs/api/api-reference/api-keys/delete-an-api-key.md), [current](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key.md) (OpenAPI `openapi.yaml` embutido nas páginas, lido em 2026-11-18).
+
+**Objeto da chave** (todos os campos são obrigatórios na resposta; `C` = aceito na criação, `U` = aceito no `PATCH`):
+
+| Campo | Tipo e semântica | C | U |
+|---|---|---|---|
+| `hash` | id estável (hex de 64), usado nos caminhos e em guardrails/BYOK/observability | — | — |
+| `name` | 1 a 256 caracteres; obrigatório na criação | sim | sim |
+| `label` | rótulo legível; na prática o prefixo mascarado da chave | — | — |
+| `disabled` | bool; desativação é reversível | — | sim |
+| `expires_at` | ISO 8601 UTC ou `null` (nunca expira) | sim | **não** |
+| `limit` | teto de gasto em USD, `0` ≤ x < 1.000.000, ou `null` (sem teto) | sim | sim |
+| `limit_remaining` | USD restante no período atual, ou `null` | — | — |
+| `limit_reset` | `daily`, `weekly`, `monthly` ou `null` (teto vitalício) | sim | sim |
+| `include_byok_in_limit` | bool; se o gasto BYOK (o que o OpenRouter teria cobrado) conta no teto; padrão `false` | sim | sim |
+| `usage`, `usage_daily`, `usage_weekly`, `usage_monthly` | gasto em créditos OpenRouter (USD): total, dia UTC, semana UTC (segunda a domingo), mês UTC | — | — |
+| `byok_usage`, `byok_usage_daily`, `byok_usage_weekly`, `byok_usage_monthly` | idem para gasto BYOK | — | — |
+| `created_at`, `updated_at` | ISO 8601; `updated_at` pode ser `null` | — | — |
+| `last_used_at` | ISO 8601 UTC do último uso registrado, ou `null` (só registrado desde o fim de 2025) | — | — |
+| `creator_user_id` | membro criador; em chave de organização, omitir na criação gera chave "do workspace" (sem dono) | sim | — |
+| `workspace_id` | UUID do workspace | sim | sim (move a chave; ela mantém o valor) |
+| `external_user` | id de usuário externo do parceiro, ou `null` | sim, via `external.user` (1 a 512 caracteres); `external.api_key` opcional (≥32 caracteres, guardado só como SHA-256) | — |
+
+`GET /api/v1/key` acrescenta: `is_free_tier`, `is_management_key`, `is_provisioning_key`, `organization_id`, `free_model_daily_requests {limit, remaining, used}`, `allowed_data_regions` (`global`|`europe`|`us`), `budgets[]` e `effective_budget` (abaixo) e `rate_limit` (descontinuado, sempre `-1`, ignorar). Não traz `hash`, `name` nem `disabled`.
+
+**Validade** ([management-api-keys](https://openrouter.ai/docs/guides/overview/auth/management-api-keys.md), [security-settings](https://openrouter.ai/docs/guides/overview/auth/security-settings.md)):
+
+- `expires_at` na criação exige segundos (`YYYY-MM-DDTHH:MM:SSZ`, frações aceitas); precisão de minuto é rejeitada. Sem campo de validade no `PATCH`: a validade é imutável; para estender, cria-se outra chave e apaga-se a antiga. (doc)
+- Depois de vencida, toda requisição com a chave recebe `401` com a mensagem `API key expired`. A chave continua listada no painel até ser apagada; na API, só com `include_expired=true`. (doc)
+- "Vida máxima de chave" (configuração de privacidade da conta, no painel; não está na API de organização): rejeita requisições de chaves sem validade ou com validade além do máximo, inclusive chaves já existentes. (doc)
+
+**Limites de gasto e orçamentos** ([limits](https://openrouter.ai/docs/api_reference/limits.md), [guardrails](https://openrouter.ai/docs/guides/features/guardrails.md), [capping-shared-agent-keys](https://openrouter.ai/docs/guides/best-practices/capping-shared-agent-keys.md)):
+
+- Camadas verificadas em ordem a cada pedido pago: orçamentos de guardrail (padrão do workspace contra o agregado do membro e contra a chave, guardrail do membro, guardrail da chave), orçamento do workspace (diário, semanal, mensal e vitalício, cumulativos) e por fim o `limit` da própria chave. Vence o mais restrito. Janelas em UTC: dia às 00:00, semana na segunda, mês no dia 1. (doc)
+- `budgets[]`/`effective_budget` em `GET /api/v1/key`: `{scope, limit_usd, spend_usd, remaining_usd, reset_interval, resets_at, include_byok, guardrail_id, budget_id}`, com `scope` em `workspace_default_member`, `workspace_default_key`, `member`, `api_key`, `workspace`, `key_limit`. `effective_budget` é o que bloqueia primeiro. (doc)
+- Gasto da chave também conta no orçamento do membro que a criou; chave sem criador ("do workspace") escapa dos guardrails de membro. (doc)
+
+**Limites de taxa por chave**: não existem. Criar chaves ou contas a mais não muda limites; a capacidade é global. Valem só: `:free` (20 req/min; 50 ou 1.000/dia), 10.000 operações de gestão de chaves por dia por conta (reset 00:00 UTC), rajada por IP em `/api/v1/keys`, `/api/v1/keys/{hash}`, `/api/v1/key` e `/api/v1/credits` (sem `X-RateLimit-*`) e o Cloudflare ([limits](https://openrouter.ai/docs/api_reference/limits.md)). (doc)
+
+**Restrições por chave**:
+
+| Restrição | Como funciona | Evidência |
+|---|---|---|
+| Allowlist de IP | Só no plano Enterprise e **por conta/organização, não por chave**: entradas de IPv4/IPv6 único ou CIDR (`10.0.0.0/8`), com rótulo opcional e escopo "todos os workspaces" ou até 100 workspaces. Lista vazia aceita qualquer IP; com entradas, IP fora recebe `403`. Vale para inferência e demais leituras/escritas com chave comum (créditos, activity, generations, arquivos, batches); não é verificada em endpoints só de gestão (`/api/v1/keys`, workspaces, guardrails), Vault, skills e provisioning. Chave de gestão de escopo organização precisa casar com entrada "todos os workspaces"; se nenhuma existir, fica sem restrição. Workspace sem entrada aplicável fica sem restrição. Mudança vale na hora; só pelo painel (sem endpoint documentado). Corpo exato do `403` não documentado. ([security-settings](https://openrouter.ai/docs/guides/overview/auth/security-settings.md)) | doc |
+| Modelos e provedores permitidos | Não é campo da chave: vem de um guardrail ou política "model availability" atribuída à chave (`allowed_models`, `allowed_providers`, `ignored_models`, `ignored_providers`; vazio = tudo). Combinação entre camadas por interseção. Uma chave tem no máximo um guardrail direto e uma política de cada tipo. `GET /api/v1/models` chamado com chave devolve só o que aquela chave pode usar. ([guardrails](https://openrouter.ai/docs/guides/features/guardrails.md), [policies](https://openrouter.ai/docs/guides/features/guardrails/policies.md), [org settings](https://openrouter.ai/docs/api/api-reference/organization/update-organization-settings.md)) | doc |
+| ZDR e política de dados | Por guardrail, por grupo de modelos: `enforce_zdr_anthropic`, `_openai`, `_google`, `_xai`, `_other` (OR entre camadas), `allow_safety_retention_google`/`_other`; `allowed_data_regions` restringe o host de entrada (`openrouter.ai`, `eu.`, `us.`; Business/Enterprise). Treino por provedor é configuração da conta, não da chave. ([guardrails](https://openrouter.ai/docs/guides/features/guardrails.md), [zdr](https://openrouter.ai/docs/guides/features/zdr.md)) | doc |
+| Filtros de conteúdo | Por guardrail/política de moderação: injeção de prompt, PII (redigir ou bloquear) e regex próprias; bloqueio dá `403`. | doc |
+| Harness | `enforce_first_party_harness_models` no guardrail: Codex lista só OpenAI e Claude Code/Desktop só Anthropic em `GET /models` (não bloqueia id pedido diretamente). | doc |
+| Log de entrada/saída | Opt-in da conta (Observability), com filtro de chaves incluídas e excluídas (exclusão vence). Destinos de broadcast aceitam `api_key_hashes`. | doc ([input-output-logging](https://openrouter.ai/docs/guides/features/input-output-logging.md)) |
+| BYOK por chave | Cada credencial BYOK aceita `allowed_api_key_hashes` (allowlist de chaves que podem usá-la; `null` = todas; `[]` dá `400`). | doc ([byok](https://openrouter.ai/docs/guides/overview/auth/byok.md)) |
+
+**Rotação**: não há endpoint de rotação nem período de carência. O procedimento documentado é criar a nova chave, migrar e apagar a antiga; as duas valem ao mesmo tempo durante a troca ([api-key-rotation](https://openrouter.ai/docs/cookbook/administration/api-key-rotation.md)). O OpenRouter é parceiro do secret scanning do GitHub e avisa por e-mail quando detecta chave exposta. A página Security sinaliza chaves sem limite, sem validade, com limite ≥ US$ 1.000, validade > 365 dias ou ociosas há 90+ dias; "arquivar" é permanente, "desativar" é reversível ([security-settings](https://openrouter.ai/docs/guides/overview/auth/security-settings.md)). (doc)
+
+**Erros de chave** (corpo `{error:{code, message, metadata?}}`, opcionalmente `openrouter_metadata` e `user_id` no topo):
+
+| Situação | Status e mensagem | Evidência |
+|---|---|---|
+| Sem credencial | `401 No cookie auth credentials found` (endpoints que aceitam sessão) ou `401 Missing Authentication header` | sonda 2026-11-18 (`GET /api/v1/key`) |
+| `Bearer` vazio / `undefined` | `401 No API key in the Authorization header` | doc |
+| Chave de outro fornecedor (`sk-` sem `sk-or-`) | `401 Invalid API key: this is not an OpenRouter API key` | doc |
+| Caracteres inválidos no cabeçalho | `401 Malformed authentication credential` | doc |
+| Chave desativada, apagada ou inexistente | `401 Invalid API key` ou `401 User not found.` (a doc não distingue desativada de apagada) | doc |
+| Chave vencida | `401 API key expired` | doc |
+| Teto da chave esgotado | `403 Key limit exceeded`, `metadata.limit_source: "openrouter_key_limit"`, `scope: "key_limit"`, `limit_usd`, `spend_usd`, `resets_at`, `remedy_hint`; sem `Retry-After`. A página de limites também cita `openrouter_key_limit` sob "Handling 402"; as páginas divergem e o status real não foi confirmado (não confirmado). | doc |
+| Orçamento de guardrail/workspace esgotado | `403` com mensagem terminando em `$X of $Y used; resets <ISO>.` e `limit_source` `openrouter_guardrail_budget` ou `openrouter_workspace_budget` | doc |
+| Saldo da conta insuficiente / orçamento em voo | `402`, `limit_source` `openrouter_credits` ou `openrouter_in_flight_budget` (este com `Retry-After`) | doc |
+| IP fora da allowlist | `403` (corpo não documentado) | doc |
+| Bloqueio por guardrail (modelo, provedor, região, conteúdo) | `403`; em `/api/v1/messages` vira envelope Anthropic `permission_error`; em `/api/v1/responses` o código nativo colapsa e `error_type` no topo guarda a causa (`authentication` → `server_error`) | doc |
+| Chave comum em rota de gestão | `403 Only management keys can perform this operation` | doc |
+| Chave de gestão sem permissão / escopo errado | `403 Management key does not have permission for this request`, `... scoped to a workspace; this request requires an organization-scoped management key`, `... scoped to a different workspace` | doc |
+
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - **Roteamento de provedores por rota** (desde 2026-11-06): os campos `provider.*` são parâmetros por rota (`routing-core/openrouter-provider-routing.ts`, `clientOwnsRoot`: o objeto `provider` do cliente vence por inteiro). Erro embutido em 200 e erro SSE antes do primeiro conteúdo viram status real (`upstream-error-classifier.ts`, `stream-warmup.ts` `peekStreamStart`). O `provider` da resposta, o `id` (`gen-...`) e o `model` vão para `agent_messages.served_provider`, `upstream_generation_id` e `served_model` (`served-provider.ts`). `openrouter/free` publica em `/v1/models` a menor janela dos `:free`.
@@ -142,8 +253,10 @@ Pontos no código:
 | G4 | oportunidade | Enviar `session_id`/`x-session-id` (o Thinker já tem `providerCacheKey`) para fixar o provedor e manter caches quentes em Anthropic, Gemini e DeepSeek; hoje a afinidade depende só do heurístico de 10 minutos. | providers | — | aberta |
 | G5 | oportunidade | Atribuição: trocar `X-Title` por `X-OpenRouter-Title` (o antigo segue aceito) e avaliar `X-OpenRouter-Categories` e `X-OpenRouter-App-Visibility: hidden`. O `HTTP-Referer` atual expõe o app em rankings públicos; é decisão do mantenedor. | providers | — | aberta |
 | G6 | oportunidade | Endpoint nativo `/api/v1/messages` e `/api/v1/responses` disponíveis em 382 modelos; usar para `anthropic/*` preservaria thinking, `cache_control` e blocos nativos sem tradução (relacionada a G1). | providers | — | aberta |
+| G7 | oportunidade | O OpenRouter expõe validade e teto da própria chave em `GET /api/v1/key` (`expires_at`, `limit_remaining`, `effective_budget`) e distingue `401 API key expired` e `403 Key limit exceeded` (`metadata.limit_source`, `resets_at`). O Thinker não lê esse endpoint ao validar a chave do provedor nem usa `resets_at` para descansar a rota; uma chave vencida ou com teto esgotado só aparece como falha 401/403 genérica. Sugestão: ao cadastrar/testar a chave, ler `GET /api/v1/key` e avisar sobre validade próxima e teto; tratar `limit_source` como cota com reset em `resets_at`. | providers | — | aberta |
 
 ## Histórico
 
+- 2026-11-18: revisão parcial pedida para o planejamento de chaves de harness. Nova subseção "Chaves de API (modelo de chave)" em Contrato: objeto da chave e campos graváveis, validade imutável e `401 API key expired`, tetos e orçamentos em camadas, ausência de limite de taxa por chave, allowlist de IP/CIDR (Enterprise, por conta/workspace, não por chave), restrições via guardrails, chaves de gestão, rotação e erros. Sonda sem credencial em `GET /api/v1/key`. Divergência na doc sobre o status do teto de chave esgotado (403 vs 402). Registrada G7. Catálogo e Formato na rede não revisados.
 - 2026-11-04: primeira revisão completa. Contrato escrito a partir da doc e do catálogo vivo (455 modelos). Registradas G1 a G6; aberta a issue #432 para G1. Pendente de conferência com chave real: efeito do campo `thinking` no Chat Completions, tratamento de parâmetros não suportados e percentual da taxa de compra de créditos.
 - 2026-11-03: esqueleto criado, sem pesquisa.

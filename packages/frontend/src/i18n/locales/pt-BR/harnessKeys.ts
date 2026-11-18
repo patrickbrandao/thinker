@@ -1,0 +1,90 @@
+import type en from '../en/harnessKeys.js';
+import type { Catalog } from '../../types.js';
+
+const ptBR: Catalog<typeof en> = {
+  title: 'Chaves de API',
+  intro:
+    'Cada chave autentica este harness. A chave principal nunca expira e é a usada na configuração acima; as chaves extras expiram e são mostradas uma única vez.',
+  newKey: 'Nova chave',
+  loadError: 'Não foi possível carregar as chaves de API.',
+  empty: 'Nenhuma chave ainda.',
+  primary: 'Principal',
+  unnamed: 'Chave sem nome',
+  primaryName: 'Chave principal',
+  unused: 'Sem uso há 90+ dias',
+  unusedHint: 'Não foi usada nos últimos 90 dias. Revogue se nada depende dela.',
+  never: 'Nunca',
+  neverUsed: 'Nunca usada',
+  noExpiry: 'Não expira',
+  inDays: 'em {{ n }}d',
+  daysAgo: 'há {{ n }}d',
+  today: 'hoje',
+  showRevoked: 'Mostrar revogadas ({{ count }})',
+  hideRevoked: 'Ocultar revogadas',
+  limit: 'Até {{ max }} chaves não revogadas.',
+  col: {
+    name: 'Nome',
+    prefix: 'Chave',
+    status: 'Status',
+    expires: 'Expira',
+    lastUsed: 'Último uso',
+    created: 'Criada',
+    actions: 'Ações',
+  },
+  status: {
+    active: 'Ativa',
+    disabled: 'Desativada',
+    expired: 'Expirada',
+    revoked: 'Revogada',
+  },
+  actions: {
+    menu: 'Ações de {{ name }}',
+    rename: 'Renomear',
+    disable: 'Desativar',
+    enable: 'Ativar',
+    revoke: 'Revogar',
+    rotate: 'Rotacionar',
+  },
+  create: {
+    title: 'Nova chave de API',
+    name: 'Nome',
+    namePlaceholder: 'ex.: runner de CI',
+    expiry: 'Expira',
+    days: '{{ n }} dias',
+    custom: 'Data personalizada',
+    customDate: 'Data de expiração',
+    customHint: 'No máximo 365 dias a partir de hoje.',
+    invalidDate: 'Escolha uma data depois de hoje e no máximo 365 dias à frente.',
+    submit: 'Criar chave',
+  },
+  created: {
+    title: 'Chave criada',
+    warning: 'Copie esta chave agora. Ela não será mostrada de novo.',
+    done: 'Já salvei',
+  },
+  rename: {
+    title: 'Renomear chave',
+    submit: 'Renomear',
+  },
+  revoke: {
+    title: 'Revogar chave?',
+    body: 'Requisições que usam {{ name }} serão recusadas na hora. Não dá para desfazer.',
+    confirm: 'Revogar',
+  },
+  rotate: {
+    title: 'Rotacionar a chave principal?',
+    body: 'Uma nova chave principal substitui a atual, que para de funcionar na hora. Atualize todos os clientes que a usam.',
+    confirm: 'Rotacionar',
+    newTitle: 'Nova chave principal',
+  },
+  toast: {
+    created: 'Chave criada',
+    renamed: 'Chave renomeada',
+    disabled: 'Chave desativada',
+    enabled: 'Chave ativada',
+    revoked: 'Chave revogada',
+    rotated: 'Chave principal rotacionada',
+  },
+};
+
+export default ptBR;

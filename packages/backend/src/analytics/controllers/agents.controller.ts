@@ -266,6 +266,55 @@ export class AgentsController {
     return { apiKey: result.apiKey };
   }
 
+  /** Every key of the harness (no secrets): primary first. */
+  @Get('agents/:agentName/keys')
+  async listAgentKeys(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
+    const info = await this.lifecycle.findAgentInfo(ctx.tenantId, agentName);
+    if (!info || !ctx.tenantId) throw new NotFoundException(`Agent "${agentName}" not found`);
+    return { keys: await this.apiKeyGenerator.listKeys(ctx.tenantId, agentName) };
+  }
+
+  /** Extra key with a mandatory expiry; the full key is returned only here. */
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
+  @Post('agents/:agentName/keys')
+  async createAgentKey(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Body() body: { name?: unknown; expiresAt?: unknown },
+  ) {
+    const info = await this.lifecycle.findAgentInfo(ctx.tenantId, agentName);
+    if (!info || !ctx.tenantId) throw new NotFoundException(`Agent "${agentName}" not found`);
+    return this.apiKeyGenerator.createKey(ctx.tenantId, agentName, body ?? {});
+  }
+
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
+  @Patch('agents/:agentName/keys/:keyId')
+  async updateAgentKey(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Param('keyId') keyId: string,
+    @Body() body: { name?: unknown; disabled?: unknown },
+  ) {
+    const info = await this.lifecycle.findAgentInfo(ctx.tenantId, agentName);
+    if (!info || !ctx.tenantId) throw new NotFoundException(`Agent "${agentName}" not found`);
+    return {
+      key: await this.apiKeyGenerator.updateKey(ctx.tenantId, agentName, keyId, body ?? {}),
+    };
+  }
+
+  /** Revokes an extra key for good (it stays listed as revoked). */
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
+  @Delete('agents/:agentName/keys/:keyId')
+  async revokeAgentKey(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Param('keyId') keyId: string,
+  ) {
+    const info = await this.lifecycle.findAgentInfo(ctx.tenantId, agentName);
+    if (!info || !ctx.tenantId) throw new NotFoundException(`Agent "${agentName}" not found`);
+    return { key: await this.apiKeyGenerator.revokeKey(ctx.tenantId, agentName, keyId) };
+  }
+
   @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
   @Patch('agents/:agentName')
   async updateAgent(

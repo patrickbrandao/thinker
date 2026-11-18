@@ -7,6 +7,12 @@ export interface IngestionContext {
    * only (e.g. requests.user_id) — never used for scoping or auth.
    */
   userId: string | null;
+  /** The agent key that authenticated the request (absent on the dev loopback). */
+  keyId?: string;
+  keyName?: string | null;
+  keyIsPrimary?: boolean;
+  /** ISO expiry of that key; null = never expires. */
+  keyExpiresAt?: string | null;
 }
 
 /**

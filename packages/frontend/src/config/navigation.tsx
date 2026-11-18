@@ -18,6 +18,7 @@ import {
   Network,
   BellRing,
   Brain,
+  ListFilter,
 } from 'lucide-react';
 import { t, type TranslationKey } from '../i18n/index.js';
 import { connectionBreadcrumbSignal } from '../services/connection-breadcrumb-store.js';
@@ -108,6 +109,7 @@ export const USER_MENU_PAGES: NavItem[] = [
   { key: 'organization', to: '/organization', label: 'nav.organization', icon: Users },
   { key: 'triggers', to: '/triggers', label: 'nav.triggers', icon: Zap },
   { key: 'proxyServers', to: '/proxy-servers', label: 'nav.proxyServers', icon: Network },
+  { key: 'ipPrefixLists', to: '/ip-prefix-lists', label: 'nav.ipPrefixLists', icon: ListFilter },
   { key: 'adminUsers', to: '/admin/users', label: 'nav.users', icon: ShieldCheck },
   { key: 'mcp', to: '/integrations/mcp', label: 'nav.mcpServer', icon: Unplug },
   { key: 'cli', to: '/integrations/cli', label: 'nav.cli', icon: Terminal },

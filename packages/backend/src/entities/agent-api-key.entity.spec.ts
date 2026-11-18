@@ -45,24 +45,26 @@ describe('AgentApiKey entity', () => {
   describe('TypeORM relation callbacks', () => {
     it('ManyToOne callback resolves to Tenant', () => {
       const relations = getMetadataArgsStorage().relations.filter((r) => r.target === AgentApiKey);
-      const manyToOne = relations.find((r) => r.relationType === 'many-to-one');
+      const manyToOne = relations.find(
+        (r) => r.relationType === 'many-to-one' && r.propertyName === 'tenant',
+      );
       expect(manyToOne).toBeDefined();
       const resolved = (manyToOne!.type as () => unknown)();
       expect(resolved).toBe(Tenant);
     });
 
-    it('OneToOne callback resolves to Agent with inverse side', () => {
-      const relations = getMetadataArgsStorage().relations.filter((r) => r.target === AgentApiKey);
-      const oneToOne = relations.find((r) => r.relationType === 'one-to-one');
-      expect(oneToOne).toBeDefined();
-      const resolved = (oneToOne!.type as () => unknown)();
+    it('ManyToOne callback resolves to Agent with inverse side (many keys per agent)', () => {
+      const relations = getMetadataArgsStorage().relations.filter(
+        (r) => r.target === AgentApiKey && r.propertyName === 'agent',
+      );
+      expect(relations[0]?.relationType).toBe('many-to-one');
+      const resolved = (relations[0]!.type as () => unknown)();
       expect(resolved).toBe(Agent);
 
-      // Invoke the inverse side callback
       const agent = new Agent();
-      agent.apiKey = new AgentApiKey();
-      const inverseFn = oneToOne!.inverseSideProperty as (obj: Agent) => unknown;
-      expect(inverseFn(agent)).toBe(agent.apiKey);
+      agent.apiKeys = [new AgentApiKey()];
+      const inverseFn = relations[0]!.inverseSideProperty as (obj: Agent) => unknown;
+      expect(inverseFn(agent)).toBe(agent.apiKeys);
     });
   });
 });

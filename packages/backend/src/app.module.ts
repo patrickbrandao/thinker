@@ -33,6 +33,7 @@ import { SetupModule } from './setup/setup.module';
 import { McpModule } from './mcp/mcp.module';
 import { TriggersModule } from './triggers/triggers.module';
 import { ProxyServersModule } from './proxy-servers/proxy-servers.module';
+import { IpPrefixesModule } from './ip-prefixes/ip-prefixes.module';
 import { mcpAvailability } from './auth/mcp-availability';
 
 const frontendPath = resolveFrontendDir();
@@ -89,6 +90,7 @@ const mcpImports = mcpAvailability().enabled ? [McpModule] : [];
     ModelPricesModule,
     NotificationsModule,
     ProxyServersModule,
+    IpPrefixesModule,
     TriggersModule,
     RoutingModule,
     PlaygroundModule,

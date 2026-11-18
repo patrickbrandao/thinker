@@ -27,6 +27,10 @@ vi.mock('../../src/components/SetupStepAddProvider', () => ({
   ),
 }));
 
+vi.mock('../../src/components/AgentKeysPanel', () => ({
+  default: (props: any) => <div data-testid="agent-keys" data-agent={props.agentName} />,
+}));
+
 vi.mock('../../src/components/FrameworkSnippets', () => ({
   default: (props: any) => (
     <div data-testid="framework-snippets" data-models={(props.modelOptions ?? []).join(',')} />
@@ -51,6 +55,7 @@ describe('AgentConnection', () => {
     expect(setup.getAttribute('data-base-url')).toMatch(/\/v1$/);
     expect(screen.getByText('Suggested setup')).toBeTruthy();
     expect(screen.getByText('SDK code examples')).toBeTruthy();
+    expect(screen.getByTestId('agent-keys').getAttribute('data-agent')).toBe('test-agent');
     await vi.waitFor(() =>
       expect(screen.getByTestId('framework-snippets').getAttribute('data-models')).toBe('fast'),
     );

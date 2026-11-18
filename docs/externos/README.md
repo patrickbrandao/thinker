@@ -61,8 +61,8 @@ Cada pesquisador atualiza a própria linha (data da revisão e lacunas abertas).
 | `api-nvidia` | API | NVIDIA NIM | `nvidia` | [dossiê](api/api-nvidia.md) | 2026-11-04 | 2 |
 | `api-openai` | API | OpenAI | `openai` | [dossiê](api/api-openai.md) | 2026-11-04 | 1 |
 | `api-pioneer` | API | Pioneer | `pioneer` | [dossiê](api/api-pioneer.md) | 2026-11-04 | 2 |
-| `api-opencode` | API | OpenCode (API: paid and free models) | `opencode` | [dossiê](api/api-opencode.md) | 2026-11-03 | 3 |
-| `api-openrouter` | API | OpenRouter | `openrouter` | [dossiê](api/api-openrouter.md) | 2026-11-04 | 5 |
+| `api-opencode` | API | OpenCode (API: paid and free models) | `opencode` | [dossiê](api/api-opencode.md) | 2026-11-18 | 4 |
+| `api-openrouter` | API | OpenRouter | `openrouter` | [dossiê](api/api-openrouter.md) | 2026-11-18 | 6 |
 | `api-requesty` | API | Requesty | `requesty` | [dossiê](api/api-requesty.md) | 2026-11-12 | 4 |
 | `api-xai` | API | xAI | `xai` | [dossiê](api/api-xai.md) | 2026-11-04 | 3 |
 | `api-zai` | API | Z.ai | `zai` | [dossiê](api/api-zai.md) | 2026-11-04 | 2 |

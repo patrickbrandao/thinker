@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn, OneToOne, Index } from 'typeorm';
+import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { Tenant } from './tenant.entity';
 import { AgentApiKey } from './agent-api-key.entity';
 import { timestampType, timestampDefault } from '../common/utils/postgres-sql';
@@ -62,8 +62,12 @@ export class Agent {
   @Column('varchar')
   tenant_id!: string;
 
-  @OneToOne(() => AgentApiKey, (k) => k.agent, { cascade: true })
-  apiKey!: AgentApiKey;
+  @OneToMany(() => AgentApiKey, (k) => k.agent)
+  apiKeys!: AgentApiKey[];
+
+  /** Keys are accepted only from the linked IP prefix lists (`agent_ip_prefix_lists`). */
+  @Column('boolean', { default: false })
+  ip_restriction_enabled!: boolean;
 
   @Column(timestampType(), { default: timestampDefault() })
   created_at!: string;
