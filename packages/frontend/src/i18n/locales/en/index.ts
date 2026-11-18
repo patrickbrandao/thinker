@@ -21,6 +21,8 @@ import proxies from './proxies.js';
 import sessions from './sessions.js';
 import alerts from './alerts.js';
 import liveSession from './liveSession.js';
+import harnessKeys from './harnessKeys.js';
+import ipLists from './ipLists.js';
 
 export default {
   common,
@@ -46,4 +48,6 @@ export default {
   sessions,
   alerts,
   liveSession,
+  harnessKeys,
+  ipLists,
 };

@@ -49,17 +49,16 @@ describe('Agent entity', () => {
       expect(inverseFn(tenant)).toBe(tenant.agents);
     });
 
-    it('OneToOne callback resolves to AgentApiKey with inverse side', () => {
+    it('OneToMany callback resolves to AgentApiKey with inverse side', () => {
       const relations = getMetadataArgsStorage().relations.filter((r) => r.target === Agent);
-      const oneToOne = relations.find((r) => r.relationType === 'one-to-one');
-      expect(oneToOne).toBeDefined();
-      const resolved = (oneToOne!.type as () => unknown)();
+      const oneToMany = relations.find((r) => r.relationType === 'one-to-many');
+      expect(oneToMany).toBeDefined();
+      const resolved = (oneToMany!.type as () => unknown)();
       expect(resolved).toBe(AgentApiKey);
 
-      // Invoke the inverse side callback
       const apiKey = new AgentApiKey();
       apiKey.agent = new Agent();
-      const inverseFn = oneToOne!.inverseSideProperty as (obj: AgentApiKey) => unknown;
+      const inverseFn = oneToMany!.inverseSideProperty as (obj: AgentApiKey) => unknown;
       expect(inverseFn(apiKey)).toBe(apiKey.agent);
     });
   });
@@ -173,14 +172,6 @@ describe('Agent entity', () => {
       expect(manyToOne).toBeDefined();
       // FK to tenants(id) must cascade — orphaned agents would break tenant filtering.
       expect(manyToOne!.options.onDelete).toBe('CASCADE');
-    });
-
-    it('cascades inserts/updates through the agent → apiKey OneToOne', () => {
-      const oneToOne = agentRelations().find((r) => r.relationType === 'one-to-one');
-      expect(oneToOne).toBeDefined();
-      // `cascade: true` lets `agentRepo.save(agent)` persist the attached apiKey
-      // in the same transaction as ApiKeyGeneratorService.onboardAgent.
-      expect(oneToOne!.options.cascade).toBe(true);
     });
 
     it('wires the tenant join column to the "tenant_id" foreign key', () => {

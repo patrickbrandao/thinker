@@ -64,6 +64,7 @@ import {
   ProxyServer,
   ProxyUsageDaily,
 } from '../src/entities/proxy-server.entity';
+import { AgentIpPrefixList, IpPrefixList } from '../src/entities/ip-prefix-list.entity';
 import { TopologyPosition } from '../src/entities/topology-position.entity';
 import { AuthModule } from '../src/auth/auth.module';
 import { HealthModule } from '../src/health/health.module';
@@ -122,6 +123,8 @@ const entities = [
   ProxyLog,
   ProxyUsageDaily,
   TopologyPosition,
+  IpPrefixList,
+  AgentIpPrefixList,
 ];
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MODELS_DEV_URL = 'https://models.dev/api.json';
@@ -382,7 +385,7 @@ export async function createTestApp(options: CreateTestAppOptions = {}): Promise
         [TEST_AGENT_ID, 'test-agent', 'Test Agent', 'Test agent', TEST_TENANT_ID, now, now],
       );
       await ds.query(
-        `INSERT INTO agent_api_keys (id, key, key_hash, key_prefix, label, tenant_id, agent_id, is_active, created_at) VALUES ($1, NULL, $2, $3, $4, $5, $6, true, $7)`,
+        `INSERT INTO agent_api_keys (id, key, key_hash, key_prefix, label, tenant_id, agent_id, is_active, is_primary, created_at) VALUES ($1, NULL, $2, $3, $4, $5, $6, true, true, $7)`,
         [
           'test-otlp-key-id',
           hashKey(TEST_OTLP_KEY),

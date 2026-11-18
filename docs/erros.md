@@ -26,6 +26,14 @@ Toda falha gerada pelo próprio Thinker (e não pelo provedor) traz um código `
 
 **Chaves conflitantes.** Os cabeçalhos `Authorization` e `x-api-key` trazem credenciais diferentes. Envie a chave em só um deles, ou a mesma nos dois.
 
+## M007
+
+**Chave desativada ou revogada.** A chave existe, mas foi desativada ou revogada no dashboard. Use outra chave do harness ou reative esta na aba de chaves do harness.
+
+## M008
+
+**IP de origem não permitido.** O harness aceita suas chaves só a partir das listas de prefixos IP marcadas nele, e o endereço de origem da requisição não está em nenhuma delas. A resposta é HTTP 403. Inclua o endereço (ou o prefixo) numa das listas, ou desligue a restrição no harness.
+
 ## M100
 
 **Chave de API do provedor ausente.** Cadastre a chave do provedor na página de roteamento do agente.

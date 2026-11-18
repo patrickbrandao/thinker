@@ -140,6 +140,7 @@ async function seedLegacyCohort(deps: CohortSeedDeps): Promise<void> {
     tenant_id: OLD_TENANT_ID,
     agent_id: OLD_AGENT_ID,
     is_active: true,
+    is_primary: true,
   });
 
   // The legacy tenant needs its own provider connections; enable them for the

@@ -240,4 +240,87 @@ export function registerAgentTools(
         })(),
       ),
   );
+
+  server.registerTool(
+    'thinker_agent_keys_list',
+    {
+      title: 'List agent keys',
+      description:
+        'List every API key of a harness (no secrets): primary key first, with status (active, disabled, expired, revoked), expiry and last use.',
+      inputSchema: z.object({ agent: z.string().min(1) }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ agent }) =>
+      result(
+        (async () => {
+          const info = await deps.lifecycle.findAgentInfo(operator.tenantId, agent);
+          if (!info) throw new Error(`Agent "${agent}" not found`);
+          return { keys: await deps.apiKeys.listKeys(operator.tenantId, agent) };
+        })(),
+      ),
+  );
+
+  server.registerTool(
+    'thinker_agent_key_create',
+    {
+      title: 'Create an agent key',
+      description:
+        'Create an extra API key for a harness. It must expire (expiresAt ISO date-time, at most 365 days ahead). The full key is returned only once.',
+      inputSchema: z.object({
+        agent: z.string().min(1),
+        name: z.string().min(1).max(100),
+        expiresAt: z.string().min(1),
+      }),
+    },
+    async ({ agent, name, expiresAt }) =>
+      result(
+        (async () => {
+          const info = await deps.lifecycle.findAgentInfo(operator.tenantId, agent);
+          if (!info) throw new Error(`Agent "${agent}" not found`);
+          return await deps.apiKeys.createKey(operator.tenantId, agent, { name, expiresAt });
+        })(),
+      ),
+  );
+
+  server.registerTool(
+    'thinker_agent_key_update',
+    {
+      title: 'Rename, disable or enable an agent key',
+      description: 'Rename a harness key, or disable / re-enable it (disabled: true | false).',
+      inputSchema: z.object({
+        agent: z.string().min(1),
+        keyId: z.string().min(1),
+        name: z.string().min(1).max(100).optional(),
+        disabled: z.boolean().optional(),
+      }),
+    },
+    async ({ agent, keyId, name, disabled }) =>
+      result(
+        (async () => {
+          const info = await deps.lifecycle.findAgentInfo(operator.tenantId, agent);
+          if (!info) throw new Error(`Agent "${agent}" not found`);
+          return {
+            key: await deps.apiKeys.updateKey(operator.tenantId, agent, keyId, { name, disabled }),
+          };
+        })(),
+      ),
+  );
+
+  server.registerTool(
+    'thinker_agent_key_revoke',
+    {
+      title: 'Revoke an agent key',
+      description:
+        'Revoke an extra harness key for good. The primary key cannot be revoked: rotate or disable it.',
+      inputSchema: z.object({ agent: z.string().min(1), keyId: z.string().min(1) }),
+    },
+    async ({ agent, keyId }) =>
+      result(
+        (async () => {
+          const info = await deps.lifecycle.findAgentInfo(operator.tenantId, agent);
+          if (!info) throw new Error(`Agent "${agent}" not found`);
+          return { key: await deps.apiKeys.revokeKey(operator.tenantId, agent, keyId) };
+        })(),
+      ),
+  );
 }

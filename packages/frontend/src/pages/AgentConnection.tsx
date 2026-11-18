@@ -1,4 +1,5 @@
 import { useParams } from 'react-router';
+import AgentKeysPanel from '../components/AgentKeysPanel.js';
 import FrameworkSnippets from '../components/FrameworkSnippets.js';
 import RichText from '../components/RichText.js';
 import SetupStepAddProvider, { PLATFORM_TO_TOOLKIT } from '../components/SetupStepAddProvider.js';
@@ -14,7 +15,8 @@ import { t } from '../i18n/index.js';
 
 /**
  * Connection tab of a harness: the suggested setup for its type and the SDK
- * code examples, both fixed here instead of popping up after edits.
+ * code examples, both fixed here instead of popping up after edits, and the
+ * harness API keys.
  */
 export default function AgentConnection() {
   const params = useParams<{ agentName: string }>();
@@ -87,6 +89,8 @@ export default function AgentConnection() {
           )}
         </Panel>
       )}
+
+      <AgentKeysPanel agentName={agentName} onPrimaryRotated={() => void apiKeyData.reload()} />
     </div>
   );
 }

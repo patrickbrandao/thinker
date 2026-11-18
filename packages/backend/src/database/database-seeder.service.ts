@@ -297,6 +297,7 @@ export class DatabaseSeederService implements OnModuleInit {
       tenant_id: SEED_TENANT_ID,
       agent_id: SEED_AGENT_ID,
       is_active: true,
+      is_primary: true,
     });
 
     this.logger.log(`Seeded tenant/agent with OTLP key: ${SEED_OTLP_KEY.substring(0, 8)}***`);

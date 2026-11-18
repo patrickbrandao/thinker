@@ -29,6 +29,7 @@ export default {
   organization: 'Organization',
   triggers: 'Triggers',
   proxyServers: 'Proxy configuration',
+  ipPrefixLists: 'IP prefix lists',
   cli: 'CLI',
   userFallback: 'User',
   harnessActions: 'Harness actions',

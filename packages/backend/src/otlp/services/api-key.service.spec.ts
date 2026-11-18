@@ -384,7 +384,7 @@ describe('ApiKeyGeneratorService', () => {
         NotFoundException,
       );
       await expect(service.getKeyForAgent('tenant-1', 'agent-a')).rejects.toThrow(
-        'No active API key found for this agent',
+        'No primary API key found for this agent',
       );
     });
 
@@ -401,7 +401,7 @@ describe('ApiKeyGeneratorService', () => {
         agentName: 'bot-x',
       });
       expect(mockKeyQb.andWhere).toHaveBeenCalledWith('a.deleted_at IS NULL');
-      expect(mockKeyQb.andWhere).toHaveBeenCalledWith('k.is_active = true');
+      expect(mockKeyQb.andWhere).toHaveBeenCalledWith('k.is_primary = true');
     });
 
     it('should return fullKey when encrypted key is stored', async () => {
@@ -474,7 +474,7 @@ describe('ApiKeyGeneratorService', () => {
 
       await service.rotateKey('tenant-1', 'my-agent');
 
-      expect(mockKeyDelete).toHaveBeenCalledWith({ agent_id: 'agent-id-1' });
+      expect(mockKeyDelete).toHaveBeenCalledWith({ agent_id: 'agent-id-1', is_primary: true });
     });
 
     it('should create a new key with encrypted key, hash and prefix', async () => {

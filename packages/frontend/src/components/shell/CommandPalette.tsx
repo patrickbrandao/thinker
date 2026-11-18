@@ -10,6 +10,7 @@ import {
   LogOut,
   Moon,
   Network,
+  ListFilter,
   Plug,
   Search,
   Settings,
@@ -148,6 +149,13 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
               label: t('nav.proxyServers'),
               icon: <Network />,
               run: go('/proxy-servers'),
+            },
+            {
+              id: 'nav:ip-prefix-lists',
+              group: t('shell.palette.goTo'),
+              label: t('nav.ipPrefixLists'),
+              icon: <ListFilter />,
+              run: go('/ip-prefix-lists'),
             },
           ]
         : []),

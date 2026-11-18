@@ -33,6 +33,16 @@ export const THINKER_ERRORS = {
     template:
       'The Authorization and x-api-key headers carry different credentials. Send your key in only one of them, or the same key in both.',
   },
+  M007: {
+    title: 'Key disabled',
+    template:
+      'This key is disabled or was revoked. Use another key of this harness, or re-enable it in the dashboard',
+  },
+  M008: {
+    title: 'Source IP not allowed',
+    template:
+      "This harness only accepts its keys from the IP prefix lists set in the dashboard, and this request's source address is not in them",
+  },
   M100: {
     title: 'Provider API key missing',
     template: 'No {provider} API key yet. Add one here: {dashboardUrl}',

@@ -83,7 +83,9 @@ export function normalizeIp(raw: string | undefined | null): string | null {
   return isIP(value) === 0 ? null : value;
 }
 
-function parsePrefix(entry: string): { ip: string; len: number; family: 'ipv4' | 'ipv6' } | null {
+export function parsePrefix(
+  entry: string,
+): { ip: string; len: number; family: 'ipv4' | 'ipv6' } | null {
   const [address, length, extra] = entry.split('/');
   if (extra !== undefined) return null;
   const version = isIP(address);

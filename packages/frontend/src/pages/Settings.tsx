@@ -18,6 +18,7 @@ import RichText from '../components/RichText.js';
 import { Button, IconButton, Modal, Panel } from '../components/ui.js';
 import SettingsRecordingSection from './SettingsRecordingSection.js';
 import SettingsModelListingSection from './SettingsModelListingSection.js';
+import SettingsIpRestrictionSection from './SettingsIpRestrictionSection.js';
 import SettingsRow from './SettingsRow.js';
 import { me, roleCan } from '../services/session-store.js';
 import { agentDisplayNameSignal } from '../services/agent-display-name.js';
@@ -235,6 +236,9 @@ export default function Settings() {
 
           {/* -- /v1/models listing ------------------------ */}
           <SettingsModelListingSection agentName={agentName} />
+
+          {/* -- Source IP restriction (admins) ------------ */}
+          <SettingsIpRestrictionSection agentName={agentName} />
 
           {/* -- API key ---------------------------------- */}
           <SectionBoundary

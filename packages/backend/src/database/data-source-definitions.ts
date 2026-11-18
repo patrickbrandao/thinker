@@ -38,6 +38,7 @@ import {
   ProxyUsageDaily,
 } from '../entities/proxy-server.entity';
 import { TopologyPosition } from '../entities/topology-position.entity';
+import { AgentIpPrefixList, IpPrefixList } from '../entities/ip-prefix-list.entity';
 import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
 import { ReclassifyPlanRequestLimitMessages1800100000000 } from './migrations/1800100000000-ReclassifyPlanRequestLimitMessages';
 import { AddMessageErrorCode1800200000000 } from './migrations/1800200000000-AddMessageErrorCode';
@@ -97,6 +98,7 @@ import { NotificationLogAlertType1805800000000 } from './migrations/180580000000
 import { DropOrphanLimitRules1805800000001 } from './migrations/1805800000001-DropOrphanLimitRules';
 import { AllowPrivateDestination1805900000000 } from './migrations/1805900000000-AllowPrivateDestination';
 import { AddTenantProviderUrlOverrides1806000000000 } from './migrations/1806000000000-AddTenantProviderUrlOverrides';
+import { HarnessKeysAndIpPrefixes1806100000000 } from './migrations/1806100000000-HarnessKeysAndIpPrefixes';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -261,6 +263,8 @@ export const entities = [
   ProxyLog,
   ProxyUsageDaily,
   TopologyPosition,
+  IpPrefixList,
+  AgentIpPrefixList,
 ];
 
 export const migrations = [
@@ -441,4 +445,5 @@ export const migrations = [
   DropOrphanLimitRules1805800000001,
   AllowPrivateDestination1805900000000,
   AddTenantProviderUrlOverrides1806000000000,
+  HarnessKeysAndIpPrefixes1806100000000,
 ];

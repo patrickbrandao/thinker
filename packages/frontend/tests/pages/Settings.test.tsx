@@ -31,6 +31,8 @@ vi.mock('../../src/services/api', () => ({
   updateModelListing: (_agent: string, mode: string) => Promise.resolve({ mode }),
 }));
 
+vi.mock('../../src/pages/SettingsIpRestrictionSection', () => ({ default: () => null }));
+
 vi.mock('../../src/services/toast-store', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));

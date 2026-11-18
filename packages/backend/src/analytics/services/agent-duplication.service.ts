@@ -138,6 +138,7 @@ export class AgentDuplicationService {
         tenant_id: source.tenant_id,
         agent_id: newAgentId,
         is_active: true,
+        is_primary: true,
       });
 
       // Providers — regular AND custom — are tenant-global, shared across agents
