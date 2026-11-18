@@ -11,7 +11,6 @@ import {
   type LiveWireFormat,
 } from 'thinker-shared';
 import { RequestRecordingStorageService } from '../common/services/request-recording-storage.service';
-import { decodeRequestRecording } from '../common/utils/request-recording-codec';
 import type { StoredAttemptRecording } from '../routing/proxy/attempt-recording.types';
 import type { RequestTimelineEvent } from '../routing/proxy/request-timeline';
 import { redactInlineImageDataUrls } from '../routing/proxy/inline-image-redaction';
@@ -469,7 +468,7 @@ export class LiveSessionHistoryService {
   private async loadRecording(key: string): Promise<StoredAttemptRecording | null> {
     if (!this.storage?.backend) return null;
     try {
-      return await decodeRequestRecording(await this.storage.get(key));
+      return await this.storage.loadRecording(key);
     } catch (error) {
       this.logger.warn(`Live session replay: recording ${key} unreadable: ${String(error)}`);
       return null;

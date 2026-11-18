@@ -18,10 +18,13 @@ Observações:
 - **Licença:** tudo fora de `enterprise/` é MIT. O diretório `enterprise/` (logs de auditoria, hooks de moderação, vector stores gerenciados, `liteadmin`) tem licença própria (BerriAI Enterprise License). Para esses itens, só vale reimplementar do zero a partir da ideia; não copiar código.
 - Os caminhos citados são da árvore do LiteLLM, salvo quando começam com `packages/` ou `docs/` (Thinker).
 
+A tabela acima vale para `recursos.md`. Cada documento por tema traz no topo o próprio SHA, a data e o commit do Thinker comparado, porque são revisados em momentos diferentes.
+
 ## Índice
 
-| Arquivo | Conteúdo |
-|---|---|
-| [`recursos.md`](recursos.md) | Ranking dos recursos do LiteLLM Proxy que o Thinker não tem, ordenados por valor/esforço, com encaixe nos ADRs e onde ficariam no código do Thinker. |
+| Arquivo | Conteúdo | SHA do LiteLLM | Revisado em |
+|---|---|---|---|
+| [`recursos.md`](recursos.md) | Ranking dos recursos do LiteLLM Proxy que o Thinker não tem, ordenados por valor/esforço, com encaixe nos ADRs e onde ficariam no código do Thinker. | `aa7917a3` | 2026-11-05 |
+| [`armazenamento-requisicoes.md`](armazenamento-requisicoes.md) | Como o LiteLLM Proxy armazena as requisições: onde (Postgres, Redis, callbacks), retenção e limpeza, campos gravados (spend logs, tabelas diárias, auditoria), privacidade e redação, caminho de escrita em lote com livro-razão, divergências entre código e docs, e comparação com as gravações do Thinker. | `c030ffb6` | 2026-11-18 |
 
 Novos documentos por tema (por exemplo `roteamento-fallbacks.md`, `cache.md`, `guardrails.md`) entram aqui conforme as perguntas aparecerem.

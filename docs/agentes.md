@@ -7,6 +7,7 @@ O Thinker é desenvolvido por agentes do Claude Code. O **Principal** é a sess�
 | Principal | `CLAUDE.md` | sessão | Recebe pedidos, implementa e publica conforme o [ADR 0005](adr/0005-modo-autonomo.md) | Sim |
 | Manifest | `manifest-tracker.md` | Sonnet | Acompanha o upstream e abre issues `upstream` | Não (só `upstream/`) |
 | LiteLLM | `litellm-expert.md` | Sonnet | Estuda o código atual do LiteLLM Proxy (clone raso em `~/.cache/thinker/litellm`), responde como ele faz X e ranqueia recursos que o Thinker não tem, em [`docs/referencia/litellm/`](referencia/litellm/) | Não (só `docs/referencia/litellm/`) |
+| OmniRoute | `omniroute-expert.md` | Sonnet | Estuda o código atual do OmniRoute (`cheaper-inference/OmniRoute`, o "omni router"; clone raso em `~/.cache/thinker/omniroute`), responde como ele faz X e ranqueia recursos que o Thinker não tem, em [`docs/referencia/omniroute/`](referencia/omniroute/) | Não (só `docs/referencia/omniroute/`) |
 | QA Docker | `qa-docker.md` | Sonnet | Build da imagem e testes no Docker local | Não |
 | Revisor | `reviewer.md` | herda | Revisão sob demanda: bugs, segurança, isolamento | Não |
 | Backend | `backend-dev.md` | herda | NestJS, TypeORM, proxy, CLI, MCP | Sim |

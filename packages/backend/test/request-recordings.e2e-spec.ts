@@ -8,7 +8,11 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import { RequestRecordingStorageService } from '../src/common/services/request-recording-storage.service';
+import {
+  RequestRecordingStorageService,
+  createBlobStorage,
+  resolveRecordingStorage,
+} from '../src/common/services/request-recording-storage.service';
 import { decodeRequestRecording } from '../src/common/utils/request-recording-codec';
 import { RequestRecordingRetentionService } from '../src/database/request-recording-retention.service';
 import { createTestApp, TEST_API_KEY, TEST_OTLP_KEY, TEST_TENANT_ID } from './helpers';
@@ -19,9 +23,14 @@ type AttemptRecordingPointer = {
   recording_key: string;
 };
 
-const expectedBackend = process.env['E2E_RECORDING_BACKEND'] === 's3' ? 's3' : 'filesystem';
+// PostgreSQL is the default backend (ADR 0013); E2E_RECORDING_BACKEND=filesystem|s3
+// runs the same suite against a blob store.
+const requestedBackend = process.env['E2E_RECORDING_BACKEND'];
+const expectedBackend =
+  requestedBackend === 's3' || requestedBackend === 'filesystem' ? requestedBackend : 'postgres';
 const canBreakStorage =
-  expectedBackend === 'filesystem' || Boolean(process.env['E2E_S3_CONTAINER_NAME']);
+  expectedBackend === 'filesystem' ||
+  (expectedBackend === 's3' && Boolean(process.env['E2E_S3_CONTAINER_NAME']));
 const storageFailureTest = canBreakStorage ? it : it.skip;
 const execFileAsync = promisify(execFile);
 const previousEnv = new Map<string, string | undefined>();
@@ -51,12 +60,19 @@ const modelKey = () => `custom:${customProviderId}/recording-model`;
 beforeAll(async () => {
   for (const key of recordingEnvKeys) previousEnv.set(key, process.env[key]);
 
-  process.env['THINKER_RECORDING_STORAGE'] = 'auto';
+  process.env['THINKER_RECORDING_STORAGE'] =
+    expectedBackend === 'postgres' ? 'auto' : expectedBackend;
   // Unset, so the app runs with the 30-day default retention.
   delete process.env['THINKER_RECORDING_RETENTION_DAYS'];
   if (expectedBackend === 'filesystem') {
     filesystemRoot = await mkdtemp(join(tmpdir(), 'thinker-recordings-e2e-'));
     process.env['THINKER_RECORDING_FILESYSTEM_PATH'] = filesystemRoot;
+  } else if (expectedBackend === 'postgres') {
+    // A directory that does not exist, so no legacy store is picked up.
+    process.env['THINKER_RECORDING_FILESYSTEM_PATH'] = join(
+      tmpdir(),
+      'thinker-no-legacy-recordings',
+    );
   }
 
   await startMockProvider();
@@ -79,7 +95,7 @@ afterAll(async () => {
 });
 
 describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
-  it('records the exact provider JSON exchange outside PostgreSQL and serves it through the authenticated drawer API', async () => {
+  it('records the exact provider JSON exchange in its recording store and serves it through the authenticated drawer API', async () => {
     const largeTail = `${'complete-payload-'.repeat(3_500)}__END_OF_REQUEST__`;
     const requestBody = {
       model: modelKey(),
@@ -119,16 +135,34 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
     )) as Array<{ table_name: string }>;
     expect(metadataTables).toHaveLength(0);
 
-    const objectBytes = await storage.get(jsonRecording.recording_key);
-    // Encrypted envelope, not gzip: the on-disk object must not expose the exchange.
-    expect(objectBytes.subarray(0, 4).toString('ascii')).toBe('MRE1');
-    expect(objectBytes.includes(Buffer.from(largeTail, 'utf8'))).toBe(false);
-    await expect(decodeRequestRecording(objectBytes)).resolves.toEqual({
+    const expectedRecording = {
       version: 1,
       wire_format: 'openai_chat_completions',
       request_body: providerRequestBody,
       response_body: { type: 'json', body: response.body },
-    });
+    };
+    if (expectedBackend === 'postgres') {
+      // Readable jsonb row, owned by the attempt it belongs to.
+      const rows = (await dataSource.query(
+        `SELECT payload, tenant_id, request_id, attempt_id
+         FROM provider_attempt_recordings WHERE storage_key = $1`,
+        [jsonRecording.recording_key],
+      )) as unknown[];
+      expect(rows).toEqual([
+        {
+          payload: expectedRecording,
+          tenant_id: TEST_TENANT_ID,
+          request_id: jsonRecording.request_id,
+          attempt_id: jsonRecording.attempt_id,
+        },
+      ]);
+    } else {
+      const objectBytes = await rawBlob(jsonRecording.recording_key);
+      // Encrypted envelope, not gzip: the stored object must not expose the exchange.
+      expect(objectBytes.subarray(0, 4).toString('ascii')).toBe('MRE1');
+      expect(objectBytes.includes(Buffer.from(largeTail, 'utf8'))).toBe(false);
+      await expect(decodeRequestRecording(objectBytes)).resolves.toEqual(expectedRecording);
+    }
 
     const details = await dashboardAuth(
       api().get(`/api/v1/messages/${jsonRecording.request_id}/details`),
@@ -157,7 +191,7 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
       .expect(200);
     streamRecording = await waitForLatestRecording(jsonRecording.request_id, 10_000);
 
-    const payload = await decodeRequestRecording(await storage.get(streamRecording.recording_key));
+    const payload = await storage.loadRecording(streamRecording.recording_key);
     expect(payload.wire_format).toBe('openai_chat_completions');
     expect(payload.request_body).toEqual(providerRequestBodies.at(-1));
     expect(payload.response_body).toEqual({
@@ -195,9 +229,7 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
       .expect(200);
 
     const imageRecording = await waitForRecordingOutside(known);
-    const stored = JSON.stringify(
-      await decodeRequestRecording(await storage.get(imageRecording.recording_key)),
-    );
+    const stored = JSON.stringify(await storage.loadRecording(imageRecording.recording_key));
     expect(stored).not.toContain(base64);
     expect(stored).toContain('[inline image: image/png,');
     expect(stored).toContain('describe this screenshot');
@@ -219,7 +251,7 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
         .set('x-test-user-id', 'intruder-user'),
     ).expect(404);
 
-    await expect(storage.get(jsonRecording.recording_key)).resolves.toBeInstanceOf(Buffer);
+    await expect(storage.loadRecording(jsonRecording.recording_key)).resolves.toBeDefined();
   });
 
   it('stops creating payload objects immediately when recording is disabled', async () => {
@@ -298,7 +330,7 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
       type: 'json',
       body: jsonResponseBody,
     });
-    await expect(storage.get(jsonRecording.recording_key)).resolves.toBeInstanceOf(Buffer);
+    await expect(storage.loadRecording(jsonRecording.recording_key)).resolves.toBeDefined();
   });
 
   it('retention keeps recordings for 30 days by default: a 31-day-old one is deleted, a 29-day-old one is kept', async () => {
@@ -316,7 +348,7 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
       [jsonRecording.attempt_id],
     );
     expect(metadata).toEqual([{ recording_key: null }]);
-    await expect(storage.get(jsonRecording.recording_key)).rejects.toBeDefined();
+    await expect(storage.loadRecording(jsonRecording.recording_key)).rejects.toBeDefined();
     const parent = await dataSource.query(`SELECT id FROM requests WHERE id = $1`, [
       jsonRecording.request_id,
     ]);
@@ -327,7 +359,7 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
       streamRecording.attempt_id,
     ]);
     expect(kept).toEqual([{ recording_key: streamRecording.recording_key }]);
-    await expect(storage.get(streamRecording.recording_key)).resolves.toBeInstanceOf(Buffer);
+    await expect(storage.loadRecording(streamRecording.recording_key)).resolves.toBeDefined();
   });
 
   it('honours THINKER_RECORDING_RETENTION_DAYS after a restart', async () => {
@@ -349,7 +381,7 @@ describe(`Provider Attempt recording E2E (${expectedBackend})`, () => {
       [streamRecording.attempt_id],
     );
     expect(metadata).toEqual([{ recording_key: null }]);
-    await expect(storage.get(streamRecording.recording_key)).rejects.toBeDefined();
+    await expect(storage.loadRecording(streamRecording.recording_key)).rejects.toBeDefined();
   }, 30_000);
 });
 
@@ -367,6 +399,15 @@ async function ageAttempt(attemptId: string, days: number): Promise<void> {
 // parsed from the environment at boot.
 function retentionService(): RequestRecordingRetentionService {
   return new RequestRecordingRetentionService(dataSource, app.get(ConfigService), storage);
+}
+
+/** The encoded object as the filesystem or S3 store holds it. */
+function rawBlob(key: string): Promise<Buffer> {
+  const resolved = resolveRecordingStorage(app.get(ConfigService));
+  if (resolved.backend !== 'filesystem' && resolved.backend !== 's3') {
+    throw new Error(`No blob store for backend ${String(resolved.backend)}`);
+  }
+  return createBlobStorage(resolved).get(key);
 }
 
 function refreshAppReferences(): void {
@@ -468,7 +509,7 @@ async function waitForStorageObject(recording: AttemptRecordingPointer): Promise
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     try {
-      await storage.get(recording.recording_key);
+      await storage.loadRecording(recording.recording_key);
       return;
     } catch {
       await new Promise((resolve) => setTimeout(resolve, 100));

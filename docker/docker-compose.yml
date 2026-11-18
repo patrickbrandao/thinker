@@ -119,8 +119,9 @@ services:
       # MCP clients whose Client ID Metadata Document lives on a private or
       # loopback host are refused unless this is true (SSRF guard, #18).
       - THINKER_CIMD_ALLOW_PRIVATE=${THINKER_CIMD_ALLOW_PRIVATE:-false}
-      # Message recordings use this mounted Docker volume automatically when
-      # S3-compatible bucket credentials are not present.
+      # Recordings go to PostgreSQL by default (auto = postgres, ADR 0013).
+      # The volume below holds recordings from older versions, which are moved
+      # into PostgreSQL at boot, and is used again only with STORAGE=filesystem.
       - THINKER_RECORDING_STORAGE=${THINKER_RECORDING_STORAGE:-auto}
       - THINKER_RECORDING_FILESYSTEM_PATH=/data/request-recordings
       - THINKER_RECORDING_RETENTION_DAYS=${THINKER_RECORDING_RETENTION_DAYS:-}

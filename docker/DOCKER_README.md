@@ -94,7 +94,7 @@ Chaves de provedores e tokens OAuth são regravados; as gravações de requisiç
 
 ## Backup
 
-Os dados ficam nos volumes `thinker_pgdata` (PostgreSQL) e `thinker_request_recordings` (gravações locais, fora do dump). Guarde também o `.env`.
+Os dados ficam no volume `thinker_pgdata` (PostgreSQL, que por padrão também guarda as gravações) e em `thinker_request_recordings` (gravações de versões antigas, movidas para o banco no boot, ou de `THINKER_RECORDING_STORAGE=filesystem`). Guarde também o `.env`.
 
 ```bash
 docker compose exec -T postgres pg_dump -U thinker thinker > thinker-backup-$(date +%F).sql

@@ -29,7 +29,7 @@ Estes só são contatados porque você os configurou, e só quando o recurso é 
 | **E-mail de autenticação** (Resend, SendGrid, Mailgun) | Só se `EMAIL_PROVIDER` estiver definido. |
 | **Gatilhos de eventos**: as APIs de e-mail (`api.resend.com`, `api.sendgrid.com`, `api.mailgun.net`), `api.telegram.org`, a URL de cada webhook e os servidores de log (Syslog, GELF, RELP) que você cadastrar | Só para os gatilhos cadastrados no workspace e ligados a um harness ou evento. |
 | **Login social** (Google, GitHub, Discord) | Só se o par `*_CLIENT_ID`/`*_CLIENT_SECRET` estiver definido. |
-| **Armazenamento S3** das gravações | Só se `THINKER_RECORDING_S3_ENDPOINT` estiver definido. |
+| **Armazenamento S3** das gravações | Só com `THINKER_RECORDING_STORAGE=s3`, ou, com o padrão `postgres`, para mover gravações antigas de um bucket já configurado. |
 | **Metadados de cliente MCP (CIMD)**: o documento na URL HTTPS que um cliente MCP informa como `client_id` durante o OAuth | Quando um cliente MCP faz login. Só endereços públicos, salvo `THINKER_CIMD_ALLOW_PRIVATE=true`; endereços de metadata de nuvem ficam sempre bloqueados. Desligue o MCP com `MCP_ENABLED=false`. |
 
 ## O que não existe
@@ -38,4 +38,4 @@ Telemetria, verificação de atualização, Sentry ou relatórios de erro, servi
 
 ## Seus dados
 
-Chaves de provedores, tokens OAuth e gravações ficam no seu PostgreSQL e no seu volume (ou bucket S3), cifrados com `THINKER_ENCRYPTION_KEY`. As gravações contêm os prompts e as respostas completos e são apagadas após a retenção de logs (a do harness, senão a da organização, senão `THINKER_RECORDING_RETENTION_DAYS`, 30 por padrão), junto com os cabeçalhos e parâmetros capturados das requisições. Para não gravar nada, desligue a gravação no harness ou use `THINKER_RECORDING_STORAGE=disabled`.
+Chaves de provedores e tokens OAuth ficam no seu PostgreSQL, cifrados com `THINKER_ENCRYPTION_KEY`. As gravações ficam por padrão no mesmo PostgreSQL, **em texto claro** (quem acessa o banco ou um dump lê os prompts); com `THINKER_RECORDING_STORAGE=filesystem` ou `s3` ficam no volume ou bucket, cifradas. As gravações contêm os prompts e as respostas completos e são apagadas após a retenção de logs (a do harness, senão a da organização, senão `THINKER_RECORDING_RETENTION_DAYS`, 30 por padrão), junto com os cabeçalhos e parâmetros capturados das requisições. Para não gravar nada, desligue a gravação no harness ou use `THINKER_RECORDING_STORAGE=disabled`.

@@ -41,14 +41,14 @@ O passo a passo, inclusive para quem dependia do antigo fallback para `BETTER_AU
 
 ## Gravações de requisições
 
-O Thinker grava o corpo das requisições e respostas dos provedores (por harness; ligado por padrão em harnesses novos), cifrado com `THINKER_ENCRYPTION_KEY`. Imagens em base64 embutidas são removidas.
+O Thinker grava o corpo das requisições e respostas dos provedores (por harness; ligado por padrão em harnesses novos). Por padrão a gravação fica no próprio PostgreSQL, na tabela `provider_attempt_recordings`, como JSON legível (consultável por SQL e **sem cifra**). Em disco ou S3 ela fica cifrada com `THINKER_ENCRYPTION_KEY`. Imagens em base64 embutidas são removidas. Gravações antigas em disco ou S3 são movidas para o PostgreSQL automaticamente no boot.
 
 | Variável | Padrão | Descrição |
 | --- | --- | --- |
 | `THINKER_RECORDING_RETENTION_DAYS` | `30` | Retenção padrão de logs, em dias. A organização pode trocá-la em Organização → Retenção de logs, e cada harness em Configurações (Global ou Personalizada). Precisa ser um inteiro positivo, senão o boot falha. Uma tarefa diária às 02:00 apaga os corpos gravados e os cabeçalhos/parâmetros das requisições expiradas; tokens, custos e status ficam. |
-| `THINKER_RECORDING_STORAGE` | `auto` | `auto`, `s3`, `filesystem` ou `disabled`. Em `auto`, credenciais S3 completas têm prioridade; senão usa o disco. |
-| `THINKER_RECORDING_FILESYSTEM_PATH` | `/data/request-recordings` | Diretório local (o compose monta o volume `thinker_request_recordings` ali). |
-| `THINKER_RECORDING_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | vazio | Armazenamento compatível com S3. Use-o em deploy com mais de uma réplica. |
+| `THINKER_RECORDING_STORAGE` | `auto` | `auto` (= `postgres`), `postgres`, `s3`, `filesystem` ou `disabled`. Disco e S3 só são usados quando escolhidos pelo nome. |
+| `THINKER_RECORDING_FILESYSTEM_PATH` | `/data/request-recordings` | Diretório local de `filesystem` (o compose monta o volume `thinker_request_recordings` ali). Com `postgres`, é de onde as gravações antigas são movidas. |
+| `THINKER_RECORDING_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | vazio | Armazenamento compatível com S3, para `s3`. Com `postgres`, é de onde as gravações antigas são movidas. |
 | `THINKER_RECORDING_S3_FORCE_PATH_STYLE` | `false` | `true` para S3 com endereçamento por caminho (MinIO e similares). |
 
 ## Identidade visual do painel

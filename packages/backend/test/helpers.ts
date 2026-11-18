@@ -24,6 +24,7 @@ import { hashKey, keyPrefix } from '../src/common/utils/hash.util';
 import { INVALID_WHERE_VALUES_BEHAVIOR } from '../src/database/data-source-definitions';
 import { pinSessionTimeZoneToUtc } from '../src/common/utils/utc-clock';
 import { AgentMessage } from '../src/entities/agent-message.entity';
+import { ProviderAttemptRecording } from '../src/entities/provider-attempt-recording.entity';
 import { ThinkerRequest } from '../src/entities/request.entity';
 import { ApiKey } from '../src/entities/api-key.entity';
 import { Tenant } from '../src/entities/tenant.entity';
@@ -92,6 +93,7 @@ const entities = [
   UserProfile,
   AgentMessage,
   ThinkerRequest,
+  ProviderAttemptRecording,
   ApiKey,
   Tenant,
   Agent,

@@ -8,7 +8,6 @@ afterAll(() => {
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
-import { encodeRequestRecording } from '../../common/utils/request-recording-codec';
 import { MessageDetailsService } from './message-details.service';
 import { AgentMessage } from '../../entities/agent-message.entity';
 
@@ -326,7 +325,7 @@ describe('MessageDetailsService', () => {
       response_body: { type: 'json', body: { choices: [] } },
     };
     const recordingStorage = {
-      get: jest.fn().mockResolvedValue(await encodeRequestRecording(storedPayload as never)),
+      loadRecording: jest.fn().mockResolvedValue(storedPayload),
     };
     const requestAware = new MessageDetailsService(
       { find: jest.fn().mockResolvedValue(attempts) } as never,
@@ -355,7 +354,9 @@ describe('MessageDetailsService', () => {
       expect.objectContaining({ id: 'attempt-1', provider: 'openai' }),
       expect.objectContaining({ id: 'attempt-2', provider: 'anthropic' }),
     ]);
-    expect(recordingStorage.get).toHaveBeenCalledWith('request-recordings/v1/attempt-2.json.gz');
+    expect(recordingStorage.loadRecording).toHaveBeenCalledWith(
+      'request-recordings/v1/attempt-2.json.gz',
+    );
     expect(result.message.attempts![1]!.recording).toEqual({
       request_body: storedPayload.request_body,
       response_body: storedPayload.response_body,

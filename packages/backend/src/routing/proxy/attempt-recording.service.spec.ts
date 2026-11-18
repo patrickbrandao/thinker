@@ -1,11 +1,3 @@
-const ORIGINAL_ENCRYPTION_KEY = process.env['THINKER_ENCRYPTION_KEY'];
-process.env['THINKER_ENCRYPTION_KEY'] ??= 'test-recording-secret-at-least-32-characters';
-afterAll(() => {
-  if (ORIGINAL_ENCRYPTION_KEY === undefined) delete process.env['THINKER_ENCRYPTION_KEY'];
-  else process.env['THINKER_ENCRYPTION_KEY'] = ORIGINAL_ENCRYPTION_KEY;
-});
-
-import { decodeRequestRecording } from '../../common/utils/request-recording-codec';
 import type { StoredAttemptRecording } from './attempt-recording.types';
 import { AttemptRecordingService } from './attempt-recording.service';
 
@@ -13,12 +5,12 @@ describe('AttemptRecordingService', () => {
   const update = jest.fn().mockResolvedValue({ affected: 1 });
   const repository = { update };
   const storage = {
-    backend: 'filesystem' as 'filesystem' | null,
+    backend: 'postgres' as 'postgres' | null,
     objectKey: jest.fn(
       (tenantId: string, requestId: string, attemptId: string) =>
         `request-recordings/v1/tenants/${tenantId}/requests/${requestId}/attempts/${attemptId}.json.gz`,
     ),
-    put: jest.fn().mockResolvedValue(undefined),
+    saveRecording: jest.fn().mockResolvedValue(undefined),
     delete: jest.fn().mockResolvedValue(undefined),
   };
   const service = new AttemptRecordingService(repository as never, storage as never);
@@ -31,8 +23,8 @@ describe('AttemptRecordingService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    storage.backend = 'filesystem';
-    storage.put.mockResolvedValue(undefined);
+    storage.backend = 'postgres';
+    storage.saveRecording.mockResolvedValue(undefined);
     storage.delete.mockResolvedValue(undefined);
     update.mockResolvedValue({ affected: 1 });
   });
@@ -48,9 +40,11 @@ describe('AttemptRecordingService', () => {
 
     const key =
       'request-recordings/v1/tenants/tenant-1/requests/request-1/attempts/attempt-1.json.gz';
-    const encoded = storage.put.mock.calls[0][1] as Buffer;
-    expect(storage.put).toHaveBeenCalledWith(key, expect.any(Buffer));
-    await expect(decodeRequestRecording(encoded)).resolves.toEqual(payload);
+    expect(storage.saveRecording).toHaveBeenCalledWith(key, payload, {
+      tenantId: 'tenant-1',
+      requestId: 'request-1',
+      attemptId: 'attempt-1',
+    });
     expect(update).toHaveBeenCalledWith(
       {
         id: 'attempt-1',
@@ -71,13 +65,11 @@ describe('AttemptRecordingService', () => {
 
     await service.save('tenant-1', 'request-1', 'attempt-large', largePayload);
 
-    await expect(decodeRequestRecording(storage.put.mock.calls[0][1] as Buffer)).resolves.toEqual(
-      largePayload,
-    );
+    expect(storage.saveRecording.mock.calls[0][1]).toEqual(largePayload);
   });
 
   it('does not update the attempt when object storage rejects the write', async () => {
-    storage.put.mockRejectedValue(new Error('offline'));
+    storage.saveRecording.mockRejectedValue(new Error('offline'));
 
     await expect(service.save('tenant-1', 'request-1', 'attempt-1', payload)).rejects.toThrow(
       'offline',

@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import type { StoredAttemptRecording } from './attempt-recording.types';
 import { RequestRecordingStorageService } from '../../common/services/request-recording-storage.service';
-import { encodeRequestRecording } from '../../common/utils/request-recording-codec';
 
 @Injectable()
 export class AttemptRecordingService {
@@ -27,8 +26,7 @@ export class AttemptRecordingService {
     const storageKey = this.storage.objectKey(tenantId, requestId, attemptId);
     let uploaded = false;
     try {
-      const encoded = await encodeRequestRecording(payload);
-      await this.storage.put(storageKey, encoded);
+      await this.storage.saveRecording(storageKey, payload, { tenantId, requestId, attemptId });
       uploaded = true;
       const result = await this.attemptRepo.update(
         { id: attemptId, tenant_id: tenantId, request_id: requestId },

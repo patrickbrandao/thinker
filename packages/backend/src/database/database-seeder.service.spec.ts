@@ -6,7 +6,6 @@ afterAll(() => {
 });
 
 import { keyPrefix, verifyKey } from '../common/utils/hash.util';
-import { decodeRequestRecording } from '../common/utils/request-recording-codec';
 import { DatabaseSeederService } from './database-seeder.service';
 import { getSeedConnections } from './seed-messages';
 
@@ -55,7 +54,7 @@ describe('DatabaseSeederService', () => {
   let mockRecordingStorage: {
     backend: 'filesystem';
     objectKey: jest.Mock;
-    put: jest.Mock;
+    saveRecording: jest.Mock;
   };
   let configValues: Record<string, string | undefined>;
 
@@ -85,7 +84,7 @@ describe('DatabaseSeederService', () => {
           'request-recordings/v1/tenants/seed-tenant-001/requests/' +
             'seed-req-recording-001/attempts/seed-msg-recording-001.json.gz',
         ),
-      put: jest.fn().mockResolvedValue(undefined),
+      saveRecording: jest.fn().mockResolvedValue(undefined),
     };
 
     service = new DatabaseSeederService(
@@ -176,12 +175,17 @@ describe('DatabaseSeederService', () => {
         }),
       );
 
-      const [storageKey, encoded] = mockRecordingStorage.put.mock.calls[0];
+      const [storageKey, recording, owner] = mockRecordingStorage.saveRecording.mock.calls[0];
+      expect(owner).toEqual({
+        tenantId: 'seed-tenant-001',
+        requestId: 'seed-req-recording-001',
+        attemptId: 'seed-msg-recording-001',
+      });
       expect(storageKey).toContain(
         'tenants/seed-tenant-001/requests/seed-req-recording-001/attempts/' +
           'seed-msg-recording-001.json.gz',
       );
-      await expect(decodeRequestRecording(encoded)).resolves.toEqual(
+      expect(recording).toEqual(
         expect.objectContaining({
           version: 1,
           wire_format: 'openai_chat_completions',
