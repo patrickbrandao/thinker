@@ -35,10 +35,15 @@ export async function decodeRequestRecording(body: Buffer): Promise<StoredAttemp
   } else {
     throw new Error('Unrecognized request recording blob: not encrypted and not gzip');
   }
-  const payload = JSON.parse(
-    (await gunzipAsync(compressed)).toString('utf8'),
-  ) as StoredAttemptRecording;
+  return assertStoredRecording(JSON.parse((await gunzipAsync(compressed)).toString('utf8')));
+}
+
+/** Checks the shape of a decoded recording, from a blob or from PostgreSQL. */
+export function assertStoredRecording(value: unknown): StoredAttemptRecording {
+  const payload = value as StoredAttemptRecording;
   if (
+    !payload ||
+    typeof payload !== 'object' ||
     payload.version !== 1 ||
     typeof payload.wire_format !== 'string' ||
     !payload.wire_format ||

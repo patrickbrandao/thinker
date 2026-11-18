@@ -17,7 +17,6 @@ import { TierAssignment } from '../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
 import { hashKey, keyPrefix } from '../common/utils/hash.util';
 import { RequestRecordingStorageService } from '../common/services/request-recording-storage.service';
-import { encodeRequestRecording } from '../common/utils/request-recording-codec';
 import type { StoredAttemptRecording } from '../routing/proxy/attempt-recording.types';
 import { getSeedConnections, seedAgentMessages, seedConnectionId } from './seed-messages';
 import { seedRoutingCohorts } from './seed-cohorts';
@@ -417,10 +416,11 @@ export class DatabaseSeederService implements OnModuleInit {
       SEED_RECORDED_REQUEST_ID,
       SEED_RECORDED_ATTEMPT_ID,
     );
-    await this.recordingStorage.put(
-      storageKey,
-      await encodeRequestRecording(SEED_ATTEMPT_RECORDING),
-    );
+    await this.recordingStorage.saveRecording(storageKey, SEED_ATTEMPT_RECORDING, {
+      tenantId: SEED_TENANT_ID,
+      requestId: SEED_RECORDED_REQUEST_ID,
+      attemptId: SEED_RECORDED_ATTEMPT_ID,
+    });
     await this.messageRepo.update(
       {
         id: SEED_RECORDED_ATTEMPT_ID,

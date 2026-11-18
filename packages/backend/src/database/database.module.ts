@@ -25,6 +25,7 @@ import { DbTuningService } from './db-tuning.service';
 import { ModelPricesModule } from '../model-prices/model-prices.module';
 import { shouldRetryDbConnection } from '../common/utils/db-retry';
 import { RequestRecordingRetentionService } from './request-recording-retention.service';
+import { RequestRecordingMigrationService } from './request-recording-migration.service';
 import { SecretReencryptionService } from './secret-reencryption.service';
 
 @Module({
@@ -104,6 +105,7 @@ import { SecretReencryptionService } from './secret-reencryption.service';
     DatabaseSeederService,
     DbTuningService,
     RequestRecordingRetentionService,
+    RequestRecordingMigrationService,
     SecretReencryptionService,
   ],
   exports: [DatabaseSeederService],

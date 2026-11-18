@@ -23,16 +23,18 @@ describe('HarnessKeysAndIpPrefixes migration (e2e)', () => {
     });
     await ds.initialize();
     await ds.runMigrations({ transaction: 'each' });
-    // Back to the schema before this migration, with one key per harness.
-    const last = (await ds.query(
-      `SELECT name FROM migrations ORDER BY id DESC LIMIT 1`,
-    )) as Array<{ name: string }>;
-    expect(last[0].name).toBe('HarnessKeysAndIpPrefixes1806100000000');
-    await ds.undoLastMigration({ transaction: 'each' });
+    // Back to the schema before this migration, with one key per harness:
+    // undo the migrations that came after it, then this one.
+    for (;;) {
+      const last = (await ds.query(
+        `SELECT name FROM migrations ORDER BY id DESC LIMIT 1`,
+      )) as Array<{ name: string }>;
+      const name = last[0].name;
+      await ds.undoLastMigration({ transaction: 'each' });
+      if (name === 'HarnessKeysAndIpPrefixes1806100000000') break;
+    }
 
-    await ds.query(
-      `INSERT INTO tenants (id, name, is_active) VALUES ('mk-tenant', 'mk', true)`,
-    );
+    await ds.query(`INSERT INTO tenants (id, name, is_active) VALUES ('mk-tenant', 'mk', true)`);
     await ds.query(
       `INSERT INTO agents (id, name, tenant_id) VALUES ('mk-agent', 'mk-agent', 'mk-tenant')`,
     );

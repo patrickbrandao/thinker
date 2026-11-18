@@ -9,7 +9,6 @@ import { ThinkerRequest } from '../../entities/request.entity';
 import type { RequestTimeline } from '../../routing/proxy/request-timeline';
 import type { RecordingResponseBody } from '../../routing/proxy/attempt-recording.types';
 import { RequestRecordingStorageService } from '../../common/services/request-recording-storage.service';
-import { decodeRequestRecording } from '../../common/utils/request-recording-codec';
 
 export interface MessageDetailResponse {
   message: {
@@ -289,7 +288,7 @@ export class MessageDetailsService {
   private async loadRecording(attemptId: string, storageKey: string) {
     if (!this.recordingStorage) return null;
     try {
-      return await decodeRequestRecording(await this.recordingStorage.get(storageKey));
+      return await this.recordingStorage.loadRecording(storageKey);
     } catch (error) {
       this.logger.warn(
         `Failed to load Provider Attempt recording ${attemptId}: ${
