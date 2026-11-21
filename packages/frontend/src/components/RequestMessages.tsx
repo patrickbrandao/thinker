@@ -9,11 +9,13 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Settings } from 'lucide-react';
+import { Braces, ChevronDown, Eye, Settings } from 'lucide-react';
 import {
   coerceContentToText,
   extractRecordedConversationMessages,
   extractRequestTools,
+  messageKind,
+  messageKindLabel,
   normalizeRole,
   type ChatMessage,
   type ChatTool,
@@ -23,6 +25,7 @@ import {
 import type { AttemptRecording } from '../services/api/messages.js';
 import MarkdownContentImpl from './playground/MarkdownContent.js';
 import JsonBlock from './JsonBlock.js';
+import CopyButton from './CopyButton.js';
 import { t } from '../i18n/index.js';
 import { cx } from './ui.js';
 
@@ -51,9 +54,22 @@ const ROLE_CLASS: Record<Role, string> = {
   unknown: 'bg-s3 text-muted',
 };
 
+/** Function call entries in the outline: the tool chip with a slightly lighter tint, yellow name. */
+const FUNCTION_CALL_BADGE = 'bg-warn/25 text-warn';
+const FUNCTION_NAME_TEXT = 'text-[#a16207] [.dark_&]:text-[#facc15]';
+
+/** Chip color of an entry, shared by the outline and the item header. */
+function kindBadgeClass(kind: string, role: Role): string {
+  return kind === 'function_call' ? FUNCTION_CALL_BADGE : ROLE_CLASS[role];
+}
+
 interface OutlineRow {
   index: number;
   role: Role;
+  /** Protocol item or role (`function_call`, `reasoning`, `user`…). */
+  kind: string;
+  /** Names of the functions a function_call entry calls. */
+  functionNames?: string;
   preview: string;
   tokens: number;
 }
@@ -151,8 +167,23 @@ function MessageTurn({
 }) {
   const [expanded, setExpanded] = useState(true);
   const [capped, setCapped] = useState(true);
+  const [showRaw, setShowRaw] = useState(false);
 
   const role = normalizeRole(message.role);
+  const kind = messageKind(message);
+  // The item as it was recorded; older shapes fall back to the parsed message.
+  const rawValue = useMemo(() => {
+    if (message.raw !== undefined) return message.raw;
+    const { kind: _kind, raw: _raw, ...rest } = message;
+    return rest;
+  }, [message]);
+  const rawJson = useMemo(() => {
+    try {
+      return JSON.stringify(rawValue, null, 2) ?? '';
+    } catch {
+      return String(rawValue);
+    }
+  }, [rawValue]);
   const content = coerceContentToText(message.content);
   const toolCalls = message.tool_calls ?? [];
 
@@ -176,47 +207,69 @@ function MessageTurn({
         active ? 'request-message--active border-accent' : 'border-line',
       )}
     >
-      <button
-        type="button"
-        className="request-message__header flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-3 py-2 text-left"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <span className="request-message__index font-mono text-xs text-faint">#{index + 1}</span>
-        <span
-          className={cx(
-            `request-message__role request-message__role--${role} badge`,
-            ROLE_CLASS[role],
-          )}
+      <div className="request-message__head flex items-center gap-1 pr-2">
+        <button
+          type="button"
+          className="request-message__header flex min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent px-3 py-2 text-left"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
         >
-          {/* i18n-ignore: chat protocol role names */}
-          {role === 'unknown' ? (message.role ?? 'unknown') : role}
-        </span>
-        {message.name ? (
-          <code className="request-message__meta-code font-mono text-xs text-muted">
-            {message.name}
-          </code>
-        ) : null}
-        {message.tool_call_id ? (
-          <code className="request-message__meta-code font-mono text-xs text-muted">
-            {message.tool_call_id}
-          </code>
-        ) : null}
-        {!expanded && preview ? (
-          <span className="request-message__preview min-w-0 flex-1 truncate text-xs text-muted">
-            {preview}
+          <span className="request-message__index font-mono text-xs text-faint">#{index + 1}</span>
+          <span
+            className={cx(
+              `request-message__role request-message__role--${role} badge`,
+              kindBadgeClass(kind, role),
+            )}
+          >
+            {/* i18n-ignore: chat protocol role and item names */}
+            {kind}
           </span>
-        ) : null}
-        <span
-          className={cx(
-            'request-message__chevron ml-auto inline-flex text-faint transition-transform',
-            expanded && 'request-message__chevron--open rotate-180',
-          )}
-          aria-hidden="true"
+          {message.name ? (
+            <code className="request-message__meta-code font-mono text-xs text-muted">
+              {message.name}
+            </code>
+          ) : null}
+          {message.tool_call_id ? (
+            <code className="request-message__meta-code font-mono text-xs text-muted">
+              {message.tool_call_id}
+            </code>
+          ) : null}
+          {!expanded && preview ? (
+            <span className="request-message__preview min-w-0 flex-1 truncate text-xs text-muted">
+              {preview}
+            </span>
+          ) : null}
+          <span
+            className={cx(
+              'request-message__chevron ml-auto inline-flex text-faint transition-transform',
+              expanded && 'request-message__chevron--open rotate-180',
+            )}
+            aria-hidden="true"
+          >
+            <ChevronDown className="size-4" />
+          </span>
+        </button>
+        <button
+          type="button"
+          className={cx('request-message__raw-toggle icon-btn size-6', showRaw && 'text-accent')}
+          aria-pressed={showRaw}
+          title={showRaw ? t('messages.recording.viewRendered') : t('messages.recording.viewRaw')}
+          aria-label={
+            showRaw ? t('messages.recording.viewRendered') : t('messages.recording.viewRaw')
+          }
+          onClick={() => {
+            setShowRaw((v) => !v);
+            setExpanded(true);
+          }}
         >
-          <ChevronDown className="size-4" />
-        </span>
-      </button>
+          {showRaw ? (
+            <Eye aria-hidden="true" className="size-3.5" />
+          ) : (
+            <Braces aria-hidden="true" className="size-3.5" />
+          )}
+        </button>
+        <CopyButton className="request-message__copy size-6" text={rawJson} />
+      </div>
 
       {expanded ? (
         <>
@@ -226,14 +279,16 @@ function MessageTurn({
               isCappable && capped && 'request-message__body--capped max-h-[420px] overflow-hidden',
             )}
           >
-            {content ? (
+            {showRaw ? (
+              <JsonBlock className="request-message__raw" value={rawValue} />
+            ) : content ? (
               parsedJson != null ? (
                 <JsonBlock className="request-message__content" value={parsedJson} />
               ) : (
                 <MarkdownContent class="request-message__content break-words" text={content} />
               )
             ) : null}
-            {toolCalls.length > 0 ? <ToolCalls calls={toolCalls} /> : null}
+            {!showRaw && toolCalls.length > 0 ? <ToolCalls calls={toolCalls} /> : null}
           </div>
           {isCappable ? (
             <div className="request-message__footer border-t border-line px-3 py-1.5">
@@ -276,10 +331,22 @@ export function ConversationSplit({ messages }: { messages: ChatMessage[] }) {
     .map(({ message, globalIndex }): OutlineRow | null => {
       const text = coerceContentToText(message.content);
       const prev = previewStr(text);
-      if (q && !prev.toLowerCase().includes(q)) return null;
+      const kind = messageKind(message);
+      const functionNames =
+        kind === 'function_call'
+          ? (message.tool_calls ?? [])
+              .map((call) => call.function?.name)
+              .filter(Boolean)
+              .join(', ')
+          : '';
+      if (q && !prev.toLowerCase().includes(q) && !functionNames.toLowerCase().includes(q)) {
+        return null;
+      }
       return {
         index: globalIndex,
         role: normalizeRole(message.role),
+        kind,
+        ...(functionNames ? { functionNames } : {}),
         preview: prev || '—',
         tokens: approxTokens(text),
       };
@@ -372,15 +439,28 @@ export function ConversationSplit({ messages }: { messages: ChatMessage[] }) {
               <span
                 className={cx(
                   `conv-outline-row__badge conv-outline-row__badge--${row.role} badge h-4 px-1 text-[10px]`,
-                  ROLE_CLASS[row.role],
+                  kindBadgeClass(row.kind, row.role),
                 )}
+                title={row.kind}
               >
-                {row.role.slice(0, 2).toUpperCase()}
+                {messageKindLabel(row.kind)}
               </span>
               <span className="conv-outline-row__num font-mono text-faint">#{row.index + 1}</span>
-              <span className="conv-outline-row__preview min-w-0 flex-1 truncate text-dim">
-                {row.preview}
-              </span>
+              {row.functionNames ? (
+                <span
+                  className={cx(
+                    'conv-outline-row__function min-w-0 flex-1 truncate font-mono',
+                    FUNCTION_NAME_TEXT,
+                  )}
+                  title={row.functionNames}
+                >
+                  {row.functionNames}
+                </span>
+              ) : (
+                <span className="conv-outline-row__preview min-w-0 flex-1 truncate text-dim">
+                  {row.preview}
+                </span>
+              )}
               <span className="conv-outline-row__tokens font-mono text-faint">{row.tokens}t</span>
             </button>
           ))}

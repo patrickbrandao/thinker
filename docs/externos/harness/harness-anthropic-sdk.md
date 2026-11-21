@@ -109,6 +109,10 @@ Mudanças da versão de API 2026-10-21 que afetam o gateway (migração, "Breaki
 
 Esperado: `base_url`/`baseURL` sem `/v1`, `auth_token`/`authToken` (funciona em qualquer versão do SDK, pois sempre vira Bearer) ou `api_key`, e `model: "auto"`. Para sessão estável, opcionalmente `default_headers={"x-session-key": "<id>"}`. O snippet atual do Thinker está **correto** (ver abaixo). Só a prosa de `docs/usuario/conectar-harnesses.md:131` está desatualizada para os SDKs novos.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Branch/commit lido: worktree `onda2` em `0c93e2a`, 2026-11-03.

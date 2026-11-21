@@ -140,6 +140,10 @@ USD por 1M tokens, lista padrão sem cache, páginas de 2026-11-04 (conferir no 
 
 - Parâmetros: `enable_thinking` e `thinking_budget` são específicos do Model Studio. A partir da API Responses, `enable_thinking` será descontinuado em favor de `reasoning.effort`.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Lido do código em 2026-11-04.

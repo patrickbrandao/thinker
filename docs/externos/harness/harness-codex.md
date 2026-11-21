@@ -104,6 +104,10 @@ Enviados em toda requisição Responses HTTP (e no handshake WebSocket, desligad
 
 Correto para 0.166.0: `model_provider = "thinker"`, `[model_providers.thinker]` com `name`, `base_url`, `env_key = "THINKER_API_KEY"`, `wire_api = "responses"`, mais `export THINKER_API_KEY=...`. Falta, como melhoria, `model_context_window` e `model_auto_compact_token_limit` (G3), e um aviso de que o Codex mostrará "Model metadata not found" para `auto` (esperado). Confirmar ao vivo que um `codex exec` real contra o Thinker funciona com `model = "auto"`.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Superfície: Responses (`packages/shared/src/agent-type.ts:87`); plataforma `codex` em `AGENT_PLATFORMS` (`agent-type.ts:37`), nome `Codex` (`:113`), categoria `coding` (`:132`).

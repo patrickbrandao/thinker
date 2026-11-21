@@ -21,7 +21,10 @@ describe('SpecificityController.setResponseMode', () => {
     controller = new SpecificityController(
       specificityService as unknown as SpecificityService,
       resolveAgentService as unknown as ResolveAgentService,
-      { withStatus: async (_t: string, _a: string, rows: unknown[]) => rows } as never,
+      {
+        withStatus: async (_t: string, _a: string, rows: unknown[]) => rows,
+        withStatusOne: async (_t: string, _a: string, row: unknown) => row,
+      } as never,
     );
   });
 

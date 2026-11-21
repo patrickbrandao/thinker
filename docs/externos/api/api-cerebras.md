@@ -88,6 +88,10 @@ A página de pricing não expõe tabela por modelo (apenas crédito promocional 
 - O SDK oficial retenta conexão, 408, 429 e >=500 (2 vezes, backoff exponencial). Headers de rate limit não documentados.
 - Parâmetros: `n` só `1`; `max_tokens` é alias de `max_completion_tokens` (não enviar os dois); `stop` até 4.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Provider `cerebras`, exige API key, sem prefixo, tamanho mínimo 20 (`packages/shared/src/providers.ts:146`).

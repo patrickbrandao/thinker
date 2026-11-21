@@ -79,6 +79,10 @@ Especificação mantida pelo agente `harness-zapier` conforme [`.claude/external
 
 - Não existe. Proposta (G1): ação Webhooks by Zapier > Custom Request, POST, URL pública `/v1/chat/completions`, Headers `Authorization: Bearer thk_...` e `Content-Type: application/json`, corpo `{"model":"auto","messages":[{"role":"user","content":"..."}]}`, ler `choices[0].message.content`.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Estado conferido no código em 2026-11-03:

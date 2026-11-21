@@ -113,6 +113,10 @@ Idêntico nos dois SDKs (`client.ts:2144-2250` JS; `_base_client.py:859-960` Pyt
 - O guia `docs/usuario/conectar-harnesses.md:106-118` mostra só Python com `chat.completions`, sem TypeScript, sem Responses e sem as variáveis `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`OPENAI_CUSTOM_HEADERS` (G7).
 - Alternativa sem código: `OPENAI_BASE_URL=http://localhost:2099/v1`, `OPENAI_API_KEY=thk_...` e, para sessão, `OPENAI_CUSTOM_HEADERS="x-session-key: minha-conversa"` (um valor fixo por processo; sessões distintas exigem `default_headers`/`extra_headers` por chamada).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Superfície declarada: `chat_completions` (`packages/shared/src/agent-type.ts:92`), nome `OpenAI SDK` (`:118`), categoria `app` (`:131`). A rota Responses é servida da mesma forma para qualquer harness.

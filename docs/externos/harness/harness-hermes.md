@@ -128,6 +128,10 @@ model:
 
 `hermes config edit` abre o `config.yaml` (confirmado em `user-guide/configuration.md`). A aba "Hermes onboard" do dashboard executa na verdade `hermes model` (rótulo impreciso, G2).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Superfície: Chat Completions (`packages/shared/src/agent-type.ts:76`, `hermes: 'chat_completions'`); nome de exibição `Hermes Agent` (`agent-type.ts:102`); categoria `personal` (`agent-type.ts:129`); ícone `/icons/hermes.svg` (`agent-type.ts:137`).

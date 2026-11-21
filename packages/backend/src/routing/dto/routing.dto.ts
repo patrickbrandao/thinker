@@ -22,7 +22,13 @@ import { Transform, Type } from 'class-transformer';
 import { MAX_LOG_RETENTION_DAYS } from '../../config/recording-retention';
 import { MODEL_LISTING_MODES, type ModelListingMode } from '../../entities/agent.entity';
 
-import { AUTH_TYPES, RESPONSE_MODES, TIER_SLOTS, type ResponseMode } from 'thinker-shared';
+import {
+  AUTH_TYPES,
+  MAX_VIRTUAL_MODEL_FALLBACKS,
+  RESPONSE_MODES,
+  TIER_SLOTS,
+  type ResponseMode,
+} from 'thinker-shared';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 import {
   MAX_STREAM_WARMUP_OVERRIDE_MS,
@@ -256,7 +262,7 @@ export class CopilotPollDto {
 
 export class SetFallbacksDto {
   @IsArray()
-  @ArrayMaxSize(5)
+  @ArrayMaxSize(MAX_VIRTUAL_MODEL_FALLBACKS)
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
   models!: string[];
@@ -267,7 +273,7 @@ export class SetFallbacksDto {
   // pins which provider key is used for that fallback.
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(5)
+  @ArrayMaxSize(MAX_VIRTUAL_MODEL_FALLBACKS)
   @ValidateNested({ each: true })
   @Type(() => ModelRouteDto)
   routes?: ModelRouteDto[];
@@ -380,7 +386,7 @@ export class FallbacksBody {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(5)
+  @ArrayMaxSize(MAX_VIRTUAL_MODEL_FALLBACKS)
   @ValidateNested({ each: true })
   @Type(() => ModelRouteDto)
   routes?: ModelRouteDto[];

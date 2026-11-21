@@ -92,6 +92,10 @@ Não existe. O Thinker não tem snippet nem seção de guia para o Open WebUI (v
 
 Equivalente por ambiente: `OPENAI_API_BASE_URL=http://host.docker.internal:2099/v1` e `OPENAI_API_KEY=thk_...`.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Superfície: Chat Completions (`packages/shared/src/agent-type.ts:84`). Plataforma `open-webui` em `AGENT_PLATFORMS` (`agent-type.ts:34`), exibida como "Open WebUI" (`:110`), categoria `automation` (`:130`, junto com n8n, Zapier, Langflow e Chatwoot), ícones em `:145` e `:166`. No catálogo da CLI: `packages/cli/src/provider-catalog.gen.ts:248-249` (`chat_completions`).

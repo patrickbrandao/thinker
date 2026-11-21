@@ -72,6 +72,10 @@ Tabela acima. Developer plan libera Batch e Flex com desconto (valores não publ
 - Cabeçalhos: `x-ratelimit-limit-requests|remaining-requests` (por dia), `x-ratelimit-limit-tokens|remaining-tokens` (por minuto), `x-ratelimit-reset-requests|tokens`, `retry-after` (só em 429).
 - 429 = limite excedido, retentável após `retry-after`; 400 para parâmetro não suportado; 401 chave inválida (não confirmado, padrão).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Base `https://api.groq.com/openai`, formato `openai`, cabeçalhos Bearer, `streamUsageReporting: 'openai_stream_options'` (`packages/backend/src/routing/proxy/provider-endpoints.ts:350-356`).

@@ -112,7 +112,7 @@ export default {
     expandDetails: 'Expand details',
     heartbeat: 'Heartbeat',
     perRequestCost: 'Per-request subscription cost: {{ amount }}',
-    includedInSubscription: 'Included in subscription',
+    includedInSubscription: 'Subscribed',
     virtualModel: 'Virtual model: {{ name }}',
     directTier: 'The caller requested a specific model. No routing applied.',
     defaultTier: 'Routed through the default tier.',
@@ -224,6 +224,8 @@ export default {
     collapseBack: 'Collapse back',
     filterPlaceholder: 'Filter…',
     toggleRole: 'Toggle {{ role }} messages',
+    viewRaw: 'Raw JSON of this item',
+    viewRendered: 'Rendered view',
     noMatches: 'No matches',
     noLogsTitle: 'No logs for this attempt',
     noLogsBody:

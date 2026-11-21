@@ -95,6 +95,10 @@ O Thinker **não tem** snippet nem seção de guia para o Langflow (a plataforma
 3. Habilitar os modelos descobertos (`auto` e os virtuais) e escolher um no Language Model ou Agent.
 4. Dentro de contêiner, `localhost` é reescrito para `host.docker.internal`; o Thinker precisa estar acessível nessa rota.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Verificado no código em 2026-11-03.

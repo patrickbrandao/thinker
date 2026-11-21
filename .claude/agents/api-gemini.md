@@ -23,6 +23,7 @@ Start here; add sources you discover and drop dead ones in the dossier.
 
 ## Focus
 
+- You own the canonical `### Formato na rede` section for **Gemini `generateContent` / `streamGenerateContent`**; Vertex and the Gemini subscription link to it.
 - Thought signatures and thinking budget/level.
 
 ## Related agents
@@ -31,4 +32,4 @@ Stay in your scope. When you find something that belongs to one of these, mentio
 
 ## Procedure
 
-Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format and the `api` checklist.
+Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format, the `api` checklist and the "Wire format" rules: every dossier ends "Contrato" with `### Formato na rede`, each row carrying its source and its live evidence (`sonda`, `captura` or `não verificado em produção`).

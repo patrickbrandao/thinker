@@ -85,6 +85,10 @@ Fonte: <https://mistral.ai/pricing> (2026-11-03).
 - Cota esgotada sem pay-as-you-go: o Vibe "pausa"; o código de erro HTTP e o corpo exatos: não confirmado (suspeita de 429 ou 402).
 - Modelo fora do plano: não confirmado.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Autenticação: token de assinatura colado (`subscriptionAuthMode: 'token'`), rótulo "Mistral Vibe subscription", placeholder "Paste your Mistral Vibe API key"; modelo conhecido único `mistral-vibe-cli-latest` (correspondência exata); `maxContextWindow: 200000`, cache de prompt sim, batch não. `packages/shared/src/subscription/configs.ts:127-139`.

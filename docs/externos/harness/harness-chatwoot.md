@@ -84,6 +84,10 @@ Não existe snippet nem guia. Valores corretos hoje, para o Super Admin do Chatw
 | OpenAI Model | `auto` ou o nome de um modelo virtual |
 | Embedding Model | modelo que o Thinker **não** serve (ver G1); deixe a funcionalidade desligada ou use outro endpoint |
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Plataforma `chatwoot` em `AGENT_PLATFORMS` (`packages/shared/src/agent-type.ts:33`), superfície `chat_completions` (`:83`), nome `Chatwoot` (`:109`), categoria `automation` (`:130`), ícone `/icons/chatwoot.svg` (`:144`). Registrada no catálogo do CLI (`packages/cli/src/provider-catalog.gen.ts:244`).

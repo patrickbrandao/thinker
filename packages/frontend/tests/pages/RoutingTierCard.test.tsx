@@ -54,6 +54,12 @@ vi.mock('../../src/components/AuthBadge.js', () => ({
 }));
 
 vi.mock('../../src/services/routing-utils.js', () => ({
+  formatPriceInOut: (i: number, o: number) =>
+    Number(i) === 0 && Number(o) === 0
+      ? 'Free'
+      : `$${(Number(i) * 1_000_000).toFixed(2)} in, ${(Number(o) * 1_000_000).toFixed(2)} out`,
+  isFreePricing: (i: unknown, o: unknown) =>
+    i != null && o != null && Number(i) === 0 && Number(o) === 0,
   pricePerM: (n: number) => `$${(Number(n) * 1_000_000).toFixed(2)}`,
   resolveProviderId: (p: string) => p.toLowerCase(),
   inferProviderFromModel: (m: string) => {
@@ -632,7 +638,7 @@ describe('RoutingTierCard', () => {
     expect(container.querySelector('[data-testid="auth-api_key"]')).not.toBeNull();
   });
 
-  it("renders subscription label as 'Included in subscription' instead of price", () => {
+  it("renders subscription label as 'Subscribed' instead of price", () => {
     const tier = {
       ...baseTier,
       override_route: { provider: 'anthropic', authType: 'subscription' as const, model: 'claude' },
@@ -655,7 +661,7 @@ describe('RoutingTierCard', () => {
         })}
       />,
     );
-    expect(container.textContent).toContain('Included in subscription');
+    expect(container.textContent).toContain('Subscribed');
   });
 
   it('renders the per-request cost for per-request subscriptions', () => {

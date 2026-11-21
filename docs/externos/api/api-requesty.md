@@ -79,6 +79,10 @@ Roteador compatível com OpenAI em `https://router.requesty.ai/v1` (Chat Complet
 - O Requesty diz não impor limite de taxa próprio, mas limita requisições simultâneas (página não lida; não confirmado).
 - Chaves em <https://app.requesty.ai/api-keys>.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Cadastro: `packages/shared/src/providers.ts:503` (id `requesty`, sem aliases, sem prefixo, mínimo 10 caracteres).

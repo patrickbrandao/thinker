@@ -24,6 +24,7 @@ Start here; add sources you discover and drop dead ones in the dossier.
 
 ## Focus
 
+- You own the canonical `### Formato na rede` section for **Anthropic Messages**; every dossier that serves `/v1/messages` links to it.
 - Beta headers (`anthropic-beta`) and which ones Thinker forwards or injects.
 - Prompt caching TTLs and cache-write pricing.
 - Thinking/effort parameters per model.
@@ -34,4 +35,4 @@ Stay in your scope. When you find something that belongs to one of these, mentio
 
 ## Procedure
 
-Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format and the `api` checklist.
+Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format, the `api` checklist and the "Wire format" rules: every dossier ends "Contrato" with `### Formato na rede`, each row carrying its source and its live evidence (`sonda`, `captura` or `não verificado em produção`).

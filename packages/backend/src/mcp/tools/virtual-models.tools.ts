@@ -92,7 +92,7 @@ function primaryRoute(input: {
 
 /**
  * Virtual models (ADR 0004): public model names a harness sends in `model`,
- * each with its own chain (primary + up to 5 fallbacks) and an optional
+ * each with its own chain (primary + up to 9 fallbacks) and an optional
  * "continue on Default". Same services as the dashboard and the CLI, so the
  * strict write-time route validation and the 400/404/409 messages are theirs.
  */
@@ -132,7 +132,7 @@ export function registerVirtualModelTools(
       description:
         'Create a virtual model: a public name (1-64 chars of A-Z a-z 0-9 . _ : - and inner /, ' +
         'unique per harness ignoring case, "auto" reserved) that routes through its own chain. ' +
-        'model is the primary, fallbacks (max 5) follow it in order, and continue_on_default ' +
+        'model is the primary, fallbacks (max 9) follow it in order, and continue_on_default ' +
         'appends the Default chain after them. Every route must resolve to a model the ' +
         "harness's providers offer. A name equal to a real model id shadows it while enabled.",
       inputSchema: z.object({

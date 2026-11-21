@@ -212,10 +212,10 @@ describe('strict route validation', () => {
     expect(res.body.message).toContain('Personal');
   });
 
-  it('rejects more than 5 fallbacks', async () => {
+  it('rejects more than 9 fallbacks (ADR 0014)', async () => {
     await createVm({
       name: 'too-many',
-      fallback_routes: Array.from({ length: 6 }, () => ({ model: 'gpt-4o' })),
+      fallback_routes: Array.from({ length: 10 }, () => ({ model: 'gpt-4o' })),
     }).expect(400);
   });
 });
@@ -250,7 +250,7 @@ describe('editing a virtual model', () => {
       .expect(200);
     expect(set.body).toEqual([route('openai', 'gpt-4o-mini'), route('deepseek', 'deepseek-chat')]);
     await asA(api().put(`${BASE}/${id}/fallbacks`))
-      .send({ models: Array(6).fill('gpt-4o-mini') })
+      .send({ models: Array(10).fill('gpt-4o-mini') })
       .expect(400);
     await asA(api().delete(`${BASE}/${id}/fallbacks`)).expect(200);
   });

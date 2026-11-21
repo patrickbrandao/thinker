@@ -145,6 +145,10 @@ Fonte: `codex-api/src/api_bridge.rs`.
 
 Modelo fora do plano: o bloqueio do Thinker cita 400 "not supported with a ChatGPT account" para `gpt-5.3-codex`, `gpt-5.2-codex`, `gpt-5.2`, `gpt-5.1-codex(-max)` (comentário em `provider-model-fetcher.service.ts:475`; mensagem original não reconferida).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Autenticação: OAuth PKCE em popup com callback em `localhost:1455` (`packages/backend/src/routing/oauth/openai/openai-oauth.service.ts:12-29`): authorize `https://auth.openai.com/oauth/authorize`, token `…/oauth/token`, revoke `…/oauth/revoke`, escopo `openid profile email offline_access`, `client_id` `app_EMoamEEZ73f0CkXaXp7hrann` (override `OPENAI_OAUTH_CLIENT_ID`), sem parâmetros extras do Codex. A base (`routing/oauth/core/redirect-pkce-oauth.base.ts:132,160-175,241-262`) monta redirect `http://localhost:<porta>/auth/callback` e faz refresh form-urlencoded com `grant_type`, `refresh_token`, `client_id`; o blob guarda só `access_token`, `refresh_token` e expiração (sem id_token nem `account_id`).

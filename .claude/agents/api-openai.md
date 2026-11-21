@@ -23,6 +23,7 @@ Start here; add sources you discover and drop dead ones in the dossier.
 
 ## Focus
 
+- You own the canonical `### Formato na rede` sections for **Chat Completions** and **Responses**; every OpenAI-compatible dossier links to them. Prefer `openai-openapi` at a commit and `openai-node` at a tag for field names and stream events.
 - Which models are Responses-only (`openai-model-capabilities.ts`).
 - Reasoning effort and summary parameters.
 
@@ -32,4 +33,4 @@ Stay in your scope. When you find something that belongs to one of these, mentio
 
 ## Procedure
 
-Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format and the `api` checklist.
+Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format, the `api` checklist and the "Wire format" rules: every dossier ends "Contrato" with `### Formato na rede`, each row carrying its source and its live evidence (`sonda`, `captura` or `não verificado em produção`).

@@ -105,7 +105,7 @@ Um harness pode ter quantos virtuais quiser. Eles aparecem em `GET /v1/models` l
 Na página **Roteamento** do harness, clique em **Criar modelo virtual** na barra de ações:
 
 1. Digite o nome. O dashboard valida enquanto você digita.
-2. Escolha o modelo principal e até 5 fallbacks (no modal de criação ou depois, no card do virtual). Sem modelos, o virtual responde `M301`, a menos que Continue on Default cubra a falta.
+2. Escolha o modelo principal e até 9 fallbacks (no modal de criação ou depois, no card do virtual). Sem modelos, o virtual responde `M301`, a menos que Continue on Default cubra a falta.
 3. Se quiser, ligue **Continue on Default** (veja abaixo) e escolha o modo de resposta (`buffered` ou `stream`).
 
 O card mostra o título "Modelo virtual: `<nome>`" e a cadeia. Os interruptores **Ativo**, **Continue on Default** e **Stream** ficam no modal de edição (menu do card, **Edit virtual model**), não no card. O ícone de script antes do nome, também presente no card `auto`, abre um exemplo para copiar com a URL base do harness, a chave e o nome.
@@ -134,7 +134,7 @@ O dashboard mostra um aviso (**Shadows** na listagem, **This name matches** ao d
 
 ### Cadeia, fallbacks e Continue on Default
 
-A cadeia é o **principal** seguido de **até 5 fallbacks**. Rotas cujo provedor, modelo ou credencial não está mais disponível saem da cadeia na hora do pedido. Em tempo de execução vale o mesmo [fallback](#fallback) dos tiers: se a primeira tentativa falha, o Thinker tenta a próxima.
+A cadeia é o **principal** seguido de **até 9 fallbacks**. Rotas cujo provedor, modelo ou credencial não está mais disponível saem da cadeia na hora do pedido. Em tempo de execução vale o mesmo [fallback](#fallback) dos tiers: se a primeira tentativa falha, o Thinker tenta a próxima.
 
 A cadeia só tem modelos concretos: um virtual não aponta para outro virtual, para `auto` nem para um tier customizado.
 

@@ -99,6 +99,10 @@ O backend exige que a requisição se pareça com o Claude Code / Agent SDK. O q
 - 400 `Extra inputs are not permitted` quando um campo de beta vai sem o flag correspondente (tratado pelo merge de betas no Thinker).
 - Modelo fora do plano: tratado no cliente como fallback para modelo anterior (v2.1.301, Fable); formato exato do erro `(não confirmado)`.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Configuração do provedor (`packages/shared/src/subscription/configs.ts:6-46`): rótulo `Claude Max / Pro subscription`, modo `token`, comando `claude setup-token`, prefixo `sk-ant-oat`. Lista curada de modelos (sem descoberta ao vivo): `claude-fable-5`, `claude-fable-5-1`, `claude-opus-4`, `claude-sonnet-4`, `claude-haiku-4`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`. Janela máxima 200K, com 1M só para `claude-opus-4-8`, `claude-opus-5` e `claude-sonnet-5` (e derivados por prefixo, `model-fallback.ts:157-190`); cache de prompt suportado, batch não.

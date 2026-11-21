@@ -120,6 +120,10 @@ Cabeçalhos do Copilot Chat 0.72.0 (VS Code 1.144.0):
 - Modelo aposentado ou fora do plano: erro de modelo não suportado (formato exato não verificado).
 - Cota esgotada: o uso para (sem fallback) (docs de cobrança).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Autenticação: device code com `client_id` `Iv1.b507a08c87ecfe98` e escopo `read:user` (`packages/backend/src/routing/oauth/copilot/copilot-device-auth.service.ts:4`, `:23-27`). O token OAuth do GitHub é guardado como credencial do provedor (`packages/backend/src/routing/oauth/copilot/copilot.controller.ts:51-60`).

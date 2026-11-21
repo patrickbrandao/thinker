@@ -624,6 +624,13 @@
     min-height: 0;
     overflow-y: auto;
   }
+  /* Manage window: the body stays put; the flow and the catalog list scroll
+     on their own (side by side from md up). */
+  @media (min-width: 768px) {
+    .chain-manager .floating-window-body {
+      overflow: hidden;
+    }
+  }
   .floating-window-foot {
     flex: none;
     display: flex;

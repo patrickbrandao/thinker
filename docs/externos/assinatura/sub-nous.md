@@ -123,6 +123,10 @@ Fonte: `agent/error_classifier.py`, `hermes_cli/auth_nous.py` (v0.22.7).
 | Portal fora do ar | 5xx; transitório |
 | Campo de roteamento não aceito (ex.: `provider_preferences`) | 400 |
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Conferido contra o código em 2026-11-03.

@@ -110,6 +110,10 @@ Não existe snippet nem seção de guia (G2). Proposta validada pelo schema do `
 
 Depois `pi --model thinker/auto` (ou `/model`). O ajuste de `compat` só ajuda depois que o Thinker ler `x-session-affinity` (G1). Não executado contra um Pi real (conferir ao vivo).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Superfície: Chat Completions (`packages/shared/src/agent-type.ts:89`). Plataforma `pi` em `AGENT_PLATFORMS` (`agent-type.ts:39`), nome `Agent Pi` (`:115`), categoria `coding` (`:132`), ícone `/icons/pi.svg` (`:150`, arquivo existe em `packages/frontend/public/icons/pi.svg`).

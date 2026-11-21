@@ -129,6 +129,10 @@ Limites numéricos de taxa e cabeçalhos de rate limit: não documentados; a con
 
 Parâmetros: `tool_choice` diferente de `auto` não suportado; `response_format` só em texto; `thinking: disabled` proibido no GLM-5.3.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Provedor `zai`, nome "Z.ai", alias `z.ai`, prefixos OpenRouter `z-ai` e `zhipuai`, exige chave, tamanho mínimo 30 (`packages/shared/src/providers.ts:480-491`). Ids `glm-*` inferem o provedor `zai` (`packages/shared/src/provider-inference.ts:20`).

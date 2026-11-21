@@ -86,6 +86,10 @@ Parâmetros de `/v1/chat/completions` documentados: `model`, `messages`, `stream
 - `/api/v1/models` com contexto real da instância carregada, capacidades e estado carregado (ver G1).
 - `GET /api/v1/models` pode servir de checagem de saúde com contexto (já usado no teste de conexão).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Tipo de servidor local configurável: `LOCAL_SERVER_TYPES = ['ollama','lmstudio','llamacpp']`, cada servidor vira uma linha de custom provider com `local_type` (`packages/backend/src/common/constants/local-servers.ts:116`). Defaults do LM Studio: porta 1234, `healthPath` e `modelsPath` `/api/v1/models`, env `THINKER_LMSTUDIO_BASE_URL` (`local-servers.ts:151-158`). O comentário sobre defaults cita "checado 2026-10-31" (`local-servers.ts:~133-150`).

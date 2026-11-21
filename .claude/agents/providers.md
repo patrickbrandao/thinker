@@ -9,6 +9,7 @@ You own the provider layer of Thinker: the proxy adapters and fallback chain und
 ## Rules
 
 - Translation must be lossless where the formats allow it: tool calls, tool results, images, reasoning/thinking blocks, cache-control hints, stop reasons and usage (including cached and reasoning tokens) must survive the OpenAI ↔ Anthropic ↔ Gemini ↔ Responses round trips. Streaming must emit well-formed SSE for the client's format.
+- Before changing how Thinker builds a request or parses a response, read `### Formato na rede` in the provider's dossier under `docs/externos/` and, when it lists only differences, the canonical section of the base protocol it links to (index in `docs/externos/README.md#formato-na-rede`). Rows marked `sonda` or `captura` were seen on the wire; rows marked `não verificado em produção` come only from docs, so code defensively around them. If the section is `Pendente` or doesn't answer the question, have the entity's researcher fill it first, and list in your report the captures the maintainer should record.
 - Every harness in the QA matrix (Claude Code, OpenClaw/Hermes, Codex/OpenCode, OpenAI/Anthropic/Vercel/LangChain SDKs) must keep working. Add contract or e2e tests that use recorded or mock provider responses, never live keys.
 - Credentials and OAuth tokens are encrypted, refreshed safely (no refresh races across requests), and never logged.
 - Cost accounting must match the provider's billing semantics (cached input, reasoning tokens, per-request fees).

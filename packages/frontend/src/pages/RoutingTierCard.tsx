@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from 'react';
+import { useState, type DragEvent, type ReactNode } from 'react';
 import { Pencil, Undo2 } from 'lucide-react';
 import { PROVIDERS } from '../services/providers.js';
 import type { StageDef } from '../services/providers.js';
@@ -6,7 +6,8 @@ import { getModelLabel } from '../services/provider-utils.js';
 import { providerIcon, customProviderLogo } from '../components/ProviderIcon.js';
 import { authBadgeFor } from '../components/AuthBadge.js';
 import {
-  pricePerM,
+  formatPriceInOut,
+  isFreePricing,
   resolveProviderId,
   inferProviderFromModel,
   usedKeyLabelsForModelInTier,
@@ -353,13 +354,13 @@ export default function RoutingTierCard(props: RoutingTierCardProps) {
     return modelName;
   };
 
-  const priceLabel = (modelName: string): string => {
+  const priceLabel = (modelName: string): ReactNode => {
     const info = modelInfo(modelName);
     if (!info) return '';
-    return t('routing.pricePerM', {
-      input: pricePerM(info.input_price_per_token),
-      output: pricePerM(info.output_price_per_token),
-    });
+    if (isFreePricing(info.input_price_per_token, info.output_price_per_token)) {
+      return <span className="text-accent">{t('routing.free')}</span>;
+    }
+    return formatPriceInOut(info.input_price_per_token, info.output_price_per_token);
   };
 
   const isStreamMode = tier?.response_mode === 'stream';

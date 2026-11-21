@@ -11,7 +11,7 @@ import type {
 } from '../services/api.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { authBadgeFor } from './AuthBadge.js';
-import { pricePerM } from '../services/routing-utils.js';
+import { routePriceText } from '../services/routing-utils.js';
 import { customProviderColor, formatPerRequestCost } from '../services/formatters.js';
 import ModelChainManager from './ModelChainManager.js';
 import NotInCatalogBadge from './NotInCatalogBadge.js';
@@ -28,7 +28,7 @@ import {
 } from './RouteStatusControls.js';
 
 /**
- * A named chain of concrete routes: a primary (`override_route`) and up to 5
+ * A named chain of concrete routes: a primary (`override_route`) and up to 9
  * fallbacks. Header tiers, virtual models (ADR 0004) and the `auto` model
  * share this shape and this card; each wrapper adds its own header details
  * and menu.
@@ -171,21 +171,8 @@ export default function RouteChainCard(props: RouteChainCardProps) {
     );
   };
 
-  const priceText = (r: ModelRoute, info: AvailableModel | undefined): string => {
-    if (r.authType === 'subscription') {
-      return formatPerRequestCost(info?.cost_per_request) ?? t('routing.cardSubscription');
-    }
-    if (r.authType === 'local' || !info) return '';
-    const input = Number(info.input_price_per_token);
-    const output = Number(info.output_price_per_token);
-    if (info.input_price_per_token != null && input === 0 && output === 0) {
-      return t('routing.free');
-    }
-    return t('routing.cardPrice', {
-      input: pricePerM(info.input_price_per_token),
-      output: pricePerM(info.output_price_per_token),
-    });
-  };
+  const priceText = (r: ModelRoute, info: AvailableModel | undefined): string =>
+    routePriceText(r.authType, info);
 
   const hasPrimary = props.chain.override_route != null;
   /** `primary` or the fallback index of the route at `index` in `routes`. */
@@ -241,7 +228,16 @@ export default function RouteChainCard(props: RouteChainCardProps) {
                 <AuthIcon authType={r.authType} />
                 <span className="truncate">{account}</span>
               </span>
-              {price ? <span className="routing-card__chip-price">{price}</span> : null}
+              {price ? (
+                <span
+                  className={cx(
+                    'routing-card__chip-price',
+                    price === t('routing.free') && 'text-accent',
+                  )}
+                >
+                  {price}
+                </span>
+              ) : null}
               {skipped ? (
                 <span className="routing-card__skipped-badge badge is-warn">
                   {t('routing.skippedInStream')}

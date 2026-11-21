@@ -90,6 +90,10 @@ Não existe snippet no Thinker (G1). Proposta, derivada dos docs BYOK (não test
 
 Uso: `copilot --model thinker/auto`.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Plataforma `copilot-cli` em `AGENT_PLATFORMS` (`packages/shared/src/agent-type.ts:41`), superfície `chat_completions` (`packages/shared/src/agent-type.ts:91`), rótulo "Copilot CLI" (`:117`), categoria `coding` (`:132`), ícone (`:152`, variante escura `:165`). A superfície é só metadado de exibição; o gateway aceita Chat Completions (`proxy.controller.ts:246-252`), listagem em `GET /v1/models` (`proxy.controller.ts:176`).

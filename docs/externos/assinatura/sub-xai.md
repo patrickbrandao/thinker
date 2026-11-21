@@ -85,6 +85,10 @@ Terceiros acrescentam `x-grok-conv-id` (sessão) e `x-grok-model-override` (mode
 - 401: reautenticar (o CLI faz um refresh e repete). 402: saldo de créditos esgotado. 403: sem permissão (plano sem acesso ao endpoint, ou token enviado ao host errado). 404: modelo fora da lista do usuário. 429: limite do plano atingido, tentar depois (`error_display.rs`).
 - Modelos (catálogo público, docs.x.ai 2026-11-03): `grok-4.7`, `grok-4.6`, `grok-4.5` (500k), `grok-4.3`, `grok-4.20-0309-*` (1M), `grok-build-0.1` (256k). Na assinatura o proxy mapeia para variantes `-build` (ex.: `grok-4.7-build`, `grok-4.7-build-fast`, relato pi-grok e testes do CLI). Nenhuma aposentadoria anunciada.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - OAuth no navegador via popup, `RedirectPkceOauthBaseService`: client `b1a00492-...` (sobrescrevível por `XAI_OAUTH_CLIENT_ID`), `authorize` `https://auth.x.ai/oauth2/authorize`, token `.../oauth2/token`, revoke `.../oauth2/revoke`, escopo `openid profile email offline_access grok-cli:access api:access`, redirect `http://127.0.0.1:56121/callback`, nonce, `Accept: application/json` (`packages/backend/src/routing/oauth/xai/xai-oauth.service.ts:8-35`). Refresh genérico com `grant_type=refresh_token` e `client_id` (`core/redirect-pkce-oauth.base.ts:241-253`).

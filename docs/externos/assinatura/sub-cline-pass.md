@@ -94,6 +94,10 @@ Formato OpenAI `{ "error": { "code", "message", "metadata" } }` (docs `api/error
 
 Os códigos HTTP exatos dessas respostas não estão nas fontes (não confirmado; exige conta real). 401 significa chave inválida; mid-stream `context_length_exceeded`, `content_filter`, `rate_limit` e `server_error` chegam em HTTP 200.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Cadastro: provedor `cline-pass`, nome "ClinePass", alias `cline` (`packages/shared/src/providers.ts:134-136`); assinatura por token colado, rótulo "ClinePass subscription" (`packages/shared/src/subscription/configs.ts:357-361`).

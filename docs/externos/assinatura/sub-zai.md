@@ -111,6 +111,10 @@ Formato: `{"error":{"code":"<string>","message":"..."}}`. Em streaming (SSE) a f
 | 1315 | 429 | Chave restrita a pacote enterprise |
 | 1316-1321 | 429 | Cota de 5 h ou 7 dias esgotada, sem saldo ou limite de gasto para uso extra; traz reset |
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Token colado (`subscriptionAuthMode: 'token'`), rótulo "GLM Coding Plan", placeholder "Paste your Z.ai API key": `packages/shared/src/subscription/configs.ts:238-262`.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
-import { KeyRound, Layers, RefreshCw, Search, Server, User } from 'lucide-react';
+import { Gift, KeyRound, Layers, RefreshCw, Search, Server, User } from 'lucide-react';
 import {
   refreshModels,
   refreshProviderModels,
@@ -13,7 +13,12 @@ import {
 } from '../services/api.js';
 import { PROVIDERS, STAGES, SPECIFICITY_STAGES, DEFAULT_STAGE } from '../services/providers.js';
 import { customProviderColor, formatPerRequestCost } from '../services/formatters.js';
-import { inferProviderFromModel, pricePerM, resolveProviderId } from '../services/routing-utils.js';
+import {
+  formatPriceInOut,
+  inferProviderFromModel,
+  isFreePricing,
+  resolveProviderId,
+} from '../services/routing-utils.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
@@ -47,7 +52,8 @@ type PickerItem =
   | { kind: 'model'; provId: string; name: string; model: ModalModel };
 
 /** Picker tab: one auth category, or every connected provider at once. */
-type PickerTab = AuthType | 'all';
+/** `free`: every auth type, only subscription models and metered models priced at zero. */
+type PickerTab = AuthType | 'all' | 'free';
 
 /** Price text color by billing: dark blue for subscriptions, dark orange for usage-based. */
 const PRICE_COLOR: Record<AuthType, string> = {
@@ -152,7 +158,7 @@ const isUsable = (p: { is_active: boolean; has_api_key: boolean; cached_model_co
   p.is_active && (p.has_api_key || (p.cached_model_count ?? 0) > 0);
 
 /** Column template shared by the table head and each model row (stacks under 640px). */
-const ROW_COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_92px_72px_56px_128px] sm:items-center sm:gap-3';
+const ROW_COLUMNS = 'sm:grid-cols-[minmax(0,1fr)_92px_72px_56px_168px] sm:items-center sm:gap-3';
 const ROW_GRID = `grid grid-cols-1 gap-1 ${ROW_COLUMNS}`;
 
 const pillClass = (active: boolean) =>
@@ -294,7 +300,10 @@ export default function ModelPickerModal(props: Props) {
   /** Usable connections, as account filter options (scoped to the active tab). */
   const accountOptions = useMemo(() => {
     return connected
-      .filter((c) => isUsable(c) && (activeTab === 'all' || c.auth_type === activeTab))
+      .filter(
+        (c) =>
+          isUsable(c) && (activeTab === 'all' || activeTab === 'free' || c.auth_type === activeTab),
+      )
       .map((c) => {
         const provId = resolveProviderId(c.provider) ?? c.provider.toLowerCase();
         return {
@@ -337,7 +346,7 @@ export default function ModelPickerModal(props: Props) {
     /** Auth type of a row: the model's own, else the tab's (or the provider's connection). */
     const authFor = (m: AvailableModel, provId: string): AuthType => {
       if (m.auth_type) return m.auth_type;
-      if (tab !== 'all') return tab;
+      if (tab !== 'all' && tab !== 'free') return tab;
       const conn = connectedList.find(
         (p) =>
           p.is_active &&
@@ -375,7 +384,8 @@ export default function ModelPickerModal(props: Props) {
       // from leaking into the API Keys tab and vice versa (e.g. when the
       // same provider is connected with both auth types and they have
       // different model access levels).
-      if (showTabs && tab !== 'all' && m.auth_type && m.auth_type !== tab) continue;
+      if (showTabs && tab !== 'all' && tab !== 'free' && m.auth_type && m.auth_type !== tab)
+        continue;
       if (freeOnly && !isFreeModel(m)) continue;
       if (requiredCapabilities.size > 0) {
         const caps = m.capabilities ?? [];
@@ -405,6 +415,14 @@ export default function ModelPickerModal(props: Props) {
             : (dbProvId ?? prefixProvId);
       if (!provId) continue;
       const authType = authFor(m, provId);
+      // Free tab: subscription models plus metered models priced at zero.
+      // Unpriced metered models (no price data) and local models stay out.
+      if (
+        tab === 'free' &&
+        authType !== 'subscription' &&
+        !(authType === 'api_key' && isFreeModel(m))
+      )
+        continue;
       if (allowedProviders && !allowedProviders.has(`${authType}\0${provId}`)) continue;
       if (
         selectedAccount &&
@@ -552,7 +570,7 @@ export default function ModelPickerModal(props: Props) {
     return () => cancelAnimationFrame(id);
   }, [showSearch]);
 
-  const isAll = activeTab === 'all';
+  const isAll = activeTab === 'all' || activeTab === 'free';
   const isSub = activeTab === 'subscription';
   const isLocal = activeTab === 'local';
   const isPaid = activeTab === 'api_key';
@@ -604,6 +622,12 @@ export default function ModelPickerModal(props: Props) {
       label: t('models.picker.usageBased'),
       icon: <KeyRound className="size-3.5" aria-hidden="true" />,
     });
+  if (hasSubscription || hasApiKey)
+    tabItems.push({
+      key: 'free',
+      label: t('models.picker.freeTab'),
+      icon: <Gift className="size-3.5" aria-hidden="true" />,
+    });
   if (hasLocal)
     tabItems.push({
       key: 'local',
@@ -613,7 +637,7 @@ export default function ModelPickerModal(props: Props) {
 
   const emptyMessage = search.trim()
     ? t('models.noSearchMatch')
-    : showFreeOnly
+    : showFreeOnly || activeTab === 'free'
       ? t('models.picker.noFree')
       : isAll
         ? t('models.picker.noAll')
@@ -731,21 +755,29 @@ export default function ModelPickerModal(props: Props) {
           <span className={cellLabel}>{t('models.picker.colPrice')}</span>
           <span
             className={cx(
-              'routing-modal__model-price text-right font-mono text-xs',
+              'routing-modal__model-price whitespace-nowrap text-right font-mono text-xs',
               PRICE_COLOR[model.authType],
             )}
           >
-            {model.authType === 'api_key'
-              ? model.pricing
-                ? t('models.picker.priceInOut', {
-                    input: pricePerM(model.pricing.input_price_per_token),
-                    output: pricePerM(model.pricing.output_price_per_token),
-                  })
-                : null
-              : model.authType === 'local'
-                ? t('models.picker.runsLocally')
-                : (formatPerRequestCost(model.pricing.cost_per_request) ??
-                  t('models.picker.included'))}
+            {model.authType === 'api_key' ? (
+              model.pricing ? (
+                isFreePricing(
+                  model.pricing.input_price_per_token,
+                  model.pricing.output_price_per_token,
+                ) ? (
+                  <span className="text-accent">{t('routing.free')}</span>
+                ) : (
+                  formatPriceInOut(
+                    model.pricing.input_price_per_token,
+                    model.pricing.output_price_per_token,
+                  )
+                )
+              ) : null
+            ) : model.authType === 'local' ? (
+              t('models.picker.runsLocally')
+            ) : (
+              (formatPerRequestCost(model.pricing.cost_per_request) ?? t('models.picker.included'))
+            )}
           </span>
         </span>
       </button>
@@ -753,7 +785,13 @@ export default function ModelPickerModal(props: Props) {
   };
 
   const body = (
-    <div className="routing-modal flex min-h-0 flex-col gap-3 [&>*]:shrink-0">
+    <div
+      className={cx(
+        'routing-modal flex min-h-0 flex-col gap-3 [&>*]:shrink-0',
+        // Embedded (the Manage window): fill the column so only the list scrolls.
+        props.embedded && 'flex-1',
+      )}
+    >
       {showTabs ? (
         <Tabs
           className="!mb-0"
@@ -854,7 +892,11 @@ export default function ModelPickerModal(props: Props) {
           key={pickerResetKey}
           className={cx(
             'routing-modal__list -mx-1 overflow-y-auto px-1',
-            props.embedded ? 'max-h-[calc(100vh-340px)]' : 'max-h-[55vh]',
+            // Embedded: take the space left in the window (md and up), so the
+            // list is the only scroller; stacked on phones it keeps a cap.
+            props.embedded
+              ? 'max-h-[55vh] md:!shrink md:max-h-none md:min-h-0 md:flex-1 md:basis-0'
+              : 'max-h-[55vh]',
           )}
           items={pickerItems}
           itemHeight={pickerItemHeight}

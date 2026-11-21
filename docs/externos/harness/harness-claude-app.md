@@ -97,6 +97,10 @@ Streaming SSE completo com `ping` (o app aceita ~5 min só de pings, mais `infer
 
 Não existe para `claude-app` hoje. Esperado: janela Configure Third-Party Inference com Inference provider = Gateway, Gateway base URL = URL do Thinker (porta 2099; `/v1` a confirmar), Gateway API key = `thk_...`, auth scheme `bearer`, e `inferenceModels` explícito, por exemplo `[{"name":"auto","labelOverride":"Thinker auto","behavesAs":"claude-sonnet-5","supports1m":false}]` `(não confirmado)`. Depois "Apply Changes". Em JSON de arquivo/bootstrap, um objeto com as chaves da tabela.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Branch/commit lido: worktree `onda2` em `0c93e2a`, 2026-11-03.

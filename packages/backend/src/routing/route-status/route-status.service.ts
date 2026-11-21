@@ -60,6 +60,16 @@ export class RouteStatusService {
     return rows.map((row) => ({ ...row, route_status: chainRouteStatus(row, snapshot) }));
   }
 
+  /** One chain row with its route status (for endpoints that return the updated row). */
+  async withStatusOne<T extends Pick<VirtualModel, 'override_route' | 'fallback_routes'>>(
+    tenantId: string,
+    agentId: string,
+    row: T,
+  ): Promise<T & { route_status: ChainRouteStatus }> {
+    const [withStatus] = await this.withStatus(tenantId, agentId, [row]);
+    return withStatus;
+  }
+
   /** Disables or re-enables one stored route of a chain. */
   async setDisabled(agentId: string, input: SetRouteDisabledRequest): Promise<void> {
     if (!input || !ROUTE_CHAIN_KINDS.includes(input.chain)) {

@@ -98,6 +98,10 @@ Dica: as docs são renderizadas no cliente; para preços e lista de modelos com 
 
 Erro de chave inválida (401 `AuthenticationError`): (não confirmado, não apareceu nos trechos lidos).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Estado conferido no código em 2026-11-04:

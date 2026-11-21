@@ -9,6 +9,7 @@ import type {
   RequestParamDefaults,
   RoutingProvider,
 } from '../services/api.js';
+import { MAX_VIRTUAL_MODEL_FALLBACKS } from 'thinker-shared';
 import { PROVIDERS } from '../services/providers.js';
 import { customProviderColor } from '../services/formatters.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
@@ -16,13 +17,14 @@ import { authBadgeFor } from './AuthBadge.js';
 import ModelPickerModal from './ModelPickerModal.js';
 import ModelParamsAffordance from './ModelParamsAffordance.jsx';
 import { AuthIcon, routeAccountLabel } from './RouteAccount.js';
+import { routePriceText } from '../services/routing-utils.js';
 import { beginRouteDrag, registerRouteDropZone, type RouteDragPayload } from './route-drag.js';
 import { toast } from '../services/toast-store.js';
 import { t } from '../i18n/index.js';
 import { FloatingWindow, cx } from './ui.js';
 
-/** Primary + 5 fallbacks. */
-const MAX_ROUTES = 6;
+/** Primary + up to MAX_VIRTUAL_MODEL_FALLBACKS fallbacks (10 models). */
+const MAX_ROUTES = 1 + MAX_VIRTUAL_MODEL_FALLBACKS;
 
 export interface ModelChainManagerProps {
   agentName: string;
@@ -291,6 +293,7 @@ export default function ModelChainManager(props: ModelChainManagerProps) {
               const info = modelInfo(r);
               const label = info?.display_name ?? r.model;
               const provId = r.provider.toLowerCase();
+              const price = routePriceText(r.authType, info);
               return (
                 <div key={`${r.provider}|${r.authType}|${r.model}|${r.keyLabel ?? ''}`}>
                   <div
@@ -319,6 +322,16 @@ export default function ModelChainManager(props: ModelChainManagerProps) {
                       >
                         <AuthIcon authType={r.authType} />
                         <span className="truncate">{accountText(r)}</span>
+                        {price ? (
+                          <span
+                            className={cx(
+                              'chain-manager__price ml-1 shrink-0 font-normal text-muted',
+                              price === t('routing.free') && 'text-accent',
+                            )}
+                          >
+                            {price}
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                     <div className="flex shrink-0 items-center">
