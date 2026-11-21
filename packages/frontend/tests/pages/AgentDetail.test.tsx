@@ -58,14 +58,14 @@ describe('AgentDetail', () => {
     expect(container.querySelector('h1')).toBeNull();
   });
 
-  it('renders a tablist with exactly 8 tabs', () => {
+  it('renders a tablist with exactly 9 tabs', () => {
     const { container } = renderAt('/harnesses/my-agent');
     const tablist = container.querySelector('[role="tablist"]');
     expect(tablist).not.toBeNull();
-    expect(tablist!.querySelectorAll('[role="tab"]').length).toBe(8);
+    expect(tablist!.querySelectorAll('[role="tab"]').length).toBe(9);
   });
 
-  it('renders tabs labeled Overview, Routing, Models, Providers, Limits, Triggers, Connection, Settings in order', () => {
+  it('renders tabs labeled Overview, Routing, Models, Providers, Limits, Triggers, Connection, API Keys, Settings in order', () => {
     const { container } = renderAt('/harnesses/my-agent');
     const labels = Array.from(tabsOf(container)).map((t) => t.textContent);
     expect(labels).toEqual([
@@ -76,6 +76,7 @@ describe('AgentDetail', () => {
       'Limits',
       'Triggers',
       'Connection',
+      'API Keys',
       'Settings',
     ]);
   });
@@ -107,7 +108,13 @@ describe('AgentDetail', () => {
 
   it('Settings tab links to /harnesses/:name/settings', () => {
     const { container } = renderAt('/harnesses/my-agent');
-    expect(tabsOf(container)[7].getAttribute('href')).toBe('/harnesses/my-agent/settings');
+    expect(tabsOf(container)[8].getAttribute('href')).toBe('/harnesses/my-agent/settings');
+  });
+
+  it('API Keys tab links to /harnesses/:name/keys and is active there', () => {
+    const { container } = renderAt('/harnesses/my-agent/keys');
+    expect(tabsOf(container)[7].getAttribute('href')).toBe('/harnesses/my-agent/keys');
+    expect(tabsOf(container)[7].getAttribute('aria-selected')).toBe('true');
   });
 
   it('Connection tab links to /harnesses/:name/connection and is active there', () => {
@@ -157,7 +164,7 @@ describe('AgentDetail', () => {
 
   it('marks Settings tab active when pathname starts with /settings', () => {
     const { container } = renderAt('/harnesses/my-agent/settings/advanced');
-    expect(tabsOf(container)[7].getAttribute('aria-selected')).toBe('true');
+    expect(tabsOf(container)[8].getAttribute('aria-selected')).toBe('true');
   });
 
   it('Triggers tab links to /harnesses/:name/triggers and is active there', () => {
@@ -177,7 +184,7 @@ describe('AgentDetail', () => {
   it('decodes URL-encoded agent names in title', () => {
     const { container } = renderAt('/harnesses/my%20agent');
     expect(document.title).toBe('my agent | Thinker');
-    expect(tabsOf(container).length).toBe(8);
+    expect(tabsOf(container).length).toBe(9);
   });
 
   it('does not show platform icon when agentPlatformIcon returns undefined', () => {

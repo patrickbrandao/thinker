@@ -61,12 +61,7 @@ export default function SetupModal({
   };
 
   return createPortal(
-    <div
-      className="overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <div className="overlay">
       <div
         ref={ref}
         className="modal wide max-w-[600px]"

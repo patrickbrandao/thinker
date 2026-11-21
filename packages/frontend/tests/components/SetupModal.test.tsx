@@ -115,12 +115,13 @@ describe('SetupModal', () => {
     expect(container.textContent).toContain('Connect your harness to Thinker');
   });
 
-  it('closes on overlay click', () => {
+  it('does not close on an overlay click', () => {
     const { baseElement: container } = render(
       <SetupModal open={true} agentName="test-agent" onClose={onClose} />,
     );
+    fireEvent.mouseDown(container.querySelector('.overlay')!);
     fireEvent.click(container.querySelector('.overlay')!);
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('closes when Escape key is pressed on the overlay', () => {

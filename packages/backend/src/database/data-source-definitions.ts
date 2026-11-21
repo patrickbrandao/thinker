@@ -39,7 +39,7 @@ import {
 } from '../entities/proxy-server.entity';
 import { TopologyPosition } from '../entities/topology-position.entity';
 import { ProviderAttemptRecording } from '../entities/provider-attempt-recording.entity';
-import { AgentIpPrefixList, IpPrefixList } from '../entities/ip-prefix-list.entity';
+import { AgentApiKeyIpPrefixList, IpPrefixList } from '../entities/ip-prefix-list.entity';
 import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
 import { ReclassifyPlanRequestLimitMessages1800100000000 } from './migrations/1800100000000-ReclassifyPlanRequestLimitMessages';
 import { AddMessageErrorCode1800200000000 } from './migrations/1800200000000-AddMessageErrorCode';
@@ -101,6 +101,7 @@ import { AllowPrivateDestination1805900000000 } from './migrations/1805900000000
 import { AddTenantProviderUrlOverrides1806000000000 } from './migrations/1806000000000-AddTenantProviderUrlOverrides';
 import { HarnessKeysAndIpPrefixes1806100000000 } from './migrations/1806100000000-HarnessKeysAndIpPrefixes';
 import { AddProviderAttemptRecordings1806200000000 } from './migrations/1806200000000-AddProviderAttemptRecordings';
+import { KeyIpRestriction1806300000000 } from './migrations/1806300000000-KeyIpRestriction';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -267,7 +268,7 @@ export const entities = [
   TopologyPosition,
   ProviderAttemptRecording,
   IpPrefixList,
-  AgentIpPrefixList,
+  AgentApiKeyIpPrefixList,
 ];
 
 export const migrations = [
@@ -450,4 +451,5 @@ export const migrations = [
   AddTenantProviderUrlOverrides1806000000000,
   HarnessKeysAndIpPrefixes1806100000000,
   AddProviderAttemptRecordings1806200000000,
+  KeyIpRestriction1806300000000,
 ];

@@ -48,6 +48,7 @@ Thinker follows rules it doesn't own: API providers, subscription backends, loca
 ## Ground rules
 
 - **Language:** code, identifiers, comments and commits in English. Documentation under `docs/` and release notes in Portuguese (PT-BR). The dashboard UI stays in English.
+- **Windows:** every dashboard window is floating, never modal: no blocking backdrop, and it closes only on an explicit user action (the X, Cancel/Save/Confirm, or Esc), never on a click outside. Use `<Modal>` (floating by default) or `FloatingWindow`; `<Modal modal>` only when a case explicitly asks for a modal ([ADR 0015](docs/adr/0015-janelas-flutuantes.md)).
 - **Naming:** the product is Thinker. Env vars `THINKER_*`, key prefix `thk_`, CLI `thinker`, Docker image `tmsoftbrasil/thinker`, default port `2099`. Never add new `manifest`/`mnfst` identifiers.
 - **No phone-home:** the product makes no outbound calls of its own. Outbound traffic goes only to configured providers, plus the public catalogs of [ADR 0003](docs/adr/0003-excecao-catalogos-publicos.md) (openrouter.ai and models.dev), both disabled by `THINKER_CATALOG_SYNC=false`. OpenCode's own catalog on opencode.ai is provider traffic, fetched only with an OpenCode provider registered ([ADR 0009](docs/adr/0009-opencode-catalogo-proprio-e-modelos-gratuitos.md)).
 - **Git:** Conventional Commits. `scripts/ship.sh` pushes straight to `main`; if branch protection rejects the push, it opens a PR and squash-merges it right away. Never force-push.

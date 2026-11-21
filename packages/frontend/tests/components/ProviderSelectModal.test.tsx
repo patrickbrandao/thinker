@@ -226,11 +226,11 @@ describe('ProviderSelectModal', () => {
 
   // ── Overlay / modal-card behavior (survives on ProviderSelectModal) ──────
 
-  it('renders the modal overlay and card', () => {
+  it('renders a floating window without a blocking overlay', () => {
     renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    // The ui.tsx Modal portals to document.body.
-    expect(document.querySelector('.overlay')).not.toBeNull();
-    expect(document.querySelector('.modal[role="dialog"]')).not.toBeNull();
+    // The ui.tsx Modal portals a floating window to document.body.
+    expect(document.querySelector('.overlay')).toBeNull();
+    expect(document.querySelector('.floating-window[role="dialog"]')).not.toBeNull();
   });
 
   it('renders the detail-view title for the selected provider', () => {
@@ -238,16 +238,16 @@ describe('ProviderSelectModal', () => {
     expect(screen.getByText('Connect provider')).toBeDefined();
   });
 
-  it('calls onClose when clicking overlay background', () => {
+  it('does not close on a click outside the window', () => {
     renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    const overlay = document.querySelector('.overlay')!;
-    fireEvent.mouseDown(overlay);
-    expect(onClose).toHaveBeenCalledOnce();
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('does not close when clicking inside the modal card', () => {
     renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    const card = document.querySelector('.modal')!;
+    const card = document.querySelector('[role="dialog"]')!;
     fireEvent.mouseDown(card);
     fireEvent.click(card);
     expect(onClose).not.toHaveBeenCalled();
@@ -255,8 +255,7 @@ describe('ProviderSelectModal', () => {
 
   it('calls onClose on Escape key', () => {
     renderModal({ deepLink: { providerId: 'openai', authType: 'api_key' } });
-    const overlay = document.querySelector('.overlay')!;
-    fireEvent.keyDown(overlay, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
   });
 

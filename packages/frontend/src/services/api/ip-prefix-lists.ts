@@ -1,6 +1,6 @@
 import { fetchJson, fetchMutate, type FetchMutateOptions } from './core.js';
 
-/** Organization IP prefix lists and the per-harness source IP restriction. */
+/** Organization IP prefix lists and the per-key source IP restriction. */
 
 export interface IpPrefixEntry {
   prefix: string;
@@ -17,8 +17,10 @@ export interface IpPrefixListView {
   name: string;
   description: string | null;
   entries: IpPrefixEntry[];
-  /** Harnesses whose IP restriction uses this list. */
+  /** Harnesses with a key whose IP restriction uses this list. */
   harnesses: HarnessRef[];
+  /** Keys (not revoked) whose IP restriction uses this list. */
+  keys: Array<{ id: string; name: string; harness: string; harnessDisplayName: string }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -67,15 +69,15 @@ export function deleteIpPrefixList(id: string, opts?: FetchMutateOptions) {
   return fetchMutate<{ ok: true }>(ipPrefixListPath(id), { method: 'DELETE' }, opts);
 }
 
-const restrictionPath = (agentName: string) =>
-  `/agents/${encodeURIComponent(agentName)}/ip-restriction`;
+const restrictionPath = (agentName: string, keyId: string) =>
+  `/agents/${encodeURIComponent(agentName)}/keys/${encodeURIComponent(keyId)}/ip-restriction`;
 
-export function getIpRestriction(agentName: string) {
-  return fetchJson<IpRestriction>(restrictionPath(agentName));
+export function getIpRestriction(agentName: string, keyId: string) {
+  return fetchJson<IpRestriction>(restrictionPath(agentName, keyId));
 }
 
-export function updateIpRestriction(agentName: string, body: IpRestriction) {
-  return fetchMutate<IpRestriction>(restrictionPath(agentName), {
+export function updateIpRestriction(agentName: string, keyId: string, body: IpRestriction) {
+  return fetchMutate<IpRestriction>(restrictionPath(agentName, keyId), {
     method: 'PUT',
     headers: json,
     body: JSON.stringify(body),

@@ -104,6 +104,8 @@ describe('ApiKeyGeneratorService', () => {
             insert: mockKeyInsert,
             update: mockKeyUpdate,
             delete: mockKeyDelete,
+            findOneBy: jest.fn().mockResolvedValue(null),
+            query: jest.fn().mockResolvedValue([]),
             createQueryBuilder: jest.fn().mockReturnValue(mockKeyQb),
           },
         },

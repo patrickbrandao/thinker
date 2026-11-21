@@ -65,10 +65,6 @@ export class Agent {
   @OneToMany(() => AgentApiKey, (k) => k.agent)
   apiKeys!: AgentApiKey[];
 
-  /** Keys are accepted only from the linked IP prefix lists (`agent_ip_prefix_lists`). */
-  @Column('boolean', { default: false })
-  ip_restriction_enabled!: boolean;
-
   @Column(timestampType(), { default: timestampDefault() })
   created_at!: string;
 

@@ -88,6 +88,8 @@ describe('ApiKeyGeneratorService — edge cases', () => {
           useValue: {
             insert: mockKeyInsert,
             delete: mockKeyDelete,
+            findOneBy: jest.fn().mockResolvedValue(null),
+            query: jest.fn().mockResolvedValue([]),
             createQueryBuilder: jest.fn().mockReturnValue(mockKeyQb),
           },
         },

@@ -1,3 +1,4 @@
+import { clearIpRestrictionCache } from '../../ip-prefixes/ip-restriction-cache';
 import {
   BadRequestException,
   ConflictException,
@@ -129,15 +130,24 @@ export class ApiKeyGeneratorService {
     return { keyPrefix: keyRecord.key_prefix };
   }
 
-  /** Replaces the harness's primary key; its other keys are untouched. */
+  /**
+   * Replaces the harness's primary key; its other keys are untouched. The new
+   * primary key keeps the old one's source-IP restriction.
+   */
   async rotateKey(tenantId: string, agentName: string): Promise<{ apiKey: string }> {
     const agent = await this.findAgent(tenantId, agentName);
-
-    await this.keyRepo.delete({ agent_id: agent.id, is_primary: true });
-    this.otlpAuthGuard.clearCache();
-
     const rawKey = this.generateKey();
     const keyId = randomUUID();
+
+    const old = await this.keyRepo.findOneBy({ agent_id: agent.id, is_primary: true });
+    const links = old
+      ? ((await this.keyRepo.query(
+          `SELECT list_id, tenant_id FROM agent_api_key_ip_prefix_lists WHERE key_id = $1`,
+          [old.id],
+        )) as Array<{ list_id: string; tenant_id: string }>)
+      : [];
+    await this.keyRepo.delete({ agent_id: agent.id, is_primary: true });
+    this.otlpAuthGuard.clearCache();
     await this.keyRepo.insert({
       id: keyId,
       key: encrypt(rawKey, getEncryptionSecret()),
@@ -148,7 +158,15 @@ export class ApiKeyGeneratorService {
       agent_id: agent.id,
       is_active: true,
       is_primary: true,
+      ip_restriction_enabled: old?.ip_restriction_enabled ?? false,
     });
+    for (const l of links) {
+      await this.keyRepo.query(
+        `INSERT INTO agent_api_key_ip_prefix_lists (key_id, list_id, tenant_id) VALUES ($1, $2, $3)`,
+        [keyId, l.list_id, l.tenant_id],
+      );
+    }
+    clearIpRestrictionCache();
 
     return { apiKey: rawKey };
   }
@@ -160,7 +178,26 @@ export class ApiKeyGeneratorService {
       where: { agent_id: agent.id },
       order: { is_primary: 'DESC', created_at: 'DESC' },
     });
-    return rows.map((r) => toKeyView(r));
+    const lists = await this.ipListsByKey(rows.map((r) => r.id));
+    return rows.map((r) => toKeyView(r, lists.get(r.id)));
+  }
+
+  /** IP prefix list ids linked to each key (its source-IP restriction). */
+  private async ipListsByKey(keyIds: string[]): Promise<Map<string, string[]>> {
+    const map = new Map<string, string[]>();
+    if (keyIds.length === 0) return map;
+    const rows = (await this.keyRepo.query(
+      `SELECT key_id, list_id FROM agent_api_key_ip_prefix_lists
+        WHERE key_id = ANY($1::varchar[]) ORDER BY created_at, list_id`,
+      [keyIds],
+    )) as Array<{ key_id: string; list_id: string }>;
+    for (const r of rows) map.set(r.key_id, [...(map.get(r.key_id) ?? []), r.list_id]);
+    return map;
+  }
+
+  private async viewOf(id: string): Promise<AgentKeyView> {
+    const row = await this.keyRepo.findOneByOrFail({ id });
+    return toKeyView(row, (await this.ipListsByKey([id])).get(id));
   }
 
   /**
@@ -185,7 +222,7 @@ export class ApiKeyGeneratorService {
     const rawKey = this.generateKey();
     const row: Partial<AgentApiKey> = {
       id: randomUUID(),
-      key: null,
+      key: encrypt(rawKey, getEncryptionSecret()),
       key_hash: hashKey(rawKey),
       key_prefix: keyPrefix(rawKey),
       label: name,
@@ -198,16 +235,75 @@ export class ApiKeyGeneratorService {
     };
     await this.keyRepo.insert(row);
     this.otlpAuthGuard.clearCache();
-    const saved = await this.keyRepo.findOneByOrFail({ id: row.id! });
-    return { key: toKeyView(saved), apiKey: rawKey };
+    return { key: await this.viewOf(row.id!), apiKey: rawKey };
   }
 
-  /** Renames, disables or re-enables a key. A revoked key cannot change. */
+  /**
+   * The full secret of one key, decrypted. Keys are stored encrypted (besides
+   * the hash) so they can be shown again; extra keys created before that only
+   * have the hash and return no secret. A revoked key returns none.
+   */
+  async getKeySecret(
+    tenantId: string,
+    agentName: string,
+    keyId: string,
+  ): Promise<{ keyPrefix: string; apiKey?: string }> {
+    const key = await this.findKey(tenantId, agentName, keyId);
+    if (!key.key || key.revoked_at) return { keyPrefix: key.key_prefix };
+    try {
+      return {
+        keyPrefix: key.key_prefix,
+        apiKey: decryptWithAny(key.key, getDecryptionSecrets()).plaintext,
+      };
+    } catch {
+      return { keyPrefix: key.key_prefix };
+    }
+  }
+
+  /**
+   * Rotates one key: a new secret replaces the current one at once, keeping
+   * the key's id, name, expiry, status and IP restriction. The primary key is
+   * rotated through rotateKey (its secret stays recoverable).
+   */
+  async rotateOneKey(
+    tenantId: string,
+    agentName: string,
+    keyId: string,
+  ): Promise<{ key: AgentKeyView; apiKey: string }> {
+    const key = await this.findKey(tenantId, agentName, keyId);
+    if (key.revoked_at) throw new ConflictException('This key is revoked');
+    if (key.is_primary) {
+      const { apiKey } = await this.rotateKey(tenantId, agentName);
+      const fresh = await this.keyRepo.findOneByOrFail({
+        agent_id: key.agent_id,
+        is_primary: true,
+      });
+      return { key: await this.viewOf(fresh.id), apiKey };
+    }
+    const rawKey = this.generateKey();
+    await this.keyRepo.update(
+      { id: key.id },
+      {
+        key: encrypt(rawKey, getEncryptionSecret()),
+        key_hash: hashKey(rawKey),
+        key_prefix: keyPrefix(rawKey),
+        last_used_at: null,
+      },
+    );
+    this.otlpAuthGuard.clearCache();
+    return { key: await this.viewOf(key.id), apiKey: rawKey };
+  }
+
+  /**
+   * Renames, disables or re-enables a key, or changes an extra key's expiry
+   * (`expiresAt: null` = never expires).
+   * A revoked key cannot change; the primary key never expires.
+   */
   async updateKey(
     tenantId: string,
     agentName: string,
     keyId: string,
-    input: { name?: unknown; disabled?: unknown },
+    input: { name?: unknown; disabled?: unknown; expiresAt?: unknown },
   ): Promise<AgentKeyView> {
     const key = await this.findKey(tenantId, agentName, keyId);
     if (key.revoked_at) throw new ConflictException('This key is revoked');
@@ -222,11 +318,17 @@ export class ApiKeyGeneratorService {
       }
       patch.is_active = !input.disabled;
     }
+    if (input.expiresAt !== undefined) {
+      if (key.is_primary) throw new BadRequestException('The primary key never expires');
+      // null clears the expiry: the key never expires (it is created with one).
+      patch.expires_at =
+        input.expiresAt === null ? null : toLocalSqlTimestamp(parseKeyExpiry(input.expiresAt));
+    }
     if (Object.keys(patch).length > 0) {
       await this.keyRepo.update({ id: key.id }, patch);
       this.otlpAuthGuard.clearCache();
     }
-    return toKeyView(await this.keyRepo.findOneByOrFail({ id: key.id }));
+    return this.viewOf(key.id);
   }
 
   /** Revokes an extra key for good. The primary key is rotated or disabled instead. */
@@ -242,7 +344,7 @@ export class ApiKeyGeneratorService {
       );
       this.otlpAuthGuard.clearCache();
     }
-    return toKeyView(await this.keyRepo.findOneByOrFail({ id: key.id }));
+    return this.viewOf(key.id);
   }
 
   private async findAgent(tenantId: string, agentName: string): Promise<Agent> {
@@ -281,6 +383,10 @@ export interface AgentKeyView {
   lastUsedAt: string | null;
   createdAt: string;
   revokedAt: string | null;
+  /** The full key can be shown again (stored encrypted). */
+  recoverable: boolean;
+  /** Source-IP restriction: when enabled, accepted only from the linked IP prefix lists. */
+  ipRestriction: { enabled: boolean; listIds: string[] };
 }
 
 function iso(value: string | Date | null | undefined): string | null {
@@ -298,7 +404,7 @@ export function keyStatus(
   return row.is_active ? 'active' : 'disabled';
 }
 
-export function toKeyView(row: AgentApiKey): AgentKeyView {
+export function toKeyView(row: AgentApiKey, ipListIds: string[] = []): AgentKeyView {
   return {
     id: row.id,
     name: row.name ?? (row.is_primary ? 'Primary key' : row.label),
@@ -309,6 +415,8 @@ export function toKeyView(row: AgentApiKey): AgentKeyView {
     lastUsedAt: iso(row.last_used_at),
     createdAt: iso(row.created_at) ?? new Date(0).toISOString(),
     revokedAt: iso(row.revoked_at),
+    recoverable: !!row.key && !row.revoked_at,
+    ipRestriction: { enabled: !!row.ip_restriction_enabled, listIds: ipListIds },
   };
 }
 

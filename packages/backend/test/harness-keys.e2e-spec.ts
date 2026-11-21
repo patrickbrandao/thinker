@@ -5,7 +5,7 @@ import { IpPrefixesModule } from '../src/ip-prefixes/ip-prefixes.module';
 import { clearIpRestrictionCache } from '../src/ip-prefixes/ip-restriction-cache';
 
 /**
- * Many keys per harness (the seeded key stays the primary) and the per-harness
+ * Many keys per harness (the seeded key stays the primary) and the per-key
  * source-IP restriction. Requests come from loopback, a default trusted proxy,
  * so X-Forwarded-For sets the client address the guard judges.
  */
@@ -36,11 +36,7 @@ describe('Harness keys and IP prefix lists (e2e)', () => {
   });
 
   it('creates an extra key that must expire and works alongside the primary', async () => {
-    await api()
-      .post('/api/v1/agents/test-agent/keys')
-      .set(admin)
-      .send({ name: 'ci' })
-      .expect(400);
+    await api().post('/api/v1/agents/test-agent/keys').set(admin).send({ name: 'ci' }).expect(400);
     await api()
       .post('/api/v1/agents/test-agent/keys')
       .set(admin)
@@ -58,9 +54,50 @@ describe('Harness keys and IP prefix lists (e2e)', () => {
     expect(res.body.key).toMatchObject({ name: 'ci', isPrimary: false, status: 'active' });
 
     const self = await gateway(extraKey).expect(200);
-    expect(self.body).toMatchObject({ object: 'key', name: 'ci', harness: 'test-agent', is_primary: false });
+    expect(self.body).toMatchObject({
+      object: 'key',
+      name: 'ci',
+      harness: 'test-agent',
+      is_primary: false,
+    });
     expect(self.body.expires_at).toBeTruthy();
     await gateway(TEST_OTLP_KEY).expect(200);
+  });
+
+  it('rotates the extra key in place and changes its expiry', async () => {
+    const rotated = await api()
+      .post(`/api/v1/agents/test-agent/keys/${extraKeyId}/rotate`)
+      .set(admin)
+      .expect(201);
+    expect(rotated.body.key).toMatchObject({ id: extraKeyId, name: 'ci', status: 'active' });
+    expect(rotated.body.apiKey).not.toBe(extraKey);
+    await gateway(extraKey).expect(401);
+    extraKey = rotated.body.apiKey;
+    await gateway(extraKey).expect(200);
+
+    const at = days(60);
+    const edited = await api()
+      .patch(`/api/v1/agents/test-agent/keys/${extraKeyId}`)
+      .set(admin)
+      .send({ expiresAt: at })
+      .expect(200);
+    expect(
+      Math.abs(new Date(edited.body.key.expiresAt).getTime() - new Date(at).getTime()),
+    ).toBeLessThan(1000);
+
+    const secret = await api()
+      .get(`/api/v1/agents/test-agent/keys/${extraKeyId}/secret`)
+      .set(admin)
+      .expect(200);
+    expect(secret.body.apiKey).toBe(extraKey);
+
+    const never = await api()
+      .patch(`/api/v1/agents/test-agent/keys/${extraKeyId}`)
+      .set(admin)
+      .send({ expiresAt: null })
+      .expect(200);
+    expect(never.body.key.expiresAt).toBeNull();
+    await gateway(extraKey).expect(200);
   });
 
   it('disables (M007), re-enables and revokes the extra key', async () => {
@@ -118,31 +155,34 @@ describe('Harness keys and IP prefix lists (e2e)', () => {
       { prefix: '2001:db8::1/128', label: null },
     ]);
 
-    await api()
-      .put('/api/v1/agents/test-agent/ip-restriction')
-      .set(admin)
-      .send({ enabled: true, listIds: [] })
-      .expect(400);
+    const keys = await api().get('/api/v1/agents/test-agent/keys').set(admin).expect(200);
+    const primary = keys.body.keys.find((k: { isPrimary: boolean }) => k.isPrimary);
+    const restrictionPath = `/api/v1/agents/test-agent/keys/${primary.id}/ip-restriction`;
+    await api().put(restrictionPath).set(admin).send({ enabled: true, listIds: [] }).expect(400);
     const set = await api()
-      .put('/api/v1/agents/test-agent/ip-restriction')
+      .put(restrictionPath)
       .set(admin)
       .send({ enabled: true, listIds: [list.body.id] })
       .expect(200);
     expect(set.body).toEqual({ enabled: true, listIds: [list.body.id] });
+    const listed = await api().get('/api/v1/agents/test-agent/keys').set(admin).expect(200);
+    expect(listed.body.keys.find((k: { id: string }) => k.id === primary.id).ipRestriction).toEqual(
+      { enabled: true, listIds: [list.body.id] },
+    );
 
     await gateway(TEST_OTLP_KEY, '198.51.100.77').expect(200);
     await gateway(TEST_OTLP_KEY, '2001:db8::1').expect(200);
     const refused = await gateway(TEST_OTLP_KEY, '203.0.113.9').expect(403);
     expect(refused.body.error.message).toContain('M008');
 
-    const busy = await api().delete(`/api/v1/ip-prefix-lists/${list.body.id}`).set(admin).expect(409);
-    expect(busy.body.harnesses).toEqual([{ name: 'test-agent', displayName: 'Test Agent' }]);
-
-    await api()
-      .put('/api/v1/agents/test-agent/ip-restriction')
+    const busy = await api()
+      .delete(`/api/v1/ip-prefix-lists/${list.body.id}`)
       .set(admin)
-      .send({ enabled: false, listIds: [] })
-      .expect(200);
+      .expect(409);
+    expect(busy.body.harnesses).toEqual([{ name: 'test-agent', displayName: 'Test Agent' }]);
+    expect(busy.body.keys).toHaveLength(1);
+
+    await api().put(restrictionPath).set(admin).send({ enabled: false, listIds: [] }).expect(200);
     clearIpRestrictionCache();
     await gateway(TEST_OTLP_KEY, '203.0.113.9').expect(200);
     await api().delete(`/api/v1/ip-prefix-lists/${list.body.id}`).set(admin).expect(200);

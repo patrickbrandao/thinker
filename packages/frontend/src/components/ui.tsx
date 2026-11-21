@@ -410,7 +410,14 @@ export const MenuHeading = ({ children }: { children: ReactNode }) => (
   <div className="menu-heading">{children}</div>
 );
 
-/** Modal dialog in a portal: Escape and the backdrop close it, focus is trapped. */
+/**
+ * Dialog window in a portal. By default it is a FLOATING window (ADR 0015):
+ * no blocking backdrop, draggable by its title bar, and it closes only when
+ * the user asks (the X, Cancel/Save in the content, or Escape) — never on a
+ * click outside. `modal` turns it into a blocking modal (dimmed backdrop,
+ * trapped focus); use it only when a case explicitly asks for a modal. Even
+ * then a click outside does not close it.
+ */
 export function Modal({
   open,
   title,
@@ -418,6 +425,7 @@ export function Modal({
   wide,
   children,
   label,
+  modal,
 }: {
   open: boolean;
   title?: ReactNode;
@@ -425,25 +433,35 @@ export function Modal({
   wide?: boolean;
   children: ReactNode;
   label?: string;
+  /** Blocking modal instead of a floating window; only when explicitly requested. */
+  modal?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  useFocusTrap(open, ref);
+  useFocusTrap(open && !!modal, ref);
   useEffect(() => {
-    if (!open) return;
+    if (!open || !modal) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, modal, onClose]);
   if (!open) return null;
+  if (!modal) {
+    return (
+      <FloatingWindow
+        open
+        title={title}
+        label={label}
+        onClose={onClose}
+        className={cx('floating-window--fit', wide && 'floating-window--wide')}
+      >
+        {children}
+      </FloatingWindow>
+    );
+  }
   return createPortal(
-    <div
-      className="overlay"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
+    <div className="overlay">
       <div
         ref={ref}
         className={cx('modal', wide && 'wide')}
@@ -526,6 +544,7 @@ export function WindowFooter({ children }: { children: ReactNode }) {
 export function FloatingWindow({
   open,
   title,
+  label,
   icon,
   onClose,
   footer,
@@ -533,7 +552,9 @@ export function FloatingWindow({
   children,
 }: {
   open: boolean;
-  title: string;
+  title?: ReactNode;
+  /** Accessible name when the title is not plain text. */
+  label?: string;
   icon?: ReactNode;
   onClose: () => void;
   footer?: ReactNode;
@@ -541,6 +562,9 @@ export function FloatingWindow({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Focus moves into the window and back on close, but Tab may leave it: the
+  // page behind stays usable (floating, not modal).
+  useFocusTrap(open, ref, { trap: false });
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [footEl, setFootEl] = useState<HTMLDivElement | null>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
@@ -550,8 +574,14 @@ export function FloatingWindow({
       return;
     }
     const onKey = (event: KeyboardEvent) => {
-      // A modal opened from the window takes Escape for itself.
-      if (event.key === 'Escape' && !document.querySelector('.overlay')) onClose();
+      if (event.key !== 'Escape') return;
+      // A modal opened from the window takes Escape for itself; among stacked
+      // floating windows only the topmost (last opened) one closes.
+      if (document.querySelector('.overlay')) return;
+      const windows = document.querySelectorAll('.floating-window');
+      if (windows.length && windows[windows.length - 1] !== ref.current) return;
+      event.stopImmediatePropagation();
+      onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -584,7 +614,8 @@ export function FloatingWindow({
       className={cx('floating-window', className)}
       role="dialog"
       aria-modal="false"
-      aria-label={title}
+      aria-label={label ?? (typeof title === 'string' ? title : undefined)}
+      tabIndex={-1}
       style={pos ? { left: pos.x, top: pos.y, transform: 'none' } : undefined}
     >
       <div

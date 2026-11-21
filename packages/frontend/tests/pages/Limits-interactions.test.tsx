@@ -123,11 +123,11 @@ describe('Limits page interactions', () => {
 
     // Confirm deletion: check the checkbox then click Delete rule
     await vi.waitFor(() => {
-      expect(document.querySelector('.modal label.check')).not.toBeNull();
+      expect(document.querySelector('[role="dialog"] label.check')).not.toBeNull();
     });
 
     const checkbox = document.querySelector(
-      '.modal label.check input[type="checkbox"]',
+      '[role="dialog"] label.check input[type="checkbox"]',
     ) as HTMLInputElement;
     fireEvent.click(checkbox);
 
@@ -260,11 +260,11 @@ describe('Limits page interactions', () => {
     fireEvent.click(screen.getByText('Delete'));
 
     await vi.waitFor(() => {
-      expect(document.querySelector('.modal label.check')).not.toBeNull();
+      expect(document.querySelector('[role="dialog"] label.check')).not.toBeNull();
     });
 
     const checkbox = document.querySelector(
-      '.modal label.check input[type="checkbox"]',
+      '[role="dialog"] label.check input[type="checkbox"]',
     ) as HTMLInputElement;
     fireEvent.click(checkbox);
     const deleteBtn = document.querySelector('.btn-danger') as HTMLButtonElement;
@@ -308,11 +308,11 @@ describe('Limits page interactions', () => {
     fireEvent.click(screen.getByText('Delete'));
 
     await vi.waitFor(() => {
-      expect(document.querySelector('.modal label.check')).not.toBeNull();
+      expect(document.querySelector('[role="dialog"] label.check')).not.toBeNull();
     });
 
     const checkbox = document.querySelector(
-      '.modal label.check input[type="checkbox"]',
+      '[role="dialog"] label.check input[type="checkbox"]',
     ) as HTMLInputElement;
     fireEvent.click(checkbox);
 

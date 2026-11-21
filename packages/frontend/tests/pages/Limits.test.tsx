@@ -493,7 +493,7 @@ describe('Limits page', () => {
     });
 
     const checkbox = document.querySelector(
-      '.modal label.check input[type="checkbox"]',
+      '[role="dialog"] label.check input[type="checkbox"]',
     ) as HTMLInputElement;
     fireEvent.click(checkbox);
 
@@ -600,7 +600,7 @@ describe('Limits page', () => {
     });
   });
 
-  it('closes delete modal when overlay is clicked', async () => {
+  it('does not close the delete window on a click outside it', async () => {
     mockRules = [
       {
         id: 'r1',
@@ -629,15 +629,13 @@ describe('Limits page', () => {
       expect(document.querySelector('.modal-head h2')).not.toBeNull();
     });
 
-    // Click overlay to close (the backdrop closes on mousedown)
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.mouseDown(overlay);
+    // Windows are floating: a click outside never closes them.
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
 
-    await vi.waitFor(() => {
-      const titles = document.querySelectorAll('.modal-head h2');
-      const deleteTitle = Array.from(titles).find((t) => t.textContent === 'Delete rule');
-      expect(deleteTitle).toBeUndefined();
-    });
+    const titles = document.querySelectorAll('.modal-head h2');
+    const deleteTitle = Array.from(titles).find((t) => t.textContent === 'Delete rule');
+    expect(deleteTitle).toBeDefined();
   });
 
   it('closes delete modal when Cancel button is clicked', async () => {

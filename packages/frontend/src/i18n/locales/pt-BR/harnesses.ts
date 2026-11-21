@@ -56,11 +56,12 @@ const ptBR: Catalog<typeof en> = {
     settings: 'Configurações',
     triggers: 'Triggers',
     connection: 'Conexão',
+    keys: 'Chaves de API',
   },
   settings: {
     pageTitle: 'Configurações de {{ name }}',
     metaDescription: 'Configure {{ name }}.',
-    intro: 'Renomeie o harness, altere o tipo e gerencie a chave de API',
+    intro: 'Renomeie o harness e altere o tipo',
     readOnly:
       'Você tem acesso somente leitura. Leitores não podem alterar as configurações do harness.',
     nameTitle: 'Nome do harness',
@@ -92,8 +93,14 @@ const ptBR: Catalog<typeof en> = {
     changeTypeTitle: 'Alterar tipo de harness',
     changeTypeDesc: 'Escolha o novo tipo e a plataforma deste harness.',
   },
+  keys: {
+    pageTitle: 'Chaves de API de {{ name }}',
+    intro:
+      'Chaves que autenticam este harness. Cada chave pode ser restrita aos IPs de origem de listas de prefixos IP escolhidas.',
+  },
   connection: {
     pageTitle: 'Conexão de {{ name }}',
+    keyLabel: 'Chave de API',
     intro:
       'Como apontar este harness para o Thinker: a configuração sugerida para o tipo dele e exemplos de código prontos para copiar.',
     setupTitle: 'Configuração sugerida',

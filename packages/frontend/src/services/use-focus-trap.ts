@@ -20,9 +20,14 @@ const FOCUSABLE_SELECTOR = [
 export function useFocusTrap(
   open: boolean,
   container: RefObject<HTMLElement | null>,
-  options?: { initialFocus?: () => HTMLElement | null | undefined },
+  options?: {
+    initialFocus?: () => HTMLElement | null | undefined;
+    /** false: focus moves in on open and back on close, but Tab may leave (floating windows). */
+    trap?: boolean;
+  },
 ): void {
   const initialFocus = options?.initialFocus;
+  const trap = options?.trap ?? true;
   useEffect(() => {
     if (!open) return;
     const root = container.current;
@@ -40,7 +45,7 @@ export function useFocusTrap(
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
+      if (!trap || event.key !== 'Tab') return;
       const list = root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
       if (list.length === 0) {
         event.preventDefault();

@@ -416,7 +416,7 @@ describe('RoutingTierCard', () => {
       ) as HTMLButtonElement,
     );
     // Confirm with the danger Reset button inside the modal
-    const dangerBtn = document.querySelector('.overlay .btn-danger') as HTMLButtonElement;
+    const dangerBtn = document.querySelector('[role="dialog"] .btn-danger') as HTMLButtonElement;
     fireEvent.click(dangerBtn);
     expect(onReset).toHaveBeenCalledWith('simple');
   });
@@ -1236,10 +1236,10 @@ describe('RoutingTierCard', () => {
         b.textContent?.includes('Reset'),
       ) as HTMLButtonElement,
     );
-    expect(document.querySelector('.overlay')).not.toBeNull();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     fireEvent.keyDown(document, { key: 'Escape' });
-    // Modal closes (overlay element is removed) — no reset triggered.
-    expect(document.querySelector('.overlay')).toBeNull();
+    // The window closes — no reset triggered.
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(onReset).not.toHaveBeenCalled();
   });
 

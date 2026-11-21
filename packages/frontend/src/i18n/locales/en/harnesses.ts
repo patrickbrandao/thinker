@@ -52,11 +52,12 @@ export default {
     settings: 'Settings',
     triggers: 'Triggers',
     connection: 'Connection',
+    keys: 'API Keys',
   },
   settings: {
     pageTitle: '{{ name }} Settings',
     metaDescription: 'Configure settings for {{ name }}.',
-    intro: 'Rename the harness, change its type and manage its API key',
+    intro: 'Rename the harness and change its type',
     readOnly: "You have read-only access. Viewers can't change harness settings.",
     nameTitle: 'Harness name',
     nameDesc: 'The display name for this harness across the dashboard.',
@@ -86,8 +87,14 @@ export default {
     changeTypeTitle: 'Change harness type',
     changeTypeDesc: 'Select the new type and platform for this harness.',
   },
+  keys: {
+    pageTitle: '{{ name }} API Keys',
+    intro:
+      'Keys that authenticate this harness. Each key can be restricted to the source IPs of chosen IP prefix lists.',
+  },
   connection: {
     pageTitle: '{{ name }} Connection',
+    keyLabel: 'API key',
     intro:
       'How to point this harness at Thinker: the suggested setup for its type and copyable SDK examples.',
     setupTitle: 'Suggested setup',

@@ -7,7 +7,7 @@ describe('ActionMenu', () => {
   it('renders only the trigger when closed', () => {
     const { container } = render(<ActionMenu items={[{ label: 'Edit', onClick: () => {} }]} />);
     expect(container.querySelector('.action-menu__trigger')).not.toBeNull();
-    expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).toBeNull();
   });
 
   it('opens the dropdown and lists the items on trigger click', () => {
@@ -20,7 +20,7 @@ describe('ActionMenu', () => {
       />,
     );
     fireEvent.click(container.querySelector('.action-menu__trigger')!);
-    const items = container.querySelectorAll('.action-menu__item');
+    const items = document.body.querySelectorAll('.action-menu__item');
     expect(items.length).toBe(2);
     expect(items[0].textContent).toBe('Edit');
     expect(items[1].classList.contains('action-menu__item--danger')).toBe(true);
@@ -30,26 +30,26 @@ describe('ActionMenu', () => {
     const { container } = render(<ActionMenu items={[{ label: 'Edit', onClick: () => {} }]} />);
     const trigger = container.querySelector('.action-menu__trigger')!;
     fireEvent.click(trigger);
-    expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).not.toBeNull();
     fireEvent.click(trigger);
-    expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).toBeNull();
   });
 
   it('invokes the item callback and closes the dropdown', () => {
     const onClick = vi.fn();
     const { container } = render(<ActionMenu items={[{ label: 'Edit', onClick }]} />);
     fireEvent.click(container.querySelector('.action-menu__trigger')!);
-    fireEvent.click(container.querySelector('.action-menu__item')!);
+    fireEvent.click(document.body.querySelector('.action-menu__item')!);
     expect(onClick).toHaveBeenCalledTimes(1);
-    expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).toBeNull();
   });
 
   it('closes when clicking outside the menu', () => {
     const { container } = render(<ActionMenu items={[{ label: 'Edit', onClick: () => {} }]} />);
     fireEvent.click(container.querySelector('.action-menu__trigger')!);
-    expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).not.toBeNull();
     fireEvent.click(document.body);
-    expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).toBeNull();
   });
 
   it('stays open when clicking inside the menu container', () => {
@@ -57,23 +57,23 @@ describe('ActionMenu', () => {
     fireEvent.click(container.querySelector('.action-menu__trigger')!);
     // A click that bubbles to the document but originates inside the container
     // must not close the menu.
-    fireEvent.click(container.querySelector('.action-menu__dropdown')!);
-    expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
+    fireEvent.click(document.body.querySelector('.action-menu__dropdown')!);
+    expect(document.body.querySelector('.action-menu__dropdown')).not.toBeNull();
   });
 
   it('closes when Escape is pressed', () => {
     const { container } = render(<ActionMenu items={[{ label: 'Edit', onClick: () => {} }]} />);
     fireEvent.click(container.querySelector('.action-menu__trigger')!);
-    expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).not.toBeNull();
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).toBeNull();
   });
 
   it('ignores non-Escape keydowns while open', () => {
     const { container } = render(<ActionMenu items={[{ label: 'Edit', onClick: () => {} }]} />);
     fireEvent.click(container.querySelector('.action-menu__trigger')!);
     fireEvent.keyDown(document, { key: 'Enter' });
-    expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
+    expect(document.body.querySelector('.action-menu__dropdown')).not.toBeNull();
   });
 
   it('uses the default trigger aria-label', () => {
@@ -106,10 +106,10 @@ describe('ActionMenu', () => {
     const trigger = container.querySelector('.action-menu__trigger')!;
     expect(trigger.getAttribute('aria-haspopup')).toBeNull();
     fireEvent.click(trigger);
-    expect(container.querySelector('[role="menu"]')).toBeNull();
-    expect(container.querySelectorAll('[role="menuitem"]').length).toBe(0);
+    expect(document.body.querySelector('[role="menu"]')).toBeNull();
+    expect(document.body.querySelectorAll('[role="menuitem"]').length).toBe(0);
     // The items remain real buttons so they stay keyboard-focusable/clickable.
-    expect(container.querySelectorAll('button.action-menu__item').length).toBe(2);
+    expect(document.body.querySelectorAll('button.action-menu__item').length).toBe(2);
   });
 
   it('applies a custom aria-label and root class', () => {
@@ -143,7 +143,7 @@ describe('ActionMenu', () => {
       />,
     );
     fireEvent.click(container.querySelector('.action-menu__trigger')!);
-    expect(container.querySelector('[data-testid="icon"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-testid="icon"]')).not.toBeNull();
   });
 
   it('removes the document listeners on unmount', () => {
@@ -157,5 +157,17 @@ describe('ActionMenu', () => {
     expect(removeSpy).toHaveBeenCalledWith('click', expect.any(Function));
     expect(removeSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
     removeSpy.mockRestore();
+  });
+
+  it('renders the dropdown outside clipping ancestors (in the body)', () => {
+    const { container } = render(
+      <div style={{ overflow: 'hidden' }}>
+        <ActionMenu items={[{ label: 'Edit', onClick: () => {} }]} />
+      </div>,
+    );
+    fireEvent.click(container.querySelector('.action-menu__trigger')!);
+    const dropdown = document.body.querySelector('.action-menu__dropdown') as HTMLElement;
+    expect(container.contains(dropdown)).toBe(false);
+    expect(dropdown.style.position).toBe('fixed');
   });
 });

@@ -8,13 +8,13 @@ const q = (selector: string) => document.body.querySelector(selector) as HTMLEle
 describe('FeedbackModal', () => {
   it('does not render when closed', () => {
     render(<FeedbackModal open={false} onClose={vi.fn()} onSubmit={vi.fn()} />);
-    expect(q('.overlay')).toBeNull();
+    expect(q('[role="dialog"]')).toBeNull();
   });
 
   it('renders when open', () => {
     render(<FeedbackModal open={true} onClose={vi.fn()} onSubmit={vi.fn()} />);
-    expect(q('.overlay')).not.toBeNull();
-    expect(q('.modal')).not.toBeNull();
+    expect(q('.floating-window[role="dialog"]')).not.toBeNull();
+    expect(q('.overlay')).toBeNull();
   });
 
   it('renders all feedback tags', () => {
@@ -59,18 +59,20 @@ describe('FeedbackModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('calls onClose when clicking backdrop', () => {
+  it('does not call onClose on a click outside the window', () => {
     const onClose = vi.fn();
     render(<FeedbackModal open={true} onClose={onClose} onSubmit={vi.fn()} />);
-    fireEvent.mouseDown(q('.overlay')!);
-    expect(onClose).toHaveBeenCalled();
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(q('[role="dialog"]')).not.toBeNull();
   });
 
   it('does not call onClose when clicking modal content', () => {
     const onClose = vi.fn();
     render(<FeedbackModal open={true} onClose={onClose} onSubmit={vi.fn()} />);
-    fireEvent.mouseDown(q('.modal')!);
-    fireEvent.click(q('.modal')!);
+    fireEvent.mouseDown(q('[role="dialog"]')!);
+    fireEvent.click(q('[role="dialog"]')!);
     expect(onClose).not.toHaveBeenCalled();
   });
 

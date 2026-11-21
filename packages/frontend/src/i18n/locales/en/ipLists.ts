@@ -3,13 +3,14 @@ export default {
   title: 'IP prefix lists',
   metaDescription: 'Lists of IP addresses and prefixes that harness keys can be restricted to.',
   subtitle:
-    'Named lists of IPv4 and IPv6 addresses or CIDR prefixes. A harness can accept its keys only from the addresses in the lists you pick.',
+    'Named lists of IPv4 and IPv6 addresses or CIDR prefixes. Each harness API key can be accepted only from the addresses in the lists you pick.',
   adminOnly: 'Only admins and owners can see and manage IP prefix lists.',
   back: '← IP prefix lists',
   create: 'New list',
   list: {
     emptyTitle: 'No IP prefix lists yet',
-    emptyBody: 'Create a list, then pick it in a harness Settings tab under Restrict source IP.',
+    emptyBody:
+      'Create a list, then pick it for a key in a harness API Keys tab, under Source IP restriction.',
     name: 'Name',
     entries: 'Entries',
     harnesses: 'Used by',
@@ -44,15 +45,16 @@ export default {
   },
   usedBy: {
     title: 'Used by',
-    none: 'No harness uses this list.',
+    none: 'No API key uses this list.',
   },
   delete: {
     title: 'Delete list',
-    body: 'Delete this list. Harnesses that use it must drop it first.',
+    body: 'Delete this list. API keys that use it must drop it first.',
     button: 'Delete list',
     confirmTitle: 'Delete {{ name }}?',
     confirmBody: 'This cannot be undone.',
-    inUse: 'These harnesses still use this list. Remove it from their IP restriction first:',
+    inUse:
+      'API keys of these harnesses still use this list. Remove it from their IP restriction first:',
   },
   toast: {
     created: 'List created',
@@ -62,7 +64,8 @@ export default {
   restriction: {
     title: 'Source IP',
     toggle: 'Restrict source IP',
-    help: "When on, this harness's keys are accepted only from addresses in the selected lists. Requests from other addresses get 403 (M008).",
+    help: 'Requests from other addresses get 403 (M008).',
+    modalTitle: 'Source IP of {{ name }}',
     lists: 'IP prefix lists',
     listsPlaceholder: 'Pick lists',
     noLists: 'No IP prefix lists yet.',

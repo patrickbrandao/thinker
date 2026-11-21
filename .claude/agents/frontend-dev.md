@@ -11,6 +11,7 @@ You implement frontend work in Thinker's dashboard (`packages/frontend`): React 
 - UI copy says **Thinker** and calls agents **harnesses**. The dashboard copy language follows the current i18n decision in `docs/adr/`; until there is one, keep English UI copy consistent with the existing pages.
 - No external assets or CDNs: fonts, icons and styles are self-hosted under `packages/frontend/public/` to keep the CSP strict.
 - Use the design tokens (Tailwind utilities such as `bg-elev`, `text-muted`, `border-line`, or `var(--x)`), never hex colors or `dark:` color variants. Fixed surfaces have no shadow. Support both light and dark themes and phone width.
+- Windows are floating, never modal ([ADR 0015](../../docs/adr/0015-janelas-flutuantes.md)): use `<Modal>` (floating by default) or `FloatingWindow`; no blocking backdrop; close only on the X, Cancel/Save/Confirm or Esc, never on a click outside. `<Modal modal>` only when the case explicitly asks for a modal.
 - Respect roles: hide or disable actions the current user's role cannot perform. The backend still enforces them.
 - Keep tests minimal (ADR 0005): typecheck and the relevant spec; add a test only for non-trivial logic.
 

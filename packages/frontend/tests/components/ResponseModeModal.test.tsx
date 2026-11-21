@@ -302,7 +302,7 @@ describe('ResponseModeModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('overlay click calls onClose', () => {
+  it('a click outside the window does not call onClose', () => {
     const mode = 'buffered' as const;
     const onClose = vi.fn();
     render(
@@ -314,8 +314,9 @@ describe('ResponseModeModal', () => {
         onClose={onClose}
       />,
     );
-    fireEvent.mouseDown(document.body.querySelector('.overlay') as HTMLElement);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('clicking inside the modal card does not call onClose', () => {

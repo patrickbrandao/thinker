@@ -6,14 +6,14 @@ const ptBR: Catalog<typeof en> = {
   metaDescription:
     'Listas de endereços e prefixos IP às quais as chaves de harness podem ser restritas.',
   subtitle:
-    'Listas nomeadas de endereços IPv4 e IPv6 ou prefixos CIDR. Um harness pode aceitar suas chaves só a partir dos endereços das listas escolhidas.',
+    'Listas nomeadas de endereços IPv4 e IPv6 ou prefixos CIDR. Cada chave de API de um harness pode ser aceita só a partir dos endereços das listas escolhidas.',
   adminOnly: 'Só admins e owners podem ver e gerenciar listas de prefixos IP.',
   back: '← Listas de prefixos IP',
   create: 'Nova lista',
   list: {
     emptyTitle: 'Nenhuma lista de prefixos IP ainda',
     emptyBody:
-      'Crie uma lista e escolha-a na aba Settings de um harness, em Restringir IP de origem.',
+      'Crie uma lista e escolha-a para uma chave na aba Chaves de API de um harness, em Restrição de IP de origem.',
     name: 'Nome',
     entries: 'Entradas',
     harnesses: 'Usada por',
@@ -48,15 +48,16 @@ const ptBR: Catalog<typeof en> = {
   },
   usedBy: {
     title: 'Usada por',
-    none: 'Nenhum harness usa esta lista.',
+    none: 'Nenhuma chave de API usa esta lista.',
   },
   delete: {
     title: 'Excluir lista',
-    body: 'Exclui esta lista. Os harnesses que a usam precisam removê-la antes.',
+    body: 'Exclui esta lista. As chaves de API que a usam precisam removê-la antes.',
     button: 'Excluir lista',
     confirmTitle: 'Excluir {{ name }}?',
     confirmBody: 'Não dá para desfazer.',
-    inUse: 'Estes harnesses ainda usam esta lista. Remova-a da restrição de IP deles antes:',
+    inUse:
+      'Chaves de API destes harnesses ainda usam esta lista. Remova-a da restrição de IP delas antes:',
   },
   toast: {
     created: 'Lista criada',
@@ -66,7 +67,8 @@ const ptBR: Catalog<typeof en> = {
   restriction: {
     title: 'IP de origem',
     toggle: 'Restringir IP de origem',
-    help: 'Ligado, as chaves deste harness só são aceitas a partir de endereços das listas escolhidas. Requisições de outros endereços recebem 403 (M008).',
+    help: 'Requisições de outros endereços recebem 403 (M008).',
+    modalTitle: 'IP de origem de {{ name }}',
     lists: 'Listas de prefixos IP',
     listsPlaceholder: 'Escolha listas',
     noLists: 'Nenhuma lista de prefixos IP ainda.',
