@@ -10,6 +10,9 @@ interface MenuItem {
   danger?: boolean;
   /** Optional leading icon rendered before the label. */
   icon?: ReactNode;
+  /** Shown but not clickable; `title` says why. */
+  disabled?: boolean;
+  title?: string;
 }
 
 interface ActionMenuProps {
@@ -129,6 +132,8 @@ export default function ActionMenu(props: ActionMenuProps) {
                 <button
                   key={`${i}-${item.label}`}
                   type="button"
+                  disabled={item.disabled}
+                  title={item.title}
                   className={cx(
                     'action-menu__item menu-item',
                     item.danger && 'action-menu__item--danger is-danger',

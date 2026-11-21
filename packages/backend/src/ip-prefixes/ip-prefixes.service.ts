@@ -23,8 +23,17 @@ export interface IpPrefixListView {
   entries: Array<{ prefix: string; label: string | null }>;
   /** Harnesses with at least one key (not revoked) restricted to this list. */
   harnesses: Array<{ name: string; displayName: string }>;
-  /** Keys (not revoked) whose IP restriction uses this list. */
-  keys: Array<{ id: string; name: string; harness: string; harnessDisplayName: string }>;
+  /**
+   * Keys (not revoked) whose IP restriction uses this list, with how many
+   * lists each one is restricted to (1 = this list only).
+   */
+  keys: Array<{
+    id: string;
+    name: string;
+    harness: string;
+    harnessDisplayName: string;
+    listCount: number;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -163,12 +172,21 @@ export class IpPrefixesService {
     return this.get(tid, id);
   }
 
-  async remove(tenantId: string | null, id: string): Promise<{ ok: true }> {
+  /**
+   * Deletes a list. A list in use is refused (409) unless `unlink` is set:
+   * then every key drops it first, and a key left with no list has its
+   * source-IP restriction turned off (otherwise it would accept nobody).
+   */
+  async remove(
+    tenantId: string | null,
+    id: string,
+    unlink = false,
+  ): Promise<{ ok: true; unlinkedKeys: number }> {
     const tid = requireTenant(tenantId);
     await this.findRow(this.ds.manager, tid, id);
     const usage = await this.keysByList(this.ds.manager, tid, id);
     const keys = usage.get(id) ?? [];
-    if (keys.length > 0) {
+    if (keys.length > 0 && !unlink) {
       throw new ConflictException({
         message: `This list is used by ${keys.length} API key(s). Remove it from them first.`,
         harnesses: harnessesOf(keys),
@@ -178,10 +196,19 @@ export class IpPrefixesService {
     await this.ds.transaction(async (m) => {
       // Revoked keys never authenticate again: their links do not hold the list.
       await m.query(`DELETE FROM agent_api_key_ip_prefix_lists WHERE list_id = $1`, [id]);
+      const keyIds = keys.map((k) => k.id);
+      if (keyIds.length > 0) {
+        await m.query(
+          `UPDATE agent_api_keys k SET ip_restriction_enabled = false
+            WHERE k.id = ANY($1::varchar[]) AND k.ip_restriction_enabled
+              AND NOT EXISTS (SELECT 1 FROM agent_api_key_ip_prefix_lists kl WHERE kl.key_id = k.id)`,
+          [keyIds],
+        );
+      }
       await m.query(`DELETE FROM ip_prefix_lists WHERE tenant_id = $1 AND id = $2`, [tid, id]);
     });
     clearIpRestrictionCache();
-    return { ok: true };
+    return { ok: true, unlinkedKeys: keys.length };
   }
 
   async getRestriction(
@@ -301,7 +328,8 @@ export class IpPrefixesService {
   ): Promise<Map<string, IpPrefixListView['keys']>> {
     const rows = (await m.query(
       `SELECT kl.list_id, k.id, COALESCE(k.name, CASE WHEN k.is_primary THEN 'Primary key' ELSE k.label END, k.key_prefix) AS key_name,
-              a.name, COALESCE(a.display_name, a.name) AS display_name
+              a.name, COALESCE(a.display_name, a.name) AS display_name,
+              (SELECT count(*) FROM agent_api_key_ip_prefix_lists x WHERE x.key_id = k.id)::int AS list_count
          FROM agent_api_key_ip_prefix_lists kl
          JOIN agent_api_keys k ON k.id = kl.key_id AND k.revoked_at IS NULL
          JOIN agents a ON a.id = k.agent_id AND a.deleted_at IS NULL
@@ -314,11 +342,18 @@ export class IpPrefixesService {
       key_name: string;
       name: string;
       display_name: string;
+      list_count: number;
     }>;
     const map = new Map<string, IpPrefixListView['keys']>();
     for (const r of rows) {
       const arr = map.get(r.list_id) ?? [];
-      arr.push({ id: r.id, name: r.key_name, harness: r.name, harnessDisplayName: r.display_name });
+      arr.push({
+        id: r.id,
+        name: r.key_name,
+        harness: r.name,
+        harnessDisplayName: r.display_name,
+        listCount: Number(r.list_count),
+      });
       map.set(r.list_id, arr);
     }
     return map;

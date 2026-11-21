@@ -19,10 +19,11 @@ export default {
     withSubagents: 'With subagents',
   },
   liveAgents: 'Live agents',
-  liveAgentsHint: 'Open a new tab that watches every running session live',
+  liveAgentsHint: 'Watch every running session live',
   wall: {
     pageTitle: 'Live agents - Thinker',
     title: 'Live agents',
+    openTab: 'Open in its own tab',
     count: '{{ count }} running',
     emptyTitle: 'No session running',
     emptyBody:

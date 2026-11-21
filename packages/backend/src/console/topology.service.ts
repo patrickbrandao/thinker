@@ -165,6 +165,28 @@ const add = (target: Usage, u: Usage) => {
 };
 
 export const clientNodeId = (ip: string) => `client:${ip}`;
+
+/**
+ * The client node an address belongs to. IPv6 clients rotate the last 64 bits
+ * (privacy addresses), so every address of one /64 is one client: the key is
+ * the /64 prefix ("2804:14c:65a1:4001::/64"). IPv4, IPv4-mapped IPv6 and
+ * anything unparsable keep the address itself.
+ */
+export function clientKey(ip: string): string {
+  const bare = (ip.split('%')[0] ?? ip).toLowerCase();
+  if (!bare.includes(':') || /^::ffff:\d+\.\d+\.\d+\.\d+$/.test(bare)) return ip;
+  const halves = bare.split('::');
+  if (halves.length > 2) return ip;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  // An embedded IPv4 tail ("::1.2.3.4") counts as two groups.
+  const groups = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (groups < 0 || (halves.length === 1 && head.length !== 8)) return ip;
+  const all = [...head, ...Array<string>(groups).fill('0'), ...tail];
+  const prefix = all.slice(0, 4);
+  if (prefix.length < 4 || !prefix.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return ip;
+  return `${prefix.map((g) => g.replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
 export const harnessNodeId = (agentId: string) => `harness:${agentId}`;
 export const connectionNodeId = (id: string) => `connection:${id}`;
 export const profileNodeId = (id: string) => `proxy:${id}`;
@@ -428,7 +450,7 @@ export class TopologyService {
       // client's line lights up before any provider is called.
       this.ds.query(
         live
-          ? `SELECT agent_id, ip,
+          ? `SELECT agent_id, ip, max(timestamp) AS last_at,
                     count(*)::int AS requests,
                     count(*) FILTER (WHERE status = ANY($3))::int AS errors,
                     count(*) FILTER (WHERE ${recentOnly})::int AS recent
@@ -438,7 +460,7 @@ export class TopologyService {
                       WHERE tenant_id = $1 AND agent_id IS NOT NULL AND ${inWindow()}) m
               WHERE ip IS NOT NULL
               GROUP BY agent_id, ip`
-          : `SELECT agent_id, ip,
+          : `SELECT agent_id, ip, max(timestamp) AS last_at,
                   count(*) FILTER (WHERE superseded = false)::int AS requests,
                   count(*) FILTER (WHERE status = ANY($3) AND superseded = false)::int AS errors,
                   count(*) FILTER (WHERE ${recentOnly} AND superseded = false)::int AS recent
@@ -451,7 +473,14 @@ export class TopologyService {
             GROUP BY agent_id, ip`,
         params,
       ) as Promise<
-        Array<{ agent_id: string; ip: string; requests: number; errors: number; recent: number }>
+        Array<{
+          agent_id: string;
+          ip: string;
+          last_at: Date | string | null;
+          requests: number;
+          errors: number;
+          recent: number;
+        }>
       >,
       this.ds.query(`SELECT node_id, x, y FROM topology_positions WHERE tenant_id = $1`, [
         tenantId,
@@ -592,12 +621,19 @@ export class TopologyService {
       if (harness && harness.requests === 0) addRoutes(harness.id, 'auto', row);
     }
 
-    // Client addresses, each linked to the harnesses it called.
+    // Client addresses, each linked to the harnesses it called. The IPv6
+    // addresses of one /64 are one client, shown by its most recent address.
     const clients = new Map<string, TopologyClient>();
+    const clientSeen = new Map<string, number>();
     for (const row of callers) {
       if (!harnesses.has(harnessNodeId(row.agent_id))) continue;
-      const id = clientNodeId(row.ip);
+      const id = clientNodeId(clientKey(row.ip));
       const client = clients.get(id) ?? { id, ip: row.ip, requests: 0, errors: 0, recent: 0 };
+      const seen = row.last_at ? new Date(row.last_at).getTime() : 0;
+      if (seen >= (clientSeen.get(id) ?? -1)) {
+        client.ip = row.ip;
+        clientSeen.set(id, seen);
+      }
       client.requests += row.requests;
       client.errors += row.errors;
       client.recent += row.recent;

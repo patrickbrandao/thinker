@@ -12,6 +12,15 @@ export interface HarnessRef {
   displayName: string;
 }
 
+export interface IpAclKeyRef {
+  id: string;
+  name: string;
+  harness: string;
+  harnessDisplayName: string;
+  /** IP ACLs the key is restricted to (1 = this one only). */
+  listCount: number;
+}
+
 export interface IpPrefixListView {
   id: string;
   name: string;
@@ -20,7 +29,7 @@ export interface IpPrefixListView {
   /** Harnesses with a key whose IP restriction uses this list. */
   harnesses: HarnessRef[];
   /** Keys (not revoked) whose IP restriction uses this list. */
-  keys: Array<{ id: string; name: string; harness: string; harnessDisplayName: string }>;
+  keys: IpAclKeyRef[];
   createdAt: string;
   updatedAt: string;
 }
@@ -38,7 +47,10 @@ export interface IpRestriction {
 
 const json = { 'Content-Type': 'application/json' };
 
-export const ipPrefixListPath = (id: string) => `/ip-prefix-lists/${encodeURIComponent(id)}`;
+const ipPrefixListPath = (id: string) => `/ip-prefix-lists/${encodeURIComponent(id)}`;
+
+/** The IP ACL page with the editor window open on one list ('new' to create). */
+export const ipAclEditPath = (id: string) => `/ip-prefix-lists?edit=${encodeURIComponent(id)}`;
 
 export function listIpPrefixLists() {
   return fetchJson<{ lists: IpPrefixListView[] }>('/ip-prefix-lists');
@@ -64,9 +76,16 @@ export function updateIpPrefixList(id: string, body: IpPrefixListWrite, opts?: F
   );
 }
 
-/** 409 when harnesses still use the list; the caller shows which ones. */
-export function deleteIpPrefixList(id: string, opts?: FetchMutateOptions) {
-  return fetchMutate<{ ok: true }>(ipPrefixListPath(id), { method: 'DELETE' }, opts);
+/**
+ * 409 when API keys still use the list, unless `unlink`: then every key drops
+ * it first (a key left with no list has its restriction turned off).
+ */
+export function deleteIpPrefixList(id: string, opts?: FetchMutateOptions, unlink = false) {
+  return fetchMutate<{ ok: true; unlinkedKeys: number }>(
+    `${ipPrefixListPath(id)}${unlink ? '?unlink=true' : ''}`,
+    { method: 'DELETE' },
+    opts,
+  );
 }
 
 const restrictionPath = (agentName: string, keyId: string) =>

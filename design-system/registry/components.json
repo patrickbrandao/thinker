@@ -1655,7 +1655,6 @@
         "react-flow__edge-text",
         "react-flow__edge-textbg",
         "react-flow__handle",
-        "react-flow__minimap",
         "react-flow__node",
         "react-flow__pane"
       ],
@@ -2186,7 +2185,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1096
+      "line": 1103
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2195,7 +2194,7 @@
       "prop": "display",
       "value": "inline-flex",
       "file": "shell.css",
-      "line": 1096
+      "line": 1103
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2204,21 +2203,21 @@
       "prop": "padding",
       "value": "6px 8px",
       "file": "shell.css",
-      "line": 1105
+      "line": 1112
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-5px",
       "file": "shell.css",
-      "line": 1271
+      "line": 1278
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "5px",
       "file": "shell.css",
-      "line": 1272
+      "line": 1279
     }
   ],
   "ghostRules": [
@@ -2229,8 +2228,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1089,
-      "losesTo": "shell.css:1096"
+      "line": 1096,
+      "losesTo": "shell.css:1103"
     },
     {
       "selector": ".app.is-collapsed .user-trigger > svg",
@@ -2239,8 +2238,8 @@
       "prop": "display",
       "value": "revert",
       "file": "shell.css",
-      "line": 1089,
-      "losesTo": "shell.css:1096"
+      "line": 1096,
+      "losesTo": "shell.css:1103"
     },
     {
       "selector": ".app.is-collapsed .user-trigger",
@@ -2249,24 +2248,24 @@
       "prop": "padding",
       "value": "0 10px",
       "file": "shell.css",
-      "line": 1101,
-      "losesTo": "shell.css:1105"
+      "line": 1108,
+      "losesTo": "shell.css:1112"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "inset",
       "value": "-2px",
       "file": "shell.css",
-      "line": 1227,
-      "losesTo": "shell.css:1271"
+      "line": 1234,
+      "losesTo": "shell.css:1278"
     },
     {
       "selector": ".liquid-metal::after",
       "prop": "padding",
       "value": "2px",
       "file": "shell.css",
-      "line": 1229,
-      "losesTo": "shell.css:1272"
+      "line": 1236,
+      "losesTo": "shell.css:1279"
     }
   ],
   "componentSheets": {
@@ -2283,7 +2282,7 @@
     "tokens": 59,
     "darkOverrides": 51,
     "blocks": 226,
-    "classes": 245,
+    "classes": 244,
     "canonicalRules": 5,
     "ghostRules": 5
   }

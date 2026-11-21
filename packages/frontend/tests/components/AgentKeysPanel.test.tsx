@@ -253,7 +253,7 @@ describe('AgentKeysPanel', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     fireEvent.click(within(edit).getByLabelText('Office'));
     expect(
-      within(edit).getByText('Pick at least one list to turn the restriction on.'),
+      within(edit).getByText('Pick at least one IP ACL to turn the restriction on.'),
     ).toBeTruthy();
     fireEvent.click(toggle);
     ipApi.updateIpRestriction.mockResolvedValue({ enabled: false, listIds: [] });

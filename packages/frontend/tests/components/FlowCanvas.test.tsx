@@ -219,15 +219,10 @@ describe('FlowCanvas', () => {
     expect(onResetLayout).toHaveBeenCalledTimes(1);
   });
 
-  it('does not show a minimap for small graphs', () => {
-    const { container } = render(<FlowCanvas graph={graph([node('a')])} />);
-    expect(container.querySelector('.react-flow__minimap')).toBeNull();
-  });
-
-  it('shows a minimap past 24 nodes', () => {
+  it('never shows a minimap, even on large graphs', () => {
     const many = Array.from({ length: 25 }, (_, i) => node('n' + i, {}, i * 400));
     const { container } = render(<FlowCanvas graph={graph(many)} />);
-    expect(container.querySelector('.react-flow__minimap')).not.toBeNull();
+    expect(container.querySelector('.react-flow__minimap')).toBeNull();
   });
 
   it('picks up new nodes when the graph prop changes', () => {

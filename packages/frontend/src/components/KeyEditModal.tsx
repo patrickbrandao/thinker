@@ -4,7 +4,7 @@ import KeySecret from './KeySecret.js';
 import { Button, Field, Modal, Switch } from './ui.js';
 import { updateAgentKey, type AgentKeyView } from '../services/api/agent-keys.js';
 import {
-  ipPrefixListPath,
+  ipAclEditPath,
   updateIpRestriction,
   type IpPrefixListView,
   type IpRestriction,
@@ -286,7 +286,7 @@ export default function KeyEditModal({
                           {list.name}
                         </label>
                         <Link
-                          to={ipPrefixListPath(list.id)}
+                          to={ipAclEditPath(list.id)}
                           className="text-xs text-muted hover:underline"
                         >
                           {t('ipLists.form.entriesCount', { count: list.entries.length })}

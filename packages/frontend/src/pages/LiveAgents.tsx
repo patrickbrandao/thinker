@@ -21,6 +21,7 @@ import {
   BotMessageSquare,
   Brain,
   CircleDashed,
+  ExternalLink,
   EyeOff,
   FaceSlightlySmiling,
   Moon,
@@ -61,7 +62,8 @@ import {
   type LiveGlanceItem,
   type SessionSummary,
 } from '../services/api/sessions.js';
-import { shortId } from './sessions/session-format.js';
+import { LIVE_AGENTS_PATH, LIVE_AGENTS_TAB, shortId } from './sessions/session-format.js';
+import { openNamedTab } from '../lib/named-tab.js';
 import { LiveSessionFeed, useLiveFeed } from '../services/live-session-feed.js';
 
 export const WALL_POLL_MS = 5_000;
@@ -387,13 +389,20 @@ interface AgentOption {
 export default function LiveAgents({
   createFeed = (id) => new LiveSessionFeed(id, { live: true }),
   maxTiles,
+  embedded = false,
 }: {
+  /** Inside the dashboard shell (/live-agents) instead of a tab of its own. */
+  embedded?: boolean;
   /** Test seam: how a tile's feed is built. */
   createFeed?: (sessionId: string) => LiveSessionFeed;
   /** Test seam: tiles open at once (default from the connection protocol). */
   maxTiles?: number;
 }) {
   const [budget] = useState(() => maxTiles ?? wallTileBudget());
+  // Name this tab so every "Live agents" link brings it forward instead of opening another.
+  useEffect(() => {
+    if (!embedded) window.name = LIVE_AGENTS_TAB;
+  }, [embedded]);
   const [tiles, setTiles] = useState<WallTile[]>([]);
   const [agent, setAgent] = useState('');
   const [provider, setProvider] = useState('');
@@ -1050,12 +1059,19 @@ export default function LiveAgents({
   };
 
   return (
-    <main className="lab-hex flex min-h-screen flex-col text-ink">
+    <main
+      className={cx(
+        'lab-hex flex flex-col text-ink',
+        embedded ? 'min-h-full flex-1' : 'min-h-screen',
+      )}
+    >
       <header className="flex flex-wrap items-center gap-2.5 border-b border-line bg-elev px-3 py-1">
-        <h1 className="m-0 flex items-center gap-2 text-sm font-semibold">
-          <LiveDot />
-          {t('sessions.wall.title')}
-        </h1>
+        {embedded ? null : (
+          <h1 className="m-0 flex items-center gap-2 text-sm font-semibold">
+            <LiveDot />
+            {t('sessions.wall.title')}
+          </h1>
+        )}
         <span className="wall-pill" aria-live="polite">
           <i className="wall-pill__dot" aria-hidden="true" />
           {t('sessions.wall.shown', { count: tiles.length })}
@@ -1086,15 +1102,27 @@ export default function LiveAgents({
         <div className="w-full sm:w-48">
           <Select value={provider} onChange={changeProvider} options={providerOptions} />
         </div>
-        <button
-          type="button"
-          className="lab-hex-win__btn"
-          title={dark ? t('shell.topbar.themeLight') : t('shell.topbar.themeDark')}
-          aria-label={dark ? t('shell.topbar.themeLight') : t('shell.topbar.themeDark')}
-          onClick={toggleTheme}
-        >
-          {dark ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
+        {embedded ? (
+          <button
+            type="button"
+            className="lab-hex-win__btn"
+            title={t('sessions.wall.openTab')}
+            aria-label={t('sessions.wall.openTab')}
+            onClick={() => openNamedTab(LIVE_AGENTS_PATH, LIVE_AGENTS_TAB)}
+          >
+            <ExternalLink size={14} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="lab-hex-win__btn"
+            title={dark ? t('shell.topbar.themeLight') : t('shell.topbar.themeDark')}
+            aria-label={dark ? t('shell.topbar.themeLight') : t('shell.topbar.themeDark')}
+            onClick={toggleTheme}
+          >
+            {dark ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+        )}
         <button
           type="button"
           className="lab-hex-win__btn"
