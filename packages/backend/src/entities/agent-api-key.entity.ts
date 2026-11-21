@@ -35,6 +35,10 @@ export class AgentApiKey {
   @Column('boolean', { default: false })
   is_primary!: boolean;
 
+  /** The key is accepted only from its linked IP prefix lists (`agent_api_key_ip_prefix_lists`). */
+  @Column('boolean', { default: false })
+  ip_restriction_enabled!: boolean;
+
   /** Set when the key is revoked (it then also has `is_active = false`), never cleared. */
   @Column(timestampType(), { nullable: true })
   revoked_at!: string | null;

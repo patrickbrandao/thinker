@@ -65,7 +65,7 @@ import {
   ProxyServer,
   ProxyUsageDaily,
 } from '../src/entities/proxy-server.entity';
-import { AgentIpPrefixList, IpPrefixList } from '../src/entities/ip-prefix-list.entity';
+import { AgentApiKeyIpPrefixList, IpPrefixList } from '../src/entities/ip-prefix-list.entity';
 import { TopologyPosition } from '../src/entities/topology-position.entity';
 import { AuthModule } from '../src/auth/auth.module';
 import { HealthModule } from '../src/health/health.module';
@@ -126,7 +126,7 @@ const entities = [
   ProxyUsageDaily,
   TopologyPosition,
   IpPrefixList,
-  AgentIpPrefixList,
+  AgentApiKeyIpPrefixList,
 ];
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MODELS_DEV_URL = 'https://models.dev/api.json';

@@ -6,7 +6,7 @@ import { TenantCacheService } from '../common/services/tenant-cache.service';
 import { IpPrefixesService, type IpPrefixListInput } from './ip-prefixes.service';
 
 /**
- * IP prefix lists and the per-harness source-IP restriction. Owners and
+ * IP prefix lists and the per-key source-IP restriction. Owners and
  * admins only, like the proxy servers: they describe the workspace's network.
  */
 @MinRole('admin', { includeReads: true })
@@ -58,18 +58,23 @@ export class IpPrefixesController {
     return this.lists.remove(ctx.tenantId, id);
   }
 
-  @Get('agents/:agentName/ip-restriction')
-  getRestriction(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
-    return this.lists.getRestriction(ctx.tenantId, agentName);
+  @Get('agents/:agentName/keys/:keyId/ip-restriction')
+  getRestriction(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Param('keyId') keyId: string,
+  ) {
+    return this.lists.getRestriction(ctx.tenantId, agentName, keyId);
   }
 
   @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
-  @Put('agents/:agentName/ip-restriction')
+  @Put('agents/:agentName/keys/:keyId/ip-restriction')
   setRestriction(
     @TenantCtx() ctx: TenantContext,
     @Param('agentName') agentName: string,
+    @Param('keyId') keyId: string,
     @Body() body: { enabled?: unknown; listIds?: unknown },
   ) {
-    return this.lists.setRestriction(ctx.tenantId, agentName, body ?? {});
+    return this.lists.setRestriction(ctx.tenantId, agentName, keyId, body ?? {});
   }
 }

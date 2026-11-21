@@ -32,7 +32,7 @@ Toda falha gerada pelo próprio Thinker (e não pelo provedor) traz um código `
 
 ## M008
 
-**IP de origem não permitido.** O harness aceita suas chaves só a partir das listas de prefixos IP marcadas nele, e o endereço de origem da requisição não está em nenhuma delas. A resposta é HTTP 403. Inclua o endereço (ou o prefixo) numa das listas, ou desligue a restrição no harness.
+**IP de origem não permitido.** A chave de API usada só é aceita a partir das listas de prefixos IP marcadas nela, e o endereço de origem da requisição não está em nenhuma delas. A resposta é HTTP 403. Inclua o endereço (ou o prefixo) numa das listas, ou desligue a restrição da chave (guia Chaves de API do harness).
 
 ## M100
 

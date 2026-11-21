@@ -609,7 +609,7 @@ describe('Workspace', () => {
     it('opens kebab popover with Duplicate and Delete', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
-      expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
+      expect(document.querySelector('.action-menu__dropdown')).not.toBeNull();
       expect(document.body.textContent).toContain('Duplicate');
       expect(document.body.textContent).toContain('Delete');
     });
@@ -618,22 +618,22 @@ describe('Workspace', () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       await clickKebab(container);
-      expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+      expect(document.querySelector('.action-menu__dropdown')).toBeNull();
     });
 
     it('closes the popover when clicking outside', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
-      expect(container.querySelector('.action-menu__dropdown')).not.toBeNull();
+      expect(document.querySelector('.action-menu__dropdown')).not.toBeNull();
       fireEvent.click(document.body);
-      expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+      expect(document.querySelector('.action-menu__dropdown')).toBeNull();
     });
 
     it('closes the popover on Escape', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.keyDown(document, { key: 'Escape' });
-      expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+      expect(document.querySelector('.action-menu__dropdown')).toBeNull();
     });
 
     it('ignores Escape when popover is already closed', async () => {
@@ -642,7 +642,7 @@ describe('Workspace', () => {
         expect(container.querySelector('.agent-card__menu .action-menu__trigger')).not.toBeNull();
       });
       fireEvent.keyDown(document, { key: 'Escape' });
-      expect(container.querySelector('.action-menu__dropdown')).toBeNull();
+      expect(document.querySelector('.action-menu__dropdown')).toBeNull();
     });
 
     it('opens the DuplicateAgentModal when Duplicate is clicked', async () => {
@@ -748,21 +748,20 @@ describe('Workspace', () => {
       expect(mockDeleteAgent).not.toHaveBeenCalled();
     });
 
-    it('closes the delete modal when the backdrop is clicked', async () => {
+    it('does not close the delete window on a click outside it', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const overlay = document.querySelector('.overlay') as HTMLDivElement;
-      fireEvent.mouseDown(overlay);
-      expect(document.body.textContent).not.toContain('Delete demo-agent');
+      fireEvent.mouseDown(document.body);
+      fireEvent.click(document.body);
+      expect(document.body.textContent).toContain('Delete demo-agent');
     });
 
-    it('closes the delete modal on Escape from the overlay', async () => {
+    it('closes the delete window on Escape', async () => {
       const { container } = render(() => <Workspace />);
       await clickKebab(container);
       fireEvent.click(screen.getByText('Delete'));
-      const overlay = document.querySelector('.overlay') as HTMLDivElement;
-      fireEvent.keyDown(overlay, { key: 'Escape' });
+      fireEvent.keyDown(document, { key: 'Escape' });
       expect(document.body.textContent).not.toContain('Delete demo-agent');
     });
   });

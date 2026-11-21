@@ -85,7 +85,7 @@ describe('KeyPickerModal', () => {
     expect(screen.getByText(/^•+$/)).toBeDefined();
   });
 
-  it('closes on overlay click', () => {
+  it('does not close on a click outside the window', () => {
     const onClose = vi.fn();
     render(
       <KeyPickerModal
@@ -96,10 +96,10 @@ describe('KeyPickerModal', () => {
         onClose={onClose}
       />,
     );
-    // The Modal primitive portals to document.body and closes on backdrop mousedown.
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.mouseDown(overlay);
-    expect(onClose).toHaveBeenCalled();
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   });
 
   it('does not close when clicking inside the modal content', () => {

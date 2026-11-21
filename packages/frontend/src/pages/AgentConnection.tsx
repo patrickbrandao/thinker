@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { useParams } from 'react-router';
-import AgentKeysPanel from '../components/AgentKeysPanel.js';
 import FrameworkSnippets from '../components/FrameworkSnippets.js';
 import RichText from '../components/RichText.js';
 import SetupStepAddProvider, { PLATFORM_TO_TOOLKIT } from '../components/SetupStepAddProvider.js';
+import Select from '../components/Select.js';
 import { Panel, Skel } from '../components/ui.js';
-import { getAgentKey } from '../services/api.js';
+import { getAgentKeySecret, listAgentKeys } from '../services/api/agent-keys.js';
 import { listVirtualModels } from '../services/api/virtual-models.js';
 import { installOrigin } from '../services/install-endpoints.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
@@ -15,8 +16,9 @@ import { t } from '../i18n/index.js';
 
 /**
  * Connection tab of a harness: the suggested setup for its type and the SDK
- * code examples, both fixed here instead of popping up after edits, and the
- * harness API keys.
+ * code examples, both fixed here instead of popping up after edits. A select
+ * picks the key the instructions use (the primary one by default); the keys
+ * themselves are managed in the API Keys tab.
  */
 export default function AgentConnection() {
   const params = useParams<{ agentName: string }>();
@@ -24,7 +26,22 @@ export default function AgentConnection() {
   const name = agentDisplayName() ?? agentName;
   const { platform } = useSignal(agentPlatformSignal);
 
-  const apiKeyData = useResource(() => getAgentKey(agentName), [agentName]);
+  const keyList = useResource(() => listAgentKeys(agentName), [agentName]);
+  const keys = (keyList.data?.keys ?? []).filter((k) => k.status !== 'revoked');
+  const [picked, setPicked] = useState<string | null>(null);
+  const selected = keys.find((k) => k.id === picked) ?? keys.find((k) => k.isPrimary) ?? keys[0];
+  const selectedId = selected?.id ?? null;
+  const apiKeyData = useResource(
+    () =>
+      selectedId
+        ? getAgentKeySecret(agentName, selectedId).catch(
+            (): { keyPrefix: string; apiKey?: string } => ({
+              keyPrefix: selected?.keyPrefix ?? '',
+            }),
+          )
+        : Promise.resolve(null),
+    [agentName, selectedId],
+  );
   const virtualModelList = useResource(
     () =>
       listVirtualModels(agentName).catch(() => [] as Awaited<ReturnType<typeof listVirtualModels>>),
@@ -34,9 +51,13 @@ export default function AgentConnection() {
 
   const keyData = apiKeyData.error ? undefined : apiKeyData.data;
   const apiKey = keyData?.apiKey ?? null;
-  const keyPrefix = keyData?.keyPrefix ?? null;
+  const keyPrefix = keyData?.keyPrefix ?? selected?.keyPrefix ?? null;
   const baseUrl = `${installOrigin()}/v1`;
-  const loading = apiKeyData.loading && !apiKeyData.data && !apiKeyData.error;
+  const loading =
+    (keyList.loading && !keyList.data) ||
+    (apiKeyData.loading && !apiKeyData.data && !apiKeyData.error);
+  const keyName = (k: (typeof keys)[number]) =>
+    k.isPrimary ? t('harnessKeys.primaryName') : k.name || t('harnessKeys.unnamed');
   // SDK-type harnesses already get the SDK snippets as their suggested setup.
   const setupIsSdk = !platform || platform === 'other' || !!PLATFORM_TO_TOOLKIT[platform];
 
@@ -47,7 +68,24 @@ export default function AgentConnection() {
       </title>
       <p className="text-sm text-muted">{t('harnesses.connection.intro')}</p>
 
-      {apiKeyData.error ? (
+      {keys.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted">{t('harnesses.connection.keyLabel')}</span>
+          <div className="w-72">
+            <Select
+              label={t('harnesses.connection.keyLabel')}
+              value={selectedId ?? ''}
+              onChange={setPicked}
+              options={keys.map((k) => ({
+                value: k.id,
+                label: `${keyName(k)} (${k.keyPrefix}…)`,
+              }))}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {keyList.error ? (
         <div className="notice is-warn" role="alert">
           <span>
             <RichText
@@ -89,8 +127,6 @@ export default function AgentConnection() {
           )}
         </Panel>
       )}
-
-      <AgentKeysPanel agentName={agentName} onPrimaryRotated={() => void apiKeyData.reload()} />
     </div>
   );
 }

@@ -78,12 +78,12 @@ describe('HarnessKeysAndIpPrefixes migration (e2e)', () => {
     ).rejects.toThrow();
   });
 
-  it('refuses to delete an IP prefix list a harness still uses', async () => {
+  it('refuses to delete an IP prefix list a key still uses', async () => {
     await ds.query(
       `INSERT INTO ip_prefix_lists (id, tenant_id, name, entries) VALUES ('mk-list', 'mk-tenant', 'Office', '[{"prefix":"203.0.113.0/24"}]')`,
     );
     await ds.query(
-      `INSERT INTO agent_ip_prefix_lists (agent_id, list_id, tenant_id) VALUES ('mk-agent', 'mk-list', 'mk-tenant')`,
+      `INSERT INTO agent_api_key_ip_prefix_lists (key_id, list_id, tenant_id) VALUES ('mk-key', 'mk-list', 'mk-tenant')`,
     );
     await expect(ds.query(`DELETE FROM ip_prefix_lists WHERE id = 'mk-list'`)).rejects.toThrow();
     await expect(

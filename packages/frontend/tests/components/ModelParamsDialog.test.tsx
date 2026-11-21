@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@testing-library/react';
+import { render, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { ProviderParamSpec, RequestParamDefaults } from 'thinker-shared';
 
 import ModelParamsDialog from '../../src/components/ModelParamsDialog';
@@ -154,7 +154,9 @@ describe('ModelParamsDialog', () => {
     expect(screen.getByText('No parameter controls are available for gpt-4o.')).toBeTruthy();
     expect(screen.getByText('This model has no configurable parameters.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+    // The window's title-bar X plus the content's own Close button.
+    const body = q('.floating-window-body')!;
+    expect(within(body).getByRole('button', { name: 'Close' })).toBeTruthy();
     expect(screen.queryByRole('link')).toBeNull();
   });
 
@@ -756,14 +758,16 @@ describe('ModelParamsDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('clicking the overlay closes the dialog', () => {
+  it('a click outside the window does not close the dialog', () => {
     const onClose = vi.fn();
     render(<ModelParamsDialog {...baseProps} onClose={onClose} />);
-    fireEvent.mouseDown(q('.overlay')!);
-    expect(onClose).toHaveBeenCalled();
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(q('[role="dialog"]')).not.toBeNull();
   });
 
-  it('does not close mid-save when the user re-clicks the overlay', async () => {
+  it('does not close mid-save when the user presses Escape', async () => {
     let resolveSave: (() => void) | undefined;
     const onSave = vi.fn().mockImplementation(
       () =>
@@ -775,7 +779,7 @@ describe('ModelParamsDialog', () => {
     render(<ModelParamsDialog {...baseProps} onSave={onSave} onClose={onClose} />);
 
     fireEvent.click(screen.getByText('Save'));
-    fireEvent.mouseDown(q('.overlay')!);
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
     resolveSave!();
     await waitFor(() => expect(onClose).toHaveBeenCalled());

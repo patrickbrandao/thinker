@@ -74,6 +74,7 @@ const IpPrefixLists = lazyReload(() => import('./pages/IpPrefixLists.jsx'));
 const IpPrefixList = lazyReload(() => import('./pages/IpPrefixList.jsx'));
 const AgentTriggers = lazyReload(() => import('./pages/AgentTriggers.jsx'));
 const AgentConnection = lazyReload(() => import('./pages/AgentConnection.jsx'));
+const AgentApiKeys = lazyReload(() => import('./pages/AgentApiKeys.jsx'));
 const AdminUsers = lazyReload(() => import('./pages/AdminUsers.jsx'));
 const ChangePassword = lazyReload(() => import('./pages/ChangePassword.jsx'));
 const Topology = lazyReload(() => import('./pages/Topology.jsx'));
@@ -383,6 +384,14 @@ function AppRoutes() {
               element={
                 <Lazy>
                   <AgentConnection />
+                </Lazy>
+              }
+            />
+            <Route
+              path="keys"
+              element={
+                <Lazy>
+                  <AgentApiKeys />
                 </Lazy>
               }
             />

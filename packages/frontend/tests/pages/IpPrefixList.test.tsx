@@ -127,7 +127,7 @@ describe('IP prefix list pages', () => {
     });
     renderAt('/ip-prefix-lists/l1');
     const link = await screen.findAllByRole('link', { name: 'Claude Code' });
-    expect(link[0]!.getAttribute('href')).toBe('/harnesses/claude-code/settings');
+    expect(link[0]!.getAttribute('href')).toBe('/harnesses/claude-code/keys');
     expect(
       (screen.getByRole('button', { name: 'Delete list' }) as HTMLButtonElement).disabled,
     ).toBe(true);

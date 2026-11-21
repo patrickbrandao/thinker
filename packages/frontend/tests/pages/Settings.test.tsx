@@ -31,8 +31,6 @@ vi.mock('../../src/services/api', () => ({
   updateModelListing: (_agent: string, mode: string) => Promise.resolve({ mode }),
 }));
 
-vi.mock('../../src/pages/SettingsIpRestrictionSection', () => ({ default: () => null }));
-
 vi.mock('../../src/services/toast-store', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
@@ -193,11 +191,6 @@ describe('Settings', () => {
     });
   });
 
-  it('renders API Key section', () => {
-    render(() => <Settings />);
-    expect(screen.getByText('Harness API key')).toBeDefined();
-  });
-
   it('has no Autofix section or third-party terms link', () => {
     const { container } = render(() => <Settings />);
     expect(container.textContent).not.toMatch(/autofix/i);
@@ -214,61 +207,10 @@ describe('Settings', () => {
     expect(screen.getByText('Delete harness')).toBeDefined();
   });
 
-  it('shows key prefix after loading', async () => {
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('thk_abc');
-    });
-  });
-
-  it('shows reveal button when API returns full key', async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: 'thk_abc', apiKey: 'thk_full_key_123' });
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
-    });
-  });
-
-  it('reveals full key when reveal button is clicked', async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: 'thk_abc', apiKey: 'thk_full_key_123' });
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('thk_full_key_123');
-    });
-  });
-
-  it('hides full key when hide button is clicked', async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: 'thk_abc', apiKey: 'thk_full_key_123' });
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      expect(container.querySelector('[aria-label="Reveal API key"]')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('[aria-label="Reveal API key"]')!);
-    await vi.waitFor(() => {
-      expect(container.querySelector('[aria-label="Hide API key"]')).not.toBeNull();
-    });
-    fireEvent.click(container.querySelector('[aria-label="Hide API key"]')!);
-    await vi.waitFor(() => {
-      expect(container.textContent).not.toContain('thk_full_key_123');
-    });
-  });
-
   it('opens delete modal on Delete harness click', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
     expect(document.body.textContent).toContain('Delete test-agent');
-  });
-
-  it('has rotate key button', () => {
-    const { container } = render(() => <Settings />);
-    const rotateBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Rotate key'),
-    );
-    expect(rotateBtn).not.toBeUndefined();
   });
 
   it('save button is disabled when agent name unchanged', () => {
@@ -323,36 +265,12 @@ describe('Settings', () => {
     });
   });
 
-  it('clicking Rotate key calls rotateAgentKey', async () => {
-    mockRotateAgentKey.mockResolvedValue({ apiKey: 'thk_new_rotated_key' });
-    const { container } = render(() => <Settings />);
-    const rotateBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Rotate key'),
-    )!;
-    fireEvent.click(rotateBtn);
-    await vi.waitFor(() => {
-      expect(mockRotateAgentKey).toHaveBeenCalledWith('test-agent');
-    });
-  });
-
-  it('auto-reveals key after successful rotation', async () => {
-    mockRotateAgentKey.mockResolvedValue({ apiKey: 'thk_new_rotated_key' });
-    const { container } = render(() => <Settings />);
-    const rotateBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Rotate key'),
-    )!;
-    fireEvent.click(rotateBtn);
-    await vi.waitFor(() => {
-      expect(container.querySelector('[aria-label="Hide API key"]')).not.toBeNull();
-      expect(container.textContent).toContain('thk_new_rotated_key');
-    });
-  });
-
   it('closes delete modal on Escape key', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    fireEvent.keyDown(document.querySelector('.overlay')!, { key: 'Escape' });
-    expect(document.querySelector('.overlay')).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('delete button is disabled until name matches', () => {
@@ -367,7 +285,7 @@ describe('Settings', () => {
   it('calls deleteAgent when confirmed', async () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    fireEvent.change(document.querySelector('.overlay input[type="text"]')!, {
+    fireEvent.change(document.querySelector('[role="dialog"] input[type="text"]')!, {
       target: { value: 'test-agent' },
     });
     const deleteBtn = Array.from(document.querySelectorAll('button')).find((b) =>
@@ -384,23 +302,11 @@ describe('Settings', () => {
     expect(container.textContent).toContain('Rename the harness');
   });
 
-  it('handles rotate key error gracefully', async () => {
-    mockRotateAgentKey.mockRejectedValue(new Error('Rotate failed'));
-    const { container } = render(() => <Settings />);
-    const rotateBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Rotate key'),
-    )!;
-    fireEvent.click(rotateBtn);
-    await vi.waitFor(() => {
-      expect(mockRotateAgentKey).toHaveBeenCalled();
-    });
-  });
-
   it('handles delete agent error gracefully', async () => {
     mockDeleteAgent.mockRejectedValue(new Error('Delete failed'));
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    fireEvent.change(document.querySelector('.overlay input[type="text"]')!, {
+    fireEvent.change(document.querySelector('[role="dialog"] input[type="text"]')!, {
       target: { value: 'test-agent' },
     });
     const deleteBtn = Array.from(document.querySelectorAll('button')).find((b) =>
@@ -480,23 +386,22 @@ describe('Settings', () => {
     });
   });
 
-  it('closes delete modal when clicking overlay', () => {
+  it('does not close the delete window on a click outside it', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const overlay = document.querySelector('.overlay')!;
-    // Press on the overlay itself (not the modal card inside); the shared Modal
-    // closes on a backdrop mousedown.
-    fireEvent.mouseDown(overlay);
-    expect(document.querySelector('.overlay')).toBeNull();
+    // Windows are floating: a click outside never closes them.
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   });
 
   it('closes delete modal when clicking close button', () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const closeBtn = document.querySelector('.overlay [aria-label="Close"]');
+    const closeBtn = document.querySelector('[role="dialog"] [aria-label="Close"]');
     expect(closeBtn).not.toBeNull();
     fireEvent.click(closeBtn!);
-    expect(document.querySelector('.overlay')).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('opens type modal when Change button clicked', async () => {
@@ -562,14 +467,6 @@ describe('Settings', () => {
     resolveSave!({});
   });
 
-  it('shows fallback key display when no full key available', async () => {
-    mockGetAgentKey.mockResolvedValue({ keyPrefix: 'thk_xyz' });
-    const { container } = render(() => <Settings />);
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('thk_xyz...');
-    });
-  });
-
   it('handles updateAgent rejection in type modal save without crashing', async () => {
     mockUpdateAgent.mockRejectedValueOnce(new Error('type update failed'));
     const { container } = render(() => <Settings />);
@@ -620,18 +517,18 @@ describe('Settings', () => {
     await vi.waitFor(() => {
       expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
-    // The change-type modal is the second overlay — find the one hosting the picker
+    // The change-type window is the one hosting the picker
     const pickerModal = document
       .querySelector('[data-testid="agent-type-picker"]')!
-      .closest('.overlay') as HTMLElement;
+      .closest('[role="dialog"]') as HTMLElement;
     expect(pickerModal).not.toBeNull();
-    fireEvent.keyDown(pickerModal, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     await vi.waitFor(() => {
       expect(document.querySelector('[data-testid="agent-type-picker"]')).toBeNull();
     });
   });
 
-  it('closes the Change type modal when clicking the overlay backdrop', async () => {
+  it('does not close the Change type window on a click outside it', async () => {
     const { container } = render(() => <Settings />);
     await vi.waitFor(() => {
       const changeBtn = Array.from(container.querySelectorAll('button')).find((b) =>
@@ -647,19 +544,15 @@ describe('Settings', () => {
     await vi.waitFor(() => {
       expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
     });
-    const pickerModal = document
-      .querySelector('[data-testid="agent-type-picker"]')!
-      .closest('.overlay') as HTMLElement;
-    fireEvent.mouseDown(pickerModal);
-    await vi.waitFor(() => {
-      expect(document.querySelector('[data-testid="agent-type-picker"]')).toBeNull();
-    });
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(document.querySelector('[data-testid="agent-type-picker"]')).not.toBeNull();
   });
 
   it('submits delete via Enter key on confirm input', async () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const input = document.querySelector('.overlay input[type="text"]') as HTMLInputElement;
+    const input = document.querySelector('[role="dialog"] input[type="text"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'test-agent' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     await vi.waitFor(() => {
@@ -670,7 +563,7 @@ describe('Settings', () => {
   it('does not delete via Enter when name does not match', async () => {
     const { container } = render(() => <Settings />);
     fireEvent.click(screen.getByText('Delete harness'));
-    const input = document.querySelector('.overlay input[type="text"]') as HTMLInputElement;
+    const input = document.querySelector('[role="dialog"] input[type="text"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'wrong-name' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(mockDeleteAgent).not.toHaveBeenCalled();

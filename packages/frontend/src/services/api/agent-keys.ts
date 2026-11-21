@@ -17,6 +17,10 @@ export interface AgentKeyView {
   lastUsedAt: string | null;
   createdAt: string;
   revokedAt: string | null;
+  /** The full key can be shown again (stored encrypted). */
+  recoverable: boolean;
+  /** Source IP restriction: when enabled, accepted only from the linked IP prefix lists. */
+  ipRestriction: { enabled: boolean; listIds: string[] };
 }
 
 const base = (agentName: string) => `/agents/${encodeURIComponent(agentName)}/keys`;
@@ -37,7 +41,7 @@ export function createAgentKey(agentName: string, body: { name: string; expiresA
 export function updateAgentKey(
   agentName: string,
   keyId: string,
-  body: { name?: string; disabled?: boolean },
+  body: { name?: string; disabled?: boolean; expiresAt?: string | null },
 ) {
   return fetchMutate<{ key: AgentKeyView }>(`${base(agentName)}/${encodeURIComponent(keyId)}`, {
     method: 'PATCH',
@@ -50,4 +54,19 @@ export function revokeAgentKey(agentName: string, keyId: string) {
   return fetchMutate<{ key: AgentKeyView }>(`${base(agentName)}/${encodeURIComponent(keyId)}`, {
     method: 'DELETE',
   });
+}
+
+/** New secret for one key (primary or extra), shown once; id, name, expiry and IP restriction stay. */
+export function rotateOneAgentKey(agentName: string, keyId: string) {
+  return fetchMutate<{ key: AgentKeyView; apiKey: string }>(
+    `${base(agentName)}/${encodeURIComponent(keyId)}/rotate`,
+    { method: 'POST' },
+  );
+}
+
+/** Full secret of a key; `apiKey` is absent when the key cannot be shown again. */
+export function getAgentKeySecret(agentName: string, keyId: string) {
+  return fetchJson<{ keyPrefix: string; apiKey?: string }>(
+    `${base(agentName)}/${encodeURIComponent(keyId)}/secret`,
+  );
 }

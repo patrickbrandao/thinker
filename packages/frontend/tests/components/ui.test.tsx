@@ -511,17 +511,31 @@ describe('Modal', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('renders an accessible modal dialog in a portal, named after its title', () => {
+  it('renders a floating (non-modal) dialog in a portal by default, named after its title', () => {
     render(
       <Modal open title="Confirm" onClose={() => {}}>
         body
       </Modal>,
     );
     const dialog = screen.getByRole('dialog', { name: 'Confirm' });
-    expect(dialog.getAttribute('aria-modal')).toBe('true');
-    expect(dialog.parentElement!.parentElement).toBe(document.body);
+    expect(dialog.getAttribute('aria-modal')).toBe('false');
+    expect(dialog.className).toContain('floating-window');
+    expect(dialog.parentElement).toBe(document.body);
+    expect(document.querySelector('.overlay')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Confirm' })).toBeTruthy();
     expect(screen.getByText('body')).toBeTruthy();
+  });
+
+  it('renders a blocking modal over an overlay only when `modal` is set', () => {
+    render(
+      <Modal open modal title="Confirm" onClose={() => {}}>
+        body
+      </Modal>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Confirm' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.parentElement!.className).toBe('overlay');
+    expect(dialog.parentElement!.parentElement).toBe(document.body);
   });
 
   it('prefers an explicit label over a string title, and tolerates a node title', () => {
@@ -539,31 +553,52 @@ describe('Modal', () => {
     expect(screen.getByRole('dialog').hasAttribute('aria-label')).toBe(false);
   });
 
-  it('has no header (and no close X) without a title', () => {
-    render(
+  it('a floating window keeps its close X without a title; a bare modal has no header', () => {
+    const { rerender } = render(
       <Modal open label="Bare" onClose={() => {}}>
+        b
+      </Modal>,
+    );
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+    rerender(
+      <Modal open modal label="Bare" onClose={() => {}}>
         b
       </Modal>,
     );
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
   });
 
-  it('closes via Escape, the X button and a backdrop click, but not an inner click', () => {
+  it('closes via Escape and the X button, never on a click inside or outside', () => {
     const onClose = vi.fn();
     render(
       <Modal open title="T" onClose={onClose} wide>
         <p>inner</p>
       </Modal>,
     );
-    expect(screen.getByRole('dialog').className).toContain('wide');
+    expect(screen.getByRole('dialog').className).toContain('floating-window--wide');
     fireEvent.mouseDown(screen.getByText('inner'));
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(2);
-    fireEvent.mouseDown(document.querySelector('.overlay')!);
-    expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it('a blocking modal closes on Escape but not on a backdrop click', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open modal title="T" onClose={onClose}>
+        <p>inner</p>
+      </Modal>,
+    );
+    const overlay = document.querySelector('.overlay')!;
+    fireEvent.mouseDown(overlay);
+    fireEvent.click(overlay);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('close button is localized in pt-BR', () => {

@@ -14,6 +14,7 @@ type TabKey =
   | 'guardrails'
   | 'triggers'
   | 'connection'
+  | 'keys'
   | 'settings';
 
 function safeDecode(value: string): string {
@@ -26,7 +27,7 @@ function safeDecode(value: string): string {
 
 /**
  * AgentDetail — the tabbed shell of a harness (the top bar already shows
- * Harnesses › icon › name): Overview / Routing / Models / Providers / Limits / Triggers / Connection / Settings tabs. The tab
+ * Harnesses › icon › name): Overview / Routing / Models / Providers / Limits / Triggers / Connection / API Keys / Settings tabs. The tab
  * content is the nested route, rendered through <Outlet />.
  */
 export default function AgentDetail() {
@@ -54,9 +55,11 @@ export default function AgentDetail() {
               ? 'triggers'
               : pathname.startsWith(path('/connection'))
                 ? 'connection'
-                : pathname.startsWith(path('/settings'))
-                  ? 'settings'
-                  : 'overview';
+                : pathname.startsWith(path('/keys'))
+                  ? 'keys'
+                  : pathname.startsWith(path('/settings'))
+                    ? 'settings'
+                    : 'overview';
 
   const tabs: TabItem<TabKey>[] = [
     { key: 'overview', label: t('harnesses.detail.overview'), to: path('') },
@@ -66,6 +69,7 @@ export default function AgentDetail() {
     { key: 'guardrails', label: t('harnesses.detail.limits'), to: path('/guardrails') },
     { key: 'triggers', label: t('harnesses.detail.triggers'), to: path('/triggers') },
     { key: 'connection', label: t('harnesses.detail.connection'), to: path('/connection') },
+    { key: 'keys', label: t('harnesses.detail.keys'), to: path('/keys') },
     { key: 'settings', label: t('harnesses.detail.settings'), to: path('/settings') },
   ];
 

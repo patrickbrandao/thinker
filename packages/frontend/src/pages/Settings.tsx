@@ -1,6 +1,5 @@
-import { Component, useState, type ErrorInfo, type ReactNode } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
-import { Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
 import {
   type AgentCategory,
   type AgentPlatform,
@@ -9,27 +8,17 @@ import {
   platformIcon,
   toAgentName,
 } from 'thinker-shared';
-import CopyButton from '../components/CopyButton.js';
 import ReadOnlyRegion from '../components/ReadOnlyRegion.js';
-import ErrorState from '../components/ErrorState.js';
 import AgentTypeGrid from '../components/AgentTypeGrid.js';
 import SetupModal from '../components/SetupModal.js';
 import RichText from '../components/RichText.js';
-import { Button, IconButton, Modal, Panel } from '../components/ui.js';
+import { Button, Modal, Panel } from '../components/ui.js';
 import SettingsRecordingSection from './SettingsRecordingSection.js';
 import SettingsModelListingSection from './SettingsModelListingSection.js';
-import SettingsIpRestrictionSection from './SettingsIpRestrictionSection.js';
 import SettingsRow from './SettingsRow.js';
 import { me, roleCan } from '../services/session-store.js';
 import { agentDisplayNameSignal } from '../services/agent-display-name.js';
-import {
-  deleteAgent,
-  getAgentInfo,
-  getAgentKey,
-  renameAgent,
-  rotateAgentKey,
-  updateAgent,
-} from '../services/api.js';
+import { deleteAgent, getAgentInfo, renameAgent, updateAgent } from '../services/api.js';
 import { markAgentCreated } from '../services/recent-agents.js';
 import { toast } from '../services/toast-store.js';
 import { setAgentPlatform } from '../services/agent-platform-store.js';
@@ -39,31 +28,10 @@ import { useResource } from '../lib/use-resource.js';
 import { t } from '../i18n/index.js';
 import { ThemedIcon } from '../components/setup-ui.js';
 
-/** Catches a render crash in the key/setup block and offers a retry. */
-class SectionBoundary extends Component<
-  { children: ReactNode; fallback: (error: unknown, reset: () => void) => ReactNode },
-  { error: unknown }
-> {
-  state: { error: unknown } = { error: null };
-  static getDerivedStateFromError(error: unknown) {
-    return { error: error ?? new Error('Unknown error') };
-  }
-  componentDidCatch(_error: unknown, _info: ErrorInfo) {
-    /* shown in the fallback */
-  }
-  reset = () => this.setState({ error: null });
-  render() {
-    return this.state.error
-      ? this.props.fallback(this.state.error, this.reset)
-      : this.props.children;
-  }
-}
-
 /** Harness Settings tab, rendered inside AgentDetail at /harnesses/:agentName/settings. */
 export default function Settings() {
   const params = useParams<{ agentName: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const agentName = decodeURIComponent(params.agentName ?? '');
   useSignal(me);
   const displayName = useSignal(agentDisplayNameSignal) ?? agentName;
@@ -74,19 +42,13 @@ export default function Settings() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const [rotating, setRotating] = useState(false);
-  const [rotatedKey, setRotatedKey] = useState<string | null>(
-    (location.state as { newApiKey?: string } | null)?.newApiKey ?? null,
-  );
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [modalCategory, setModalCategory] = useState<AgentCategory | null>(null);
   const [modalPlatform, setModalPlatform] = useState<AgentPlatform | null>(null);
   const [savingType, setSavingType] = useState(false);
-  const [keyRevealed, setKeyRevealed] = useState(false);
 
   const agentInfo = useResource(() => getAgentInfo(agentName), [agentName]);
-  const apiKeyData = useResource(() => getAgentKey(agentName), [agentName]);
 
   const currentCategory = (agentInfo.data?.agent_category as AgentCategory | undefined) ?? null;
   const currentPlatform = (agentInfo.data?.agent_platform as AgentPlatform | undefined) ?? null;
@@ -108,7 +70,6 @@ export default function Settings() {
       });
       setAgentPlatform(modalPlatform, modalCategory);
       await agentInfo.reload();
-      await apiKeyData.reload();
       setShowTypeModal(false);
       setShowSetupModal(true);
     } catch {
@@ -117,11 +78,6 @@ export default function Settings() {
       setSavingType(false);
     }
   };
-
-  const keyData = apiKeyData.error ? undefined : apiKeyData.data;
-  const fullKey = rotatedKey ?? keyData?.apiKey ?? null;
-  const maskedKey = `${keyData?.keyPrefix ?? '...'}...`;
-  const displayedKey = fullKey && keyRevealed ? fullKey : maskedKey;
 
   const handleDeleteAgent = async () => {
     if (deleteConfirmName !== agentName || deleting) return;
@@ -149,21 +105,6 @@ export default function Settings() {
       setName(agentName);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleRotate = async () => {
-    setRotating(true);
-    try {
-      const result = await rotateAgentKey(agentName);
-      setRotatedKey(result.apiKey);
-      setKeyRevealed(true);
-      toast.success(t('harnesses.settings.rotated'));
-      void apiKeyData.reload();
-    } catch {
-      // error toast handled by fetchMutate
-    } finally {
-      setRotating(false);
     }
   };
 
@@ -236,63 +177,6 @@ export default function Settings() {
 
           {/* -- /v1/models listing ------------------------ */}
           <SettingsModelListingSection agentName={agentName} />
-
-          {/* -- Source IP restriction (admins) ------------ */}
-          <SettingsIpRestrictionSection agentName={agentName} />
-
-          {/* -- API key ---------------------------------- */}
-          <SectionBoundary
-            fallback={(err, reset) => (
-              <div className="panel">
-                <ErrorState
-                  error={err}
-                  title={t('common.somethingWentWrong')}
-                  message={t('harnesses.settings.errorMessage')}
-                  onRetry={reset}
-                />
-              </div>
-            )}
-          >
-            <Panel title={t('harnesses.settings.apiKeyTitle')}>
-              <SettingsRow
-                title={t('harnesses.settings.apiKeyLabel')}
-                description={t('harnesses.settings.apiKeyDesc')}
-              />
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-control border border-line bg-sunken px-3 py-2 font-mono text-xs text-ink">
-                  {displayedKey}
-                </code>
-                {fullKey ? (
-                  <>
-                    <IconButton
-                      label={
-                        keyRevealed ? t('harnesses.key.hideAria') : t('harnesses.key.revealAria')
-                      }
-                      title={
-                        keyRevealed ? t('harnesses.key.hideShort') : t('harnesses.key.revealShort')
-                      }
-                      onClick={() => setKeyRevealed(!keyRevealed)}
-                    >
-                      {keyRevealed ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-                    </IconButton>
-                    <CopyButton text={fullKey} />
-                  </>
-                ) : null}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleRotate()}
-                  busy={rotating}
-                >
-                  {rotating ? (
-                    <span className="sr-only">{t('harnesses.settings.rotating')}</span>
-                  ) : (
-                    t('harnesses.settings.rotate')
-                  )}
-                </Button>
-              </div>
-            </Panel>
-          </SectionBoundary>
 
           {/* -- Danger zone -------------------------------- */}
           <section className="panel border-danger">

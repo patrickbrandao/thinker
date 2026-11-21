@@ -1,27 +1,20 @@
 import { useState, type FormEvent } from 'react';
 import { KeyRound, Plus } from 'lucide-react';
 import ActionMenu from './ActionMenu.js';
+import KeyEditModal, { ExpiryPicker, expiryAt, type Expiry } from './KeyEditModal.js';
 import CopyButton from './CopyButton.js';
 import { Badge, Button, ConfirmDialog, Field, Modal, Panel } from './ui.js';
 import {
   createAgentKey,
   listAgentKeys,
   revokeAgentKey,
-  updateAgentKey,
+  rotateOneAgentKey,
+  getAgentKeySecret,
   type AgentKeyStatus,
   type AgentKeyView,
 } from '../services/api/agent-keys.js';
-import { rotateAgentKey } from '../services/api/agents.js';
-import {
-  DAY_MS,
-  EXPIRY_PRESETS,
-  MAX_EXPIRY_DAYS,
-  dateInputValue,
-  daysFromNow,
-  expiryFromDate,
-  expiryInDays,
-  isStaleKey,
-} from '../services/agent-key-utils.js';
+import { listIpPrefixLists } from '../services/api/ip-prefix-lists.js';
+import { daysFromNow, isStaleKey } from '../services/agent-key-utils.js';
 import { formatDateTime, formatTimeAgo } from '../services/formatters.js';
 import { roleCan } from '../services/session-store.js';
 import { toast } from '../services/toast-store.js';
@@ -46,7 +39,7 @@ function relativeDays(ts: string): string {
   return d > 0 ? t('harnessKeys.inDays', { n: d }) : t('harnessKeys.daysAgo', { n: -d });
 }
 
-/** A one-time secret: the full key with a copy button and the "shown once" warning. */
+/** A new secret: the full key with a copy button (it can be shown again in the table). */
 function SecretModal({
   title,
   secret,
@@ -79,8 +72,6 @@ function SecretModal({
   );
 }
 
-type Expiry = { kind: 'preset'; days: number } | { kind: 'custom'; date: string };
-
 function NewKeyModal({
   open,
   agentName,
@@ -95,10 +86,7 @@ function NewKeyModal({
   const [name, setName] = useState('');
   const [expiry, setExpiry] = useState<Expiry>({ kind: 'preset', days: 90 });
   const [busy, setBusy] = useState(false);
-  const now = Date.now();
-  const expiresAt =
-    expiry.kind === 'preset' ? expiryInDays(expiry.days, now) : expiryFromDate(expiry.date, now);
-  const dateInvalid = expiry.kind === 'custom' && !!expiry.date && !expiresAt;
+  const expiresAt = expiryAt(expiry);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -132,58 +120,7 @@ function NewKeyModal({
             required
           />
         </Field>
-        <div>
-          <span className="label">{t('harnessKeys.create.expiry')}</span>
-          <div
-            className="segmented w-fit flex-wrap"
-            role="radiogroup"
-            aria-label={t('harnessKeys.create.expiry')}
-          >
-            {EXPIRY_PRESETS.map((d) => {
-              const on = expiry.kind === 'preset' && expiry.days === d;
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  aria-pressed={on}
-                  onClick={() => setExpiry({ kind: 'preset', days: d })}
-                >
-                  {t('harnessKeys.create.days', { n: d })}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={expiry.kind === 'custom'}
-              aria-pressed={expiry.kind === 'custom'}
-              onClick={() => setExpiry({ kind: 'custom', date: dateInputValue(now + 30 * DAY_MS) })}
-            >
-              {t('harnessKeys.create.custom')}
-            </button>
-          </div>
-        </div>
-        {expiry.kind === 'custom' ? (
-          <Field
-            label={t('harnessKeys.create.customDate')}
-            htmlFor="agent-key-date"
-            hint={t('harnessKeys.create.customHint')}
-            error={dateInvalid ? t('harnessKeys.create.invalidDate') : undefined}
-          >
-            <input
-              id="agent-key-date"
-              className="field w-auto"
-              type="date"
-              min={dateInputValue(now + DAY_MS)}
-              max={dateInputValue(now + (MAX_EXPIRY_DAYS - 1) * DAY_MS)}
-              value={expiry.date}
-              onChange={(e) => setExpiry({ kind: 'custom', date: e.currentTarget.value })}
-            />
-          </Field>
-        ) : null}
-        {expiresAt ? <p className="m-0 text-xs text-muted">{formatDateTime(expiresAt)}</p> : null}
+        <ExpiryPicker value={expiry} onChange={setExpiry} idPrefix="agent-key" />
         <div className="actions flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>
             {t('common.cancel')}
@@ -197,62 +134,11 @@ function NewKeyModal({
   );
 }
 
-function RenameModal({
-  target,
-  onClose,
-  onSave,
-}: {
-  target: AgentKeyView | null;
-  onClose: () => void;
-  onSave: (name: string) => Promise<void>;
-}) {
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [lastId, setLastId] = useState<string | null>(null);
-  if (target && target.id !== lastId) {
-    setLastId(target.id);
-    setName(target.name ?? '');
-  }
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      await onSave(name.trim());
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Modal open={target !== null} title={t('harnessKeys.rename.title')} onClose={onClose}>
-      <form className="flex flex-col gap-4" onSubmit={(e) => void submit(e)}>
-        <Field label={t('harnessKeys.create.name')} htmlFor="agent-key-rename">
-          <input
-            id="agent-key-rename"
-            className="field"
-            maxLength={100}
-            value={name}
-            onChange={(e) => setName(e.currentTarget.value)}
-            required
-          />
-        </Field>
-        <div className="actions flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit" size="sm" busy={busy} disabled={!name.trim()}>
-            {t('harnessKeys.rename.submit')}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 /**
- * API keys of a harness (Connection tab): the primary key plus extra keys
- * with an expiry. Members and up create, rename, disable and revoke them;
- * the primary key is rotated instead of revoked.
+ * API keys of a harness (API Keys tab), one table: the primary key is always
+ * there and is only rotated; extra keys expire and can be rotated or removed
+ * (revoked). Every key opens in an editor for its name, status, expiry and,
+ * for admins and owners, its source IP restriction.
  */
 export default function AgentKeysPanel({
   agentName,
@@ -263,12 +149,17 @@ export default function AgentKeysPanel({
   onPrimaryRotated?: () => void;
 }) {
   const canEdit = roleCan.editHarnesses();
+  const canManageIp = roleCan.manageProviders();
   const res = useResource(() => listAgentKeys(agentName), [agentName]);
+  const ipLists = useResource(
+    () => (canManageIp ? listIpPrefixLists() : Promise.resolve({ lists: [] })),
+    [canManageIp],
+  );
+  const [editing, setEditing] = useState<AgentKeyView | null>(null);
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState<{ title: string; key: string } | null>(null);
-  const [renaming, setRenaming] = useState<AgentKeyView | null>(null);
   const [revoking, setRevoking] = useState<AgentKeyView | null>(null);
-  const [rotating, setRotating] = useState(false);
+  const [rotating, setRotating] = useState<AgentKeyView | null>(null);
   const [busy, setBusy] = useState(false);
   const [showRevoked, setShowRevoked] = useState(false);
 
@@ -281,29 +172,6 @@ export default function AgentKeysPanel({
     res.setData((prev) =>
       prev ? { keys: prev.keys.map((k) => (k.id === key.id ? key : k)) } : prev,
     );
-
-  const toggleDisabled = async (key: AgentKeyView) => {
-    const disabled = key.status !== 'disabled';
-    try {
-      const out = await updateAgentKey(agentName, key.id, { disabled });
-      replace(out.key);
-      toast.success(disabled ? t('harnessKeys.toast.disabled') : t('harnessKeys.toast.enabled'));
-    } catch {
-      // toasted
-    }
-  };
-
-  const rename = async (name: string) => {
-    if (!renaming) return;
-    try {
-      const out = await updateAgentKey(agentName, renaming.id, { name });
-      replace(out.key);
-      toast.success(t('harnessKeys.toast.renamed'));
-      setRenaming(null);
-    } catch {
-      // toasted
-    }
-  };
 
   const revoke = async () => {
     if (!revoking) return;
@@ -321,13 +189,15 @@ export default function AgentKeysPanel({
   };
 
   const rotate = async () => {
+    if (!rotating) return;
+    const target = rotating;
     setBusy(true);
     try {
-      const out = await rotateAgentKey(agentName);
+      const out = await rotateOneAgentKey(agentName, target.id);
       toast.success(t('harnessKeys.toast.rotated'));
-      setRotating(false);
+      setRotating(null);
       setSecret({ title: t('harnessKeys.rotate.newTitle'), key: out.apiKey });
-      onPrimaryRotated?.();
+      if (target.isPrimary) onPrimaryRotated?.();
       void res.reload();
     } catch {
       // toasted
@@ -336,20 +206,49 @@ export default function AgentKeysPanel({
     }
   };
 
+  const listNames = new Map((ipLists.data?.lists ?? []).map((l) => [l.id, l.name]));
+  const ipCell = (k: AgentKeyView) => {
+    if (k.status === 'revoked') return <span className="text-muted">—</span>;
+    if (!k.ipRestriction.enabled) {
+      return <Badge tone="ok">{t('harnessKeys.anyIp')}</Badge>;
+    }
+    const names = k.ipRestriction.listIds.map((id) => listNames.get(id)).filter(Boolean);
+    return (
+      <>
+        <Badge tone="warn">{t('harnessKeys.ipRestricted')}</Badge>
+        <div className="row-sub">
+          {names.length
+            ? names.join(', ')
+            : t('harnessKeys.ipLists', { count: k.ipRestriction.listIds.length })}
+        </div>
+      </>
+    );
+  };
+
+  const copyKey = async (k: AgentKeyView) => {
+    try {
+      const { apiKey } = await getAgentKeySecret(agentName, k.id);
+      if (!apiKey) return;
+      await navigator.clipboard.writeText(apiKey);
+      toast.success(t('harnessKeys.toast.copied'));
+    } catch {
+      toast.error(t('harnessKeys.toast.copyFailed'));
+    }
+  };
+
   const actionsFor = (k: AgentKeyView) => {
     if (k.status === 'revoked') return [];
     return [
-      { label: t('harnessKeys.actions.rename'), onClick: () => setRenaming(k) },
-      {
-        label:
-          k.status === 'disabled'
-            ? t('harnessKeys.actions.enable')
-            : t('harnessKeys.actions.disable'),
-        onClick: () => void toggleDisabled(k),
-      },
-      k.isPrimary
-        ? { label: t('harnessKeys.actions.rotate'), onClick: () => setRotating(true) }
-        : { label: t('harnessKeys.actions.revoke'), onClick: () => setRevoking(k), danger: true },
+      { label: t('harnessKeys.actions.edit'), onClick: () => setEditing(k) },
+      ...(k.recoverable
+        ? [{ label: t('harnessKeys.actions.copy'), onClick: () => void copyKey(k) }]
+        : []),
+      { label: t('harnessKeys.actions.rotate'), onClick: () => setRotating(k) },
+      ...(k.isPrimary
+        ? []
+        : [
+            { label: t('harnessKeys.actions.revoke'), onClick: () => setRevoking(k), danger: true },
+          ]),
     ];
   };
 
@@ -372,7 +271,6 @@ export default function AgentKeysPanel({
       }
       bodyClassName="flex flex-col gap-3"
     >
-      <p className="m-0 text-sm text-dim">{t('harnessKeys.intro')}</p>
       {res.error ? (
         <div className="notice is-warn" role="alert">
           <span>{t('harnessKeys.loadError')}</span>
@@ -389,9 +287,10 @@ export default function AgentKeysPanel({
                 <th>{t('harnessKeys.col.name')}</th>
                 <th>{t('harnessKeys.col.prefix')}</th>
                 <th>{t('harnessKeys.col.status')}</th>
-                <th>{t('harnessKeys.col.expires')}</th>
-                <th>{t('harnessKeys.col.lastUsed')}</th>
+                <th>{t('harnessKeys.col.sourceIp')}</th>
                 <th>{t('harnessKeys.col.created')}</th>
+                <th>{t('harnessKeys.col.lastUsed')}</th>
+                <th>{t('harnessKeys.col.expires')}</th>
                 {canEdit ? (
                   <th>
                     <span className="sr-only">{t('harnessKeys.col.actions')}</span>
@@ -406,7 +305,17 @@ export default function AgentKeysPanel({
                   <tr key={k.id} data-testid={`agent-key-${k.id}`}>
                     <td>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="row-title">{keyName(k)}</span>
+                        {canEdit && k.status !== 'revoked' ? (
+                          <button
+                            type="button"
+                            className="row-title text-left hover:underline"
+                            onClick={() => setEditing(k)}
+                          >
+                            {keyName(k)}
+                          </button>
+                        ) : (
+                          <span className="row-title">{keyName(k)}</span>
+                        )}
                         {k.isPrimary ? (
                           <Badge tone="accent">{t('harnessKeys.primary')}</Badge>
                         ) : null}
@@ -417,11 +326,24 @@ export default function AgentKeysPanel({
                         </div>
                       ) : null}
                     </td>
-                    <td className="font-mono text-xs text-dim">{`${k.keyPrefix}…`}</td>
+                    <td className="max-w-[22rem]">
+                      <span className="font-mono text-xs text-dim">{`${k.keyPrefix}…`}</span>
+                    </td>
                     <td>
                       <Badge tone={STATUS_TONE[k.status]}>
                         {t(`harnessKeys.status.${k.status}`)}
                       </Badge>
+                    </td>
+                    <td className="text-sm">{ipCell(k)}</td>
+                    <td className="text-sm text-dim">{formatDateTime(k.createdAt)}</td>
+                    <td className="text-sm text-dim">
+                      {k.lastUsedAt ? (
+                        <span title={formatDateTime(k.lastUsedAt)}>
+                          {formatTimeAgo(k.lastUsedAt) ?? formatDateTime(k.lastUsedAt)}
+                        </span>
+                      ) : (
+                        t('harnessKeys.neverUsed')
+                      )}
                     </td>
                     <td className="text-sm">
                       {k.expiresAt ? (
@@ -433,16 +355,6 @@ export default function AgentKeysPanel({
                         <span className="text-muted">{t('harnessKeys.noExpiry')}</span>
                       )}
                     </td>
-                    <td className="text-sm text-dim">
-                      {k.lastUsedAt ? (
-                        <span title={formatDateTime(k.lastUsedAt)}>
-                          {formatTimeAgo(k.lastUsedAt) ?? formatDateTime(k.lastUsedAt)}
-                        </span>
-                      ) : (
-                        t('harnessKeys.neverUsed')
-                      )}
-                    </td>
-                    <td className="text-sm text-dim">{formatDateTime(k.createdAt)}</td>
                     {canEdit ? (
                       <td className="text-right">
                         {items.length ? (
@@ -485,7 +397,15 @@ export default function AgentKeysPanel({
         secret={secret?.key ?? null}
         onClose={() => setSecret(null)}
       />
-      <RenameModal target={renaming} onClose={() => setRenaming(null)} onSave={rename} />
+      <KeyEditModal
+        agentName={agentName}
+        target={editing}
+        canManageIp={canManageIp}
+        lists={ipLists.data?.lists ?? []}
+        listsLoading={ipLists.loading}
+        onClose={() => setEditing(null)}
+        onSaved={replace}
+      />
       <ConfirmDialog
         open={revoking !== null}
         title={t('harnessKeys.revoke.title')}
@@ -497,14 +417,20 @@ export default function AgentKeysPanel({
         onCancel={() => setRevoking(null)}
       />
       <ConfirmDialog
-        open={rotating}
-        title={t('harnessKeys.rotate.title')}
-        message={t('harnessKeys.rotate.body')}
+        open={rotating !== null}
+        title={
+          rotating?.isPrimary
+            ? t('harnessKeys.rotate.title')
+            : t('harnessKeys.rotate.titleExtra', { name: rotating ? keyName(rotating) : '' })
+        }
+        message={
+          rotating?.isPrimary ? t('harnessKeys.rotate.body') : t('harnessKeys.rotate.bodyExtra')
+        }
         confirmLabel={t('harnessKeys.rotate.confirm')}
         danger
         busy={busy}
         onConfirm={() => void rotate()}
-        onCancel={() => setRotating(false)}
+        onCancel={() => setRotating(null)}
       />
     </Panel>
   );

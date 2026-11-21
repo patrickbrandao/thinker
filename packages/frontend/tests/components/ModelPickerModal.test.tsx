@@ -946,10 +946,11 @@ describe('ModelPickerModal', () => {
         onClose={onClose}
       />,
     );
-    fireEvent.mouseDown(document.body.querySelector('.overlay') as HTMLElement);
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
-    fireEvent.keyDown(document.body.querySelector('.overlay') as HTMLElement, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('calls onClose on the explicit close button', () => {

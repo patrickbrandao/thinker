@@ -1048,8 +1048,7 @@ describe('CustomProviderForm — edit mode', () => {
       expect(screen.getByText('Cancel')).toBeDefined();
     });
 
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.keyDown(overlay, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
 
     await waitFor(() => {
       expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -1535,7 +1534,7 @@ describe('CustomProviderForm — edit mode: extra API key + delete UI branches',
     });
   });
 
-  it('closes the confirm modal when the overlay itself is clicked', async () => {
+  it('does not close the confirm window on a click outside it', async () => {
     const { container } = render(
       <CustomProviderForm
         agentName="test-agent"
@@ -1551,14 +1550,11 @@ describe('CustomProviderForm — edit mode: extra API key + delete UI branches',
       expect(screen.getByText('Cancel')).toBeDefined();
     });
 
-    // Press directly on the overlay — since e.target === e.currentTarget
-    // the handler closes the dialog.
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.mouseDown(overlay);
+    // Windows are floating: a click outside never closes them.
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
 
-    await waitFor(() => {
-      expect(document.querySelector('[role="dialog"]')).toBeNull();
-    });
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   });
 
   it('clicks inside the confirm modal content without closing the modal', async () => {
@@ -1577,9 +1573,7 @@ describe('CustomProviderForm — edit mode: extra API key + delete UI branches',
       expect(screen.getByText('Cancel')).toBeDefined();
     });
 
-    // Press on the modal card itself — because e.target !== e.currentTarget
-    // the overlay handler should NOT close the dialog.
-    const card = document.querySelector('.modal') as HTMLElement;
+    const card = document.querySelector('[role="dialog"]') as HTMLElement;
     fireEvent.mouseDown(card);
 
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();

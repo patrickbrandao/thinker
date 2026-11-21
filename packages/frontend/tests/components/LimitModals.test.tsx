@@ -91,7 +91,7 @@ describe('DeleteRuleModal', () => {
     );
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog).not.toBeNull();
-    expect(dialog!.getAttribute('aria-modal')).toBe('true');
+    expect(dialog!.getAttribute('aria-modal')).toBe('false');
     expect(dialog!.getAttribute('aria-label')).toBe('Delete rule');
     expect(screen.getByRole('heading', { name: 'Delete rule' })).toBeDefined();
   });

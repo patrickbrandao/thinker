@@ -293,13 +293,39 @@ export class AgentsController {
     @TenantCtx() ctx: TenantContext,
     @Param('agentName') agentName: string,
     @Param('keyId') keyId: string,
-    @Body() body: { name?: unknown; disabled?: unknown },
+    @Body() body: { name?: unknown; disabled?: unknown; expiresAt?: unknown },
   ) {
     const info = await this.lifecycle.findAgentInfo(ctx.tenantId, agentName);
     if (!info || !ctx.tenantId) throw new NotFoundException(`Agent "${agentName}" not found`);
     return {
       key: await this.apiKeyGenerator.updateKey(ctx.tenantId, agentName, keyId, body ?? {}),
     };
+  }
+
+  /** Full secret of one key (member action, like GET .../key); absent when not recoverable. */
+  @MinRole('member', { includeReads: true })
+  @Get('agents/:agentName/keys/:keyId/secret')
+  async getAgentKeySecret(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Param('keyId') keyId: string,
+  ) {
+    const info = await this.lifecycle.findAgentInfo(ctx.tenantId, agentName);
+    if (!info || !ctx.tenantId) throw new NotFoundException(`Agent "${agentName}" not found`);
+    return this.apiKeyGenerator.getKeySecret(ctx.tenantId, agentName, keyId);
+  }
+
+  /** New secret for one key (primary or extra); everything else is kept. */
+  @Audit({ entity: 'harness', action: 'updated', idParam: 'agentName', nameParams: ['agentName'] })
+  @Post('agents/:agentName/keys/:keyId/rotate')
+  async rotateOneAgentKey(
+    @TenantCtx() ctx: TenantContext,
+    @Param('agentName') agentName: string,
+    @Param('keyId') keyId: string,
+  ) {
+    const info = await this.lifecycle.findAgentInfo(ctx.tenantId, agentName);
+    if (!info || !ctx.tenantId) throw new NotFoundException(`Agent "${agentName}" not found`);
+    return this.apiKeyGenerator.rotateOneKey(ctx.tenantId, agentName, keyId);
   }
 
   /** Revokes an extra key for good (it stays listed as revoked). */

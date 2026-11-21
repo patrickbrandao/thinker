@@ -360,7 +360,7 @@ describe('RoutingInstructionModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('closes on overlay click', () => {
+  it('does not close on a click outside the window', () => {
     const onClose = vi.fn();
     render(
       <RoutingInstructionModal
@@ -370,9 +370,9 @@ describe('RoutingInstructionModal', () => {
         onClose={onClose}
       />,
     );
-    const overlay = document.body.querySelector('.overlay')!;
-    fireEvent.mouseDown(overlay);
-    expect(onClose).toHaveBeenCalled();
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('closes when close button is clicked in disable mode', () => {

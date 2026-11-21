@@ -17,7 +17,7 @@ describe('LimitRuleModal', () => {
 
   it('renders nothing when closed', () => {
     render(<LimitRuleModal open={false} onClose={mockOnClose} onSave={mockOnSave} />);
-    expect(q('.overlay')).toBeNull();
+    expect(q('[role="dialog"]')).toBeNull();
   });
 
   it('renders modal when open', () => {
@@ -63,7 +63,7 @@ describe('LimitRuleModal', () => {
     const input = q('input[type="number"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '10' } });
 
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     fireEvent.click(btn);
 
     expect(mockOnSave).toHaveBeenCalledWith({
@@ -92,7 +92,7 @@ describe('LimitRuleModal', () => {
 
   it('disables Create rule button when threshold is empty', () => {
     render(<LimitRuleModal open={true} onClose={mockOnClose} onSave={mockOnSave} />);
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 
@@ -101,7 +101,7 @@ describe('LimitRuleModal', () => {
     const input = q('input[type="number"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '50000' } });
 
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 
@@ -111,7 +111,7 @@ describe('LimitRuleModal', () => {
     const input = q('input[type="number"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '50000' } });
 
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     fireEvent.click(btn);
 
     expect(mockOnSave).toHaveBeenCalledWith({
@@ -128,7 +128,7 @@ describe('LimitRuleModal', () => {
     const input = q('input[type="number"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '0' } });
 
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     fireEvent.click(btn);
 
     expect(mockOnSave).not.toHaveBeenCalled();
@@ -140,7 +140,7 @@ describe('LimitRuleModal', () => {
     const input = q('input[type="number"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'abc' } });
 
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     fireEvent.click(btn);
 
     expect(mockOnSave).not.toHaveBeenCalled();
@@ -152,7 +152,7 @@ describe('LimitRuleModal', () => {
     const input = q('input[type="number"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '50000' } });
 
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     fireEvent.click(btn);
 
     // After async save resolves, threshold should be reset
@@ -161,14 +161,14 @@ describe('LimitRuleModal', () => {
     });
   });
 
-  it('calls onClose and resets form when overlay is clicked', () => {
+  it('does not close on a click outside the window', () => {
     render(<LimitRuleModal open={true} onClose={mockOnClose} onSave={mockOnSave} />);
 
-    // The backdrop closes on mousedown.
-    const overlay = q('.overlay');
-    fireEvent.mouseDown(overlay!);
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
 
-    expect(mockOnClose).toHaveBeenCalled();
+    expect(mockOnClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeTruthy();
   });
 
   it('does not close when clicking inside the modal card', () => {
@@ -216,7 +216,7 @@ describe('LimitRuleModal', () => {
     render(<LimitRuleModal open={true} onClose={mockOnClose} onSave={mockOnSave} />);
 
     const dialog = screen.getByRole('dialog');
-    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.getAttribute('aria-modal')).toBe('false');
     expect(dialog.getAttribute('aria-label')).toBe('Create rule');
   });
 
@@ -301,7 +301,7 @@ describe('LimitRuleModal', () => {
     const input = q('input[type="number"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '50000' } });
 
-    const btn = q('.modal .btn') as HTMLButtonElement;
+    const btn = q('[role="dialog"] .btn') as HTMLButtonElement;
     fireEvent.click(btn);
 
     await vi.waitFor(() => {

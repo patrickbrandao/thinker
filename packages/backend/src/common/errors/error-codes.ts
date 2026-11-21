@@ -41,7 +41,7 @@ export const THINKER_ERRORS = {
   M008: {
     title: 'Source IP not allowed',
     template:
-      "This harness only accepts its keys from the IP prefix lists set in the dashboard, and this request's source address is not in them",
+      "This API key is only accepted from the IP prefix lists set on it in the dashboard, and this request's source address is not in them",
   },
   M100: {
     title: 'Provider API key missing',

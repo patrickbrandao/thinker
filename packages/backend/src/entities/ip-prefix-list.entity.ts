@@ -40,12 +40,12 @@ export class IpPrefixList {
   updated_at!: string;
 }
 
-/** Lists a harness accepts its keys from when `agents.ip_restriction_enabled` is on. */
-@Entity('agent_ip_prefix_lists')
+/** Lists an API key is accepted from when `agent_api_keys.ip_restriction_enabled` is on. */
+@Entity('agent_api_key_ip_prefix_lists')
 @Index(['list_id'])
-export class AgentIpPrefixList {
+export class AgentApiKeyIpPrefixList {
   @PrimaryColumn('varchar')
-  agent_id!: string;
+  key_id!: string;
 
   @PrimaryColumn('varchar')
   list_id!: string;

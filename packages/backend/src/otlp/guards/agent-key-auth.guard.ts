@@ -453,19 +453,19 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
   }
 
   /**
-   * Source-IP restriction of the key's harness (IP prefix lists). Off by
-   * default; when on, the resolved client address must be in a linked list.
+   * Source-IP restriction of the key (IP prefix lists). Off by default; when
+   * on, the resolved client address must be in one of the key's lists.
    * The rejection is attributable, so it is recorded like M004.
    */
   private async authorizeSource(request: Request, ctx: IngestionContext): Promise<void> {
-    if (!this.ds) return;
-    const matcher = await ipRestrictionFor(this.ds, ctx.agentId);
+    if (!this.ds || !ctx.keyId) return;
+    const matcher = await ipRestrictionFor(this.ds, ctx.keyId);
     if (!matcher) return;
     const { clientIp } = clientIpInfo(request);
     if (matcher.contains(clientIp)) return;
     (request as Request & RequestWithThinkerErrorContext).thinkerErrorContext = ctx;
     this.logger.warn(
-      `Rejected agent key for harness "${ctx.agentName}" from a source IP outside its prefix lists (${clientIpLogFields(request)})`,
+      `Rejected agent key "${ctx.keyName ?? ctx.keyId}" of harness "${ctx.agentName}" from a source IP outside its prefix lists (${clientIpLogFields(request)})`,
     );
     throw new ForbiddenException(SOURCE_IP_NOT_ALLOWED);
   }

@@ -211,16 +211,15 @@ describe('DuplicateAgentModal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('closes when the overlay backdrop is clicked', async () => {
+  it('does not close on a click outside the window', async () => {
     const onClose = vi.fn();
     render(<DuplicateAgentModal open={true} sourceName="my-agent" onClose={onClose} />);
     await waitFor(() => {
-      expect(q('.overlay')).toBeDefined();
+      expect(q('[role="dialog"]')).not.toBeNull();
     });
-    const overlay = q('.overlay') as HTMLDivElement;
-    // The shared Modal closes on a backdrop mousedown.
-    fireEvent.mouseDown(overlay);
-    expect(onClose).toHaveBeenCalled();
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('does not close when a click inside the modal card bubbles to the overlay', async () => {

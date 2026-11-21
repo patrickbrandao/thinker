@@ -243,7 +243,7 @@ function HarnessLinks({ harnesses, empty }: { harnesses: HarnessRef[]; empty: st
     <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
       {harnesses.map((h) => (
         <li key={h.name}>
-          <Link to={agentPath(h.name, '/settings')} className="text-ink hover:underline">
+          <Link to={agentPath(h.name, '/keys')} className="text-ink hover:underline">
             {h.displayName || h.name}
           </Link>
         </li>

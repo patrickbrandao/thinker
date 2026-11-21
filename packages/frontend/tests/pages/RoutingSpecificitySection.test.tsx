@@ -330,12 +330,12 @@ describe('RoutingSpecificitySection', () => {
     expect(screen.getByText('Task-specific routing')).toBeDefined();
   });
 
-  it('closes the modal when clicking the overlay', () => {
+  it('does not close the window on a click outside it', () => {
     render(<RoutingSpecificitySection {...makeProps()} />);
     fireEvent.click(screen.getByText('Add a task-specific tier'));
-    const overlay = document.querySelector('.overlay') as HTMLElement;
-    fireEvent.mouseDown(overlay);
-    expect(document.querySelector('.specificity-modal')).toBeNull();
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    expect(document.querySelector('.specificity-modal')).not.toBeNull();
   });
 
   it('closes the modal on Escape', () => {
