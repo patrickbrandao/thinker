@@ -5,7 +5,7 @@ import {
   ChevronsUpDown,
   LogOut,
   Network,
-  ListFilter,
+  EthernetPort,
   Plus,
   Settings,
   ShieldCheck,
@@ -114,7 +114,7 @@ export default function UserMenu() {
             <MenuItem icon={<Network />} to="/proxy-servers">
               {t('nav.proxyServers')}
             </MenuItem>
-            <MenuItem icon={<ListFilter />} to="/ip-prefix-lists">
+            <MenuItem icon={<EthernetPort />} to="/ip-prefix-lists">
               {t('nav.ipPrefixLists')}
             </MenuItem>
           </>

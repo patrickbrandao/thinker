@@ -5,7 +5,6 @@ import {
   ControlButton,
   Controls,
   MarkerType,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
@@ -169,7 +168,6 @@ function Canvas({
             </ControlButton>
           ) : null}
         </Controls>
-        {nodes.length > 24 ? <MiniMap pannable zoomable position="top-right" /> : null}
       </ReactFlow>
       {hint ? <div className="stage-hint">{hint}</div> : null}
       {legend?.length ? (

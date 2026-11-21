@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Cctv } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { platformIcon } from 'thinker-shared';
 import ErrorState from '../components/ErrorState.js';
@@ -16,7 +17,7 @@ import { getModelDisplayName } from '../services/model-display.js';
 import {
   costLabel,
   isActive,
-  LIVE_AGENTS_PATH,
+  LIVE_AGENTS_PAGE,
   shortId,
   spanLabel,
 } from './sessions/session-format.js';
@@ -94,6 +95,16 @@ export default function Sessions() {
     const timer = setInterval(() => void reloadView(), RUNNING_REFRESH_MS);
     return () => clearInterval(timer);
   }, [running, reloadView]);
+  // Whether any session is running now, for the "Live agents" button icon.
+  const liveNow = useResource(
+    async () => (await getSessions({ running: 'true', range: '24h', limit: '1' })).items.length > 0,
+    [],
+  );
+  const reloadLiveNow = liveNow.reload;
+  useEffect(() => {
+    const timer = setInterval(() => void reloadLiveNow(), RUNNING_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [reloadLiveNow]);
   const chip = (key: string, on: boolean, label: string) => (
     <button
       type="button"
@@ -139,9 +150,9 @@ export default function Sessions() {
           size="sm"
           className="whitespace-nowrap"
           title={t('sessions.liveAgentsHint')}
-          onClick={() => window.open(LIVE_AGENTS_PATH, '_blank', 'noopener')}
+          onClick={() => navigate(LIVE_AGENTS_PAGE)}
         >
-          <LiveDot />
+          {liveNow.data ? <LiveDot /> : <Cctv aria-hidden="true" className="size-4" />}
           {t('sessions.liveAgents')}
         </Button>
         <div className="page-actions w-full lg:w-auto lg:justify-end">

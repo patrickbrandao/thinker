@@ -1,5 +1,6 @@
 import {
   BrainCircuit,
+  Cctv,
   Settings,
   ShieldCheck,
   Terminal,
@@ -18,9 +19,10 @@ import {
   Network,
   BellRing,
   Brain,
-  ListFilter,
+  EthernetPort,
 } from 'lucide-react';
 import { t, type TranslationKey } from '../i18n/index.js';
+import { LIVE_AGENTS_PAGE } from '../pages/sessions/session-format.js';
 import { connectionBreadcrumbSignal } from '../services/connection-breadcrumb-store.js';
 
 /**
@@ -50,6 +52,12 @@ export const NAVIGATION: NavGroup[] = [
     label: 'nav.sectionObservability',
     items: [
       { key: 'overview', to: '/overview', label: 'nav.overview', icon: LayoutDashboard },
+      {
+        key: 'liveAgents',
+        to: LIVE_AGENTS_PAGE,
+        label: 'nav.liveAgents',
+        icon: Cctv,
+      },
       { key: 'sessions', to: '/sessions', label: 'nav.sessions', icon: MessagesSquare },
       { key: 'requests', to: '/messages', label: 'nav.requests', icon: ScrollText },
       { key: 'alerts', to: '/alerts', label: 'nav.alerts', icon: BellRing },
@@ -109,7 +117,7 @@ export const USER_MENU_PAGES: NavItem[] = [
   { key: 'organization', to: '/organization', label: 'nav.organization', icon: Users },
   { key: 'triggers', to: '/triggers', label: 'nav.triggers', icon: Zap },
   { key: 'proxyServers', to: '/proxy-servers', label: 'nav.proxyServers', icon: Network },
-  { key: 'ipPrefixLists', to: '/ip-prefix-lists', label: 'nav.ipPrefixLists', icon: ListFilter },
+  { key: 'ipPrefixLists', to: '/ip-prefix-lists', label: 'nav.ipPrefixLists', icon: EthernetPort },
   { key: 'adminUsers', to: '/admin/users', label: 'nav.users', icon: ShieldCheck },
   { key: 'mcp', to: '/integrations/mcp', label: 'nav.mcpServer', icon: Unplug },
   { key: 'cli', to: '/integrations/cli', label: 'nav.cli', icon: Terminal },

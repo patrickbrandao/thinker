@@ -2,8 +2,12 @@ import { formatCost } from '../../services/formatters.js';
 
 const MINUTE = 60_000;
 
-/** The live agents wall: a page of its own outside the shell, opened in a new tab. */
+/** The live agents wall inside the dashboard shell. */
+export const LIVE_AGENTS_PAGE = '/live-agents';
+/** The live agents wall as a page of its own outside the shell, opened in its own tab. */
 export const LIVE_AGENTS_PATH = '/sessions/live';
+/** Name of the browser tab that shows the wall, so every link reuses one tab. */
+export const LIVE_AGENTS_TAB = 'thinker-live-agents';
 
 /** "45s", "12m", "2h 14m", "3d 5h". */
 export function spanLabel(fromIso: string, toIso: string): string {

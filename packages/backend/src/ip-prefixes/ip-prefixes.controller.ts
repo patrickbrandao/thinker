@@ -1,5 +1,5 @@
 import { Audit } from '../alerts/audit.decorator';
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { TenantCtx, TenantContext } from '../common/decorators/tenant-context.decorator';
 import { MinRole } from '../common/decorators/roles.decorator';
 import { TenantCacheService } from '../common/services/tenant-cache.service';
@@ -54,8 +54,12 @@ export class IpPrefixesController {
     lookup: { table: 'ip_prefix_lists', nameColumn: 'name' },
   })
   @Delete('ip-prefix-lists/:id')
-  remove(@TenantCtx() ctx: TenantContext, @Param('id') id: string) {
-    return this.lists.remove(ctx.tenantId, id);
+  remove(
+    @TenantCtx() ctx: TenantContext,
+    @Param('id') id: string,
+    @Query('unlink') unlink?: string,
+  ) {
+    return this.lists.remove(ctx.tenantId, id, unlink === 'true');
   }
 
   @Get('agents/:agentName/keys/:keyId/ip-restriction')

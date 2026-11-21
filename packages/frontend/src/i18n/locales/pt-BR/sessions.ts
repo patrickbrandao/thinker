@@ -21,10 +21,11 @@ const ptBR: Catalog<typeof en> = {
     withSubagents: 'Com sub-agentes',
   },
   liveAgents: 'Agentes ao vivo',
-  liveAgentsHint: 'Abre uma nova aba que acompanha ao vivo todas as sessões em execução',
+  liveAgentsHint: 'Acompanha ao vivo todas as sessões em execução',
   wall: {
     pageTitle: 'Agentes ao vivo - Thinker',
     title: 'Agentes ao vivo',
+    openTab: 'Abrir em guia própria',
     count: '{{ count }} em execução',
     emptyTitle: 'Nenhuma sessão em execução',
     emptyBody:

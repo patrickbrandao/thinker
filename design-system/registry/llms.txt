@@ -73,7 +73,7 @@
 ### sidebar
 --sidebar-width-collapsed: 60px
 
-## Blocks (226 BEM blocks, 245 classes)
+## Blocks (226 BEM blocks, 244 classes)
 actions (shell.css): actions
 agent-type-select (shell.css): agent-type-select__option
 alert-row (shell.css): alert-row
@@ -246,7 +246,7 @@ panel-body (base.css): panel-body
 panel-head (base.css): panel-head
 panel-hint (base.css): panel-hint
 provider-type-card (shell.css): provider-type-card
-react-flow (canvas.css): react-flow react-flow__attribution react-flow__controls react-flow__controls-button react-flow__edge-path react-flow__edge-text react-flow__edge-textbg react-flow__handle react-flow__minimap react-flow__node react-flow__pane
+react-flow (canvas.css): react-flow react-flow__attribution react-flow__controls react-flow__controls-button react-flow__edge-path react-flow__edge-text react-flow__edge-textbg react-flow__handle react-flow__node react-flow__pane
 row-actions (base.css): row-actions
 row-sub (base.css): row-sub
 row-title (base.css): row-title
@@ -328,18 +328,18 @@ WindowFooter: src/components/ui.tsx
 (empty until primitives exist)
 
 ## Canonical rules — same selector+property declared twice with different values; the winner renders (5)
-.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1096  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1096  [@media (max-width: 900px)]
-.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1105  [@media (max-width: 900px)]
-.liquid-metal::after { inset: -5px }  ← shell.css:1271
-.liquid-metal::after { padding: 5px }  ← shell.css:1272
+.app.is-collapsed .nav-action { display: inline-flex }  ← shell.css:1103  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger > svg { display: inline-flex }  ← shell.css:1103  [@media (max-width: 900px)]
+.app.is-collapsed .user-trigger { padding: 6px 8px }  ← shell.css:1112  [@media (max-width: 900px)]
+.liquid-metal::after { inset: -5px }  ← shell.css:1278
+.liquid-metal::after { padding: 5px }  ← shell.css:1279
 
 ## Ghost rules — declared but always losing; edit the canonical rule instead, delete these in the refactor project (5)
-.app.is-collapsed .nav-action { display: revert }  at shell.css:1089 loses to shell.css:1096
-.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1089 loses to shell.css:1096
-.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1101 loses to shell.css:1105
-.liquid-metal::after { inset: -2px }  at shell.css:1227 loses to shell.css:1271
-.liquid-metal::after { padding: 2px }  at shell.css:1229 loses to shell.css:1272
+.app.is-collapsed .nav-action { display: revert }  at shell.css:1096 loses to shell.css:1103
+.app.is-collapsed .user-trigger > svg { display: revert }  at shell.css:1096 loses to shell.css:1103
+.app.is-collapsed .user-trigger { padding: 0 10px }  at shell.css:1108 loses to shell.css:1112
+.liquid-metal::after { inset: -2px }  at shell.css:1234 loses to shell.css:1278
+.liquid-metal::after { padding: 2px }  at shell.css:1236 loses to shell.css:1279
 
 ## Component-loaded sheets — imported by components, not index.css; they load after the global styles (2)
 canvas.css ← pages/Topology.tsx

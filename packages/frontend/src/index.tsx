@@ -1,6 +1,15 @@
 import { StrictMode, Suspense, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from 'react-router';
+import { ipAclEditPath } from './services/api/ip-prefix-lists.js';
 import App from './App.jsx';
 import AuthLayout from './layouts/AuthLayout.jsx';
 import RootRedirect from './components/RootRedirect.jsx';
@@ -71,7 +80,6 @@ const TriggerTest = lazyReload(() => import('./pages/TriggerTest.jsx'));
 const ProxyServers = lazyReload(() => import('./pages/ProxyServers.jsx'));
 const ProxyServer = lazyReload(() => import('./pages/ProxyServer.jsx'));
 const IpPrefixLists = lazyReload(() => import('./pages/IpPrefixLists.jsx'));
-const IpPrefixList = lazyReload(() => import('./pages/IpPrefixList.jsx'));
 const AgentTriggers = lazyReload(() => import('./pages/AgentTriggers.jsx'));
 const AgentConnection = lazyReload(() => import('./pages/AgentConnection.jsx'));
 const AgentApiKeys = lazyReload(() => import('./pages/AgentApiKeys.jsx'));
@@ -198,6 +206,14 @@ function AppRoutes() {
           element={
             <Lazy>
               <Workspace />
+            </Lazy>
+          }
+        />
+        <Route
+          path="live-agents"
+          element={
+            <Lazy>
+              <LiveAgents embedded />
             </Lazy>
           }
         />
@@ -488,14 +504,7 @@ function AppRoutes() {
             </Lazy>
           }
         />
-        <Route
-          path="ip-prefix-lists/:listId"
-          element={
-            <Lazy>
-              <IpPrefixList />
-            </Lazy>
-          }
-        />
+        <Route path="ip-prefix-lists/:listId" element={<IpAclEditRedirect />} />
         <Route
           path="admin/users"
           element={
@@ -609,3 +618,9 @@ createRoot(root).render(
     <Root />
   </StrictMode>,
 );
+
+/** Old IP ACL page links (/ip-prefix-lists/:listId) open the editor window instead. */
+function IpAclEditRedirect() {
+  const { listId = 'new' } = useParams<{ listId: string }>();
+  return <Navigate to={ipAclEditPath(listId)} replace />;
+}

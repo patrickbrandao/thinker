@@ -216,7 +216,9 @@ describe('Sessions page', () => {
       expect(alert.textContent).toContain('backend down');
       fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
       expect(await screen.findByText('claude-dev')).toBeTruthy();
-      expect(mockGetSessions).toHaveBeenCalledTimes(2);
+      // The list's calls only (the "Live agents" icon checks running sessions apart).
+      const listCalls = mockGetSessions.mock.calls.filter(([p]) => p.limit !== '1');
+      expect(listCalls).toHaveLength(2);
     });
 
     it('still lists sessions when the harness list fails to load', async () => {
@@ -356,13 +358,11 @@ describe('Sessions page', () => {
     await waitFor(() => expect(screen.getByTestId('where').textContent).not.toContain('running='));
   });
 
-  it('"Live agents" opens the live wall in a new tab', async () => {
-    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+  it('"Live agents" opens the live wall inside the dashboard', async () => {
     renderPage();
     await screen.findByText('claude-dev');
     fireEvent.click(screen.getByRole('button', { name: 'Live agents' }));
-    expect(open).toHaveBeenCalledWith('/sessions/live', '_blank', 'noopener');
-    open.mockRestore();
+    expect(screen.getByTestId('where').textContent).toBe('/live-agents');
   });
 
   it('sets the document title and meta description', async () => {

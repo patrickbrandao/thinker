@@ -541,6 +541,13 @@
   .menu-item.is-active {
     color: var(--accent-soft);
   }
+  .menu-item:disabled,
+  .menu-item:disabled svg {
+    color: var(--text-muted);
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: none;
+  }
   .menu-item .menu-meta {
     margin-left: auto;
     color: var(--text-faint);

@@ -10,7 +10,7 @@ import {
   LogOut,
   Moon,
   Network,
-  ListFilter,
+  EthernetPort,
   Plug,
   Search,
   Settings,
@@ -154,7 +154,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
               id: 'nav:ip-prefix-lists',
               group: t('shell.palette.goTo'),
               label: t('nav.ipPrefixLists'),
-              icon: <ListFilter />,
+              icon: <EthernetPort />,
               run: go('/ip-prefix-lists'),
             },
           ]

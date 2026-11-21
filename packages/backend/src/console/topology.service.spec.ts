@@ -1,4 +1,4 @@
-import { urlHost, topologyInterval, topologyMinutes } from './topology.service';
+import { clientKey, urlHost, topologyInterval, topologyMinutes } from './topology.service';
 
 describe('topologyMinutes', () => {
   it('converts minutes, hours and days', () => {
@@ -40,5 +40,23 @@ describe('urlHost', () => {
   it('is null for an empty or malformed URL', () => {
     expect(urlHost(null)).toBeNull();
     expect(urlHost('not a url')).toBeNull();
+  });
+});
+
+describe('clientKey', () => {
+  it('groups IPv6 addresses by their /64', () => {
+    const a = clientKey('2804:14c:65a1:4001:a1b2:c3d4:e5f6:1234');
+    expect(a).toBe('2804:14c:65a1:4001::/64');
+    expect(clientKey('2804:014c:65a1:4001:ffff::1')).toBe(a);
+    expect(clientKey('2804:14C:65A1:4001::9%en0')).toBe(a);
+    expect(clientKey('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(clientKey('::1')).toBe('0:0:0:0::/64');
+  });
+
+  it('keeps IPv4, mapped IPv4 and unparsable addresses as they are', () => {
+    expect(clientKey('192.168.0.10')).toBe('192.168.0.10');
+    expect(clientKey('::ffff:10.0.0.1')).toBe('::ffff:10.0.0.1');
+    expect(clientKey('2001:db8::1::2')).toBe('2001:db8::1::2');
+    expect(clientKey('not:an:ip')).toBe('not:an:ip');
   });
 });
