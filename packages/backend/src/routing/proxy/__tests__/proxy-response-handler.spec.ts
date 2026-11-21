@@ -1264,7 +1264,8 @@ describe('proxy-response-handler', () => {
         expect.any(Function),
         expect.any(Function),
         undefined,
-        { protocol: 'google_generate_content' },
+        // partialUsage reports Gemini's cumulative usage if the stream breaks off.
+        { protocol: 'google_generate_content', partialUsage: expect.any(Function) },
       );
     });
 

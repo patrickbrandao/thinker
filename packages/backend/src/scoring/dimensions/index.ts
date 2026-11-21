@@ -6,6 +6,7 @@ export {
   scoreConditionalLogic,
   scoreCodeToProse,
   scoreConstraintDensity,
+  MAX_REGEX_SCAN_CHARS,
 } from './structural-dimensions';
 
 export {

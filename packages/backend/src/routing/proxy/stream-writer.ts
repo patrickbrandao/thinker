@@ -106,6 +106,22 @@ export interface StreamRelayOptions {
   protocol?: ProviderWireFormat;
   /** Exact decoded bytes received from the provider, before any API adaptation. */
   onUpstreamChunk?: (text: string) => void;
+  /**
+   * Usage the provider reported before a usage chunk reached the relay, for a
+   * stream that breaks off: Anthropic bills input in `message_start`, Gemini
+   * repeats cumulative usage on every event.
+   */
+  partialUsage?: () => StreamUsage | null;
+}
+
+/** What a broken-off stream had already used: the last usage chunk, else the probe. */
+function usageSoFar(captured: StreamUsage | null, options: StreamRelayOptions) {
+  if (captured) return captured;
+  try {
+    return options.partialUsage?.() ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function createProtocolParser(options: StreamRelayOptions): {
@@ -402,7 +418,7 @@ export async function pipePassthrough(
     protocol.observer?.assertComplete();
   } catch (error) {
     if (isAbortAfterProviderOutcome(error, protocol.observer)) return capturedUsage;
-    attachPartialUsage(error, capturedUsage);
+    attachPartialUsage(error, usageSoFar(capturedUsage, options));
     streamFailed = error instanceof StreamFailure;
     if (error instanceof StreamIdleTimeoutError) await reader.cancel(error).catch(() => undefined);
     throw error;
@@ -517,7 +533,7 @@ export async function pipeStream(
     }
   } catch (error) {
     if (isAbortAfterProviderOutcome(error, protocol.observer)) return capturedUsage;
-    attachPartialUsage(error, capturedUsage);
+    attachPartialUsage(error, usageSoFar(capturedUsage, options));
     streamFailed = error instanceof StreamFailure;
     if (error instanceof StreamIdleTimeoutError) await reader.cancel(error).catch(() => undefined);
     throw error;

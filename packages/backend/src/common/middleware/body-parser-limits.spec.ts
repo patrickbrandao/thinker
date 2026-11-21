@@ -4,10 +4,15 @@ import request from 'supertest';
 import { createServer, type RequestListener, type Server } from 'http';
 import {
   API_BODY_LIMIT,
+  PROXY_BODY_KEY_SHARE_BYTES,
   PROXY_BODY_LIMIT,
   PROXY_BODY_LIMIT_BYTES,
+  PROXY_PRE_AUTH,
   bodyParserErrorHandler,
   createProxyBodyBudgetMiddleware,
+  createProxyPreAuthMiddleware,
+  proxyPreAuth,
+  skipRefusedProxyBodies,
 } from './body-parser-limits';
 
 function createParserTestApp() {
@@ -226,5 +231,102 @@ describe('body parser limits', () => {
 
     expect(next).toHaveBeenCalledWith(err);
     expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe('proxy bodies are read only after the agent key is accepted', () => {
+  function preAuthApp(authenticate: (req: express.Request) => Promise<boolean>) {
+    const seen: Array<{ body: unknown }> = [];
+    const app = express();
+    app.use('/v1', createProxyPreAuthMiddleware(authenticate));
+    app.use('/v1', createProxyBodyBudgetMiddleware());
+    app.use('/v1', skipRefusedProxyBodies(express.json({ limit: PROXY_BODY_LIMIT })));
+    app.use(skipRefusedProxyBodies(express.json({ limit: API_BODY_LIMIT })));
+    app.use(bodyParserErrorHandler);
+    app.post('/v1/chat/completions', (req: Request, res: Response) => {
+      seen.push({ body: req.body });
+      const pre = proxyPreAuth(req);
+      res.status(pre?.ok === false ? 401 : 200).json({ ok: pre?.ok ?? null });
+    });
+    return { app, seen };
+  }
+
+  it('never parses the body of a refused key, and the route still answers', async () => {
+    const { app, seen } = preAuthApp(async () => {
+      throw new Error('Invalid API key');
+    });
+    await request(await serveOnLoopback(app))
+      .post('/v1/chat/completions')
+      .send({ messages: [{ role: 'user', content: 'x'.repeat(2 * 1024 * 1024) }] })
+      .expect(401);
+    expect(seen).toEqual([{ body: undefined }]);
+  });
+
+  it('parses the body of an accepted key', async () => {
+    const { app, seen } = preAuthApp(async () => true);
+    await request(await serveOnLoopback(app))
+      .post('/v1/chat/completions')
+      .send({ messages: [{ role: 'user', content: 'hi' }] })
+      .expect(200);
+    expect(seen[0]!.body).toEqual({ messages: [{ role: 'user', content: 'hi' }] });
+  });
+
+  it('does not authenticate bodyless requests ahead of the guard', async () => {
+    const authenticate = jest.fn(async () => true);
+    const middleware = createProxyPreAuthMiddleware(authenticate);
+    const next = jest.fn();
+    middleware({ method: 'GET', headers: {} } as express.Request, createMockResponse(), next);
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('a refused key reserves no budget: a full-size claim leaves room for others', () => {
+    const middleware = createProxyBodyBudgetMiddleware();
+    const refused = {
+      method: 'POST',
+      headers: { 'content-length': String(PROXY_BODY_LIMIT_BYTES) },
+      [PROXY_PRE_AUTH]: { ok: false, error: new Error('Invalid API key') },
+    } as unknown as express.Request;
+    const accepted = {
+      method: 'POST',
+      headers: { 'content-length': '1' },
+      [PROXY_PRE_AUTH]: { ok: true },
+    } as unknown as express.Request;
+    const refusedNext = jest.fn();
+    const acceptedNext = jest.fn();
+    middleware(refused, createMockResponse(), refusedNext);
+    middleware(accepted, createMockResponse(), acceptedNext);
+    expect(refusedNext).toHaveBeenCalledTimes(1);
+    expect(acceptedNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('caps what one key holds in flight once it already has a request open', () => {
+    const middleware = createProxyBodyBudgetMiddleware();
+    const fromKey = (keyId: string, bytes: number) =>
+      ({
+        method: 'POST',
+        headers: { 'content-length': String(bytes) },
+        ingestionContext: { keyId, agentId: 'a1' },
+      }) as unknown as express.Request;
+    const big = PROXY_BODY_KEY_SHARE_BYTES;
+    const firstRes = createMockResponse();
+    const first = jest.fn();
+    middleware(fromKey('k1', big), firstRes, first);
+    expect(first).toHaveBeenCalledTimes(1);
+
+    const sameKeyRes = createMockResponse();
+    const sameKey = jest.fn();
+    middleware(fromKey('k1', 1), sameKeyRes, sameKey);
+    expect(sameKey).not.toHaveBeenCalled();
+    expect(sameKeyRes.status).toHaveBeenCalledWith(429);
+
+    const otherKey = jest.fn();
+    middleware(fromKey('k2', 1), createMockResponse(), otherKey);
+    expect(otherKey).toHaveBeenCalledTimes(1);
+
+    firstRes.emit('close');
+    const afterRelease = jest.fn();
+    middleware(fromKey('k1', 1), createMockResponse(), afterRelease);
+    expect(afterRelease).toHaveBeenCalledTimes(1);
   });
 });

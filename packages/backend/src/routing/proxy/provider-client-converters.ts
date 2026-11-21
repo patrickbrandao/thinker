@@ -16,6 +16,7 @@ import {
   fromAnthropicResponse,
   transformAnthropicStreamChunk,
   createAnthropicStreamTransformer,
+  type AnthropicStreamTransformer,
   type ThinkingBlocksCallback,
 } from './anthropic-adapter';
 import {
@@ -81,7 +82,7 @@ export function convertAnthropicStreamChunk(chunk: string, model: string): strin
 export function createAnthropicTransformer(
   model: string,
   onThinkingBlocks?: ThinkingBlocksCallback,
-): (chunk: string) => string | null {
+): AnthropicStreamTransformer {
   return createAnthropicStreamTransformer(model, onThinkingBlocks);
 }
 

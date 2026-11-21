@@ -385,6 +385,33 @@ describe('pipeStream', () => {
     expect(partialUsageOf(error)).toMatchObject({ prompt_tokens: 12, completion_tokens: 3 });
   });
 
+  it('falls back to the relay probe when no usage chunk arrived before the stream broke off', async () => {
+    // Anthropic reports input in message_start; the transformer only emits a
+    // usage chunk at message_delta, so an early break has no captured usage.
+    const { res } = mockResponse();
+    const encoder = new TextEncoder();
+    let sent = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!sent) {
+          sent = true;
+          controller.enqueue(
+            encoder.encode(
+              'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":900,"output_tokens":1}}}\n\n',
+            ),
+          );
+          return;
+        }
+        controller.error(new Error('aborted'));
+      },
+    });
+
+    const error = await pipePassthrough(stream, res as never, () => null, undefined, {
+      partialUsage: () => ({ prompt_tokens: 900, completion_tokens: 1 }),
+    }).catch((e: unknown) => e);
+    expect(partialUsageOf(error)).toMatchObject({ prompt_tokens: 900, completion_tokens: 1 });
+  });
+
   function createReadableStream(chunks: string[]): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder();
     let index = 0;

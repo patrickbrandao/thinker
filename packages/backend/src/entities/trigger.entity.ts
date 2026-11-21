@@ -47,6 +47,10 @@ export class Trigger {
   @Column('varchar', { nullable: true })
   created_by_user_id!: string | null;
 
+  /** What THINKER_PROVIDER_PRIVATE_URLS allowed whoever saved it (ADR 0006 item 7). */
+  @Column('boolean', { default: true })
+  allow_private_destination!: boolean;
+
   @Column(timestampType(), { default: timestampDefault() })
   created_at!: string;
 

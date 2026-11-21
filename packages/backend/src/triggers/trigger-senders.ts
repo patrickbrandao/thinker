@@ -10,7 +10,8 @@ import {
   SYSLOG_SEVERITIES,
   type TriggerType,
 } from 'thinker-shared';
-import { ssrfSafeFetch } from '../common/utils/ssrf-safe-fetch';
+import type { LookupAddress } from 'node:dns';
+import { resolveConnectableAddresses, ssrfSafeFetch } from '../common/utils/ssrf-safe-fetch';
 import { ThresholdAlertEmail } from '../notifications/emails/threshold-alert';
 import { TriggerEventEmail } from '../notifications/emails/trigger-event';
 import { renderTemplate, type TemplateVars } from './trigger-template';
@@ -30,6 +31,12 @@ export interface DeliveryInput {
   eventType: string;
   vars: TemplateVars;
   timeoutMs: number;
+  /**
+   * Whether the destination may be a private, LAN or loopback address, as the
+   * private-URL policy allowed whoever saved the trigger (ADR 0006 item 7).
+   * Cloud metadata endpoints are refused either way.
+   */
+  allowPrivate?: boolean;
   /** Sender used when an e-mail trigger has no `from`. */
   defaultFrom: string;
   /** Recipient used when an e-mail trigger has no `to` (the workspace owner). */
@@ -37,6 +44,11 @@ export interface DeliveryInput {
 }
 
 export const MAX_RESPONSE_CHARS = 4096;
+/** Response bytes read before giving up on the rest (the log keeps 4096 chars). */
+const MAX_RESPONSE_BYTES = MAX_RESPONSE_CHARS * 4;
+/** A RELP server's answers are a few short frames; anything bigger is refused. */
+export const RELP_MAX_FRAME_BYTES = 64 * 1024;
+const RELP_MAX_BUFFER_BYTES = 2 * RELP_MAX_FRAME_BYTES;
 
 function truncate(text: string, max = MAX_RESPONSE_CHARS): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
@@ -62,17 +74,42 @@ function redact(text: string | null, secrets: Array<string | undefined>): string
   return out;
 }
 
+/** Reads at most `maxBytes` of the body and cancels the rest. */
+async function readCappedText(res: Response, maxBytes: number): Promise<string> {
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.byteLength;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  return Buffer.concat(chunks).subarray(0, maxBytes).toString('utf8');
+}
+
 async function httpCall(
   url: string,
   init: RequestInit,
   timeoutMs: number,
   secrets: Array<string | undefined> = [],
+  allowPrivate = true,
 ): Promise<DeliveryResult> {
   try {
     // Webhook URLs are tenant-supplied: never reach cloud metadata, even
-    // through a name that resolves there at connect time (DNS rebinding).
-    const res = await ssrfSafeFetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-    const text = truncate(await res.text().catch(() => ''));
+    // through a name that resolves there at connect time (DNS rebinding), nor
+    // the internal network when the trigger was saved without that permission.
+    const res = await ssrfSafeFetch(
+      url,
+      { ...init, signal: AbortSignal.timeout(timeoutMs) },
+      { allowPrivate },
+    );
+    const text = truncate(await readCappedText(res, MAX_RESPONSE_BYTES).catch(() => ''));
     return {
       success: res.ok,
       statusCode: res.status,
@@ -98,15 +135,44 @@ export async function deliver(input: DeliveryInput): Promise<DeliveryResult> {
     case 'email':
       return deliverEmail(input);
     case 'syslog':
-      return deliverSyslog(input);
+      return withSocketDestination(input, (dest) => deliverSyslog(input, dest));
     case 'gelf':
-      return deliverGelf(input);
+      return input.config.transport === 'http'
+        ? deliverGelf(input)
+        : withSocketDestination(input, (dest) => deliverGelf(input, dest));
     case 'relp':
-      return deliverRelp(input);
+      return withSocketDestination(input, (dest) => deliverRelp(input, dest));
   }
 }
 
-async function deliverWebhook({ config, secrets, vars, timeoutMs, eventType }: DeliveryInput) {
+/**
+ * Resolves a log destination once and connects to that address, so the
+ * private-URL policy and the cloud-metadata block apply to syslog, RELP and
+ * GELF over UDP/TCP like they do to HTTP (no second lookup to rebind).
+ */
+async function withSocketDestination(
+  input: DeliveryInput,
+  send: (dest: LookupAddress) => Promise<DeliveryResult>,
+): Promise<DeliveryResult> {
+  let dest: LookupAddress;
+  try {
+    [dest] = (await resolveConnectableAddresses(String(input.config.host), {
+      allowPrivate: input.allowPrivate ?? true,
+    })) as [LookupAddress];
+  } catch (err) {
+    return failed(err);
+  }
+  return send(dest);
+}
+
+async function deliverWebhook({
+  config,
+  secrets,
+  vars,
+  timeoutMs,
+  eventType,
+  allowPrivate,
+}: DeliveryInput) {
   const method = String(config.method ?? 'POST');
   const contentType = String(config.content_type ?? 'application/json');
   const url = renderTemplate(String(config.url ?? ''), vars, 'url');
@@ -135,10 +201,13 @@ async function deliverWebhook({ config, secrets, vars, timeoutMs, eventType }: D
       .digest('hex');
     headers['X-Thinker-Signature'] = `sha256=${signature}`;
   }
-  return httpCall(url, { method, headers, body, redirect: 'manual' }, timeoutMs, [
-    ...Object.values(secrets.headers ?? {}),
-    secrets.hmacSecret,
-  ]);
+  return httpCall(
+    url,
+    { method, headers, body, redirect: 'manual' },
+    timeoutMs,
+    [...Object.values(secrets.headers ?? {}), secrets.hmacSecret],
+    allowPrivate ?? true,
+  );
 }
 
 const TELEGRAM_MAX = 4096;
@@ -354,12 +423,10 @@ export function formatSyslog(
   return `<${pri}>1 ${now.toISOString()} ${host} ${app} ${process.pid} ${msgId} ${sd} ${msg}`;
 }
 
-function deliverSyslog({
-  config,
-  vars,
-  timeoutMs,
-  eventType,
-}: DeliveryInput): Promise<DeliveryResult> {
+function deliverSyslog(
+  { config, vars, timeoutMs, eventType }: DeliveryInput,
+  dest: LookupAddress,
+): Promise<DeliveryResult> {
   const line = formatSyslog(config, eventType, vars);
   const host = String(config.host);
   const port = Number(config.port);
@@ -379,7 +446,7 @@ function deliverSyslog({
 
   return new Promise((resolve) => {
     if (config.transport === 'tcp') {
-      const socket = connect({ host, port });
+      const socket = connect({ host: dest.address, port });
       let settled = false;
       const done = (result: DeliveryResult) => {
         if (settled) return;
@@ -396,12 +463,12 @@ function deliverSyslog({
       });
       return;
     }
-    const socket = createSocket(host.includes(':') ? 'udp6' : 'udp4');
+    const socket = createSocket(dest.family === 6 ? 'udp6' : 'udp4');
     const timer = setTimeout(() => {
       socket.close();
       resolve(fail(new Error(`Timed out sending to ${target}`)));
     }, timeoutMs);
-    socket.send(Buffer.from(line), port, host, (err) => {
+    socket.send(Buffer.from(line), port, dest.address, (err) => {
       clearTimeout(timer);
       socket.close();
       resolve(err ? fail(err) : ok('udp'));
@@ -476,12 +543,10 @@ export function gelfChunks(payload: Buffer, size = GELF_CHUNK_DATA): Buffer[] {
   return chunks;
 }
 
-async function deliverGelf({
-  config,
-  vars,
-  timeoutMs,
-  eventType,
-}: DeliveryInput): Promise<DeliveryResult> {
+async function deliverGelf(
+  { config, vars, timeoutMs, eventType, allowPrivate }: DeliveryInput,
+  dest?: LookupAddress,
+): Promise<DeliveryResult> {
   const json = Buffer.from(JSON.stringify(buildGelf(config, eventType, vars)));
   const gzip = config.compression === 'gzip';
   if (config.transport === 'http') {
@@ -496,13 +561,17 @@ async function deliverGelf({
       url,
       { method: 'POST', headers, body: new Uint8Array(body), redirect: 'manual' },
       timeoutMs,
+      [],
+      allowPrivate ?? true,
     );
   }
+  if (!dest) return failed(new Error('GELF destination was not resolved'));
+  const address = dest.address;
   const host = String(config.host);
   const port = Number(config.port);
   const target = `${host}:${port}`;
   if (config.transport === 'tcp') {
-    return tcpSend(host, port, timeoutMs, Buffer.concat([json, Buffer.from([0])]), (n) =>
+    return tcpSend(address, target, port, timeoutMs, Buffer.concat([json, Buffer.from([0])]), (n) =>
       sent(n, 'tcp', target),
     );
   }
@@ -513,7 +582,7 @@ async function deliverGelf({
     return failed(err);
   }
   return new Promise((resolve) => {
-    const socket = createSocket(host.includes(':') ? 'udp6' : 'udp4');
+    const socket = createSocket(dest.family === 6 ? 'udp6' : 'udp4');
     let settled = false;
     const done = (result: DeliveryResult) => {
       if (settled) return;
@@ -530,7 +599,7 @@ async function deliverGelf({
     let left = chunks.length;
     const bytes = chunks.reduce((n, c) => n + c.length, 0);
     for (const chunk of chunks) {
-      socket.send(chunk, port, host, (err) => {
+      socket.send(chunk, port, address, (err) => {
         if (err) return done(failed(err));
         if (--left === 0) {
           const via = chunks.length > 1 ? `udp (${chunks.length} chunks)` : 'udp';
@@ -543,14 +612,15 @@ async function deliverGelf({
 
 /** Writes one buffer over TCP and closes; timeouts and socket errors fail the delivery. */
 function tcpSend(
-  host: string,
+  address: string,
+  target: string,
   port: number,
   timeoutMs: number,
   data: Buffer,
   ok: (bytes: number) => DeliveryResult,
 ): Promise<DeliveryResult> {
   return new Promise((resolve) => {
-    const socket = connect({ host, port });
+    const socket = connect({ host: address, port });
     let settled = false;
     const done = (result: DeliveryResult) => {
       if (settled) return;
@@ -559,7 +629,7 @@ function tcpSend(
       resolve(result);
     };
     socket.setTimeout(timeoutMs, () =>
-      done(failed(new Error(`Timed out connecting to ${host}:${port}`))),
+      done(failed(new Error(`Timed out connecting to ${target}`))),
     );
     socket.on('error', (err) => done(failed(err)));
     socket.on('connect', () => socket.end(data, () => done(ok(data.length))));
@@ -591,6 +661,7 @@ export function parseRelpFrames(buffer: Buffer): { frames: RelpResponse[]; rest:
       throw new Error('Malformed RELP response');
     }
     const len = Number(header[3]);
+    if (len > RELP_MAX_FRAME_BYTES) throw new Error('RELP response frame too large');
     const start = header[0].length + (len > 0 ? 1 : 0);
     if (rest.length < start + len + 1) break;
     if (rest[start + len] !== 0x0a) throw new Error('Malformed RELP response');
@@ -609,32 +680,34 @@ export function parseRelpFrames(buffer: Buffer): { frames: RelpResponse[]; rest:
  * `syslog` frame acknowledged by `rsp 200`, then `close`. Anything else, a
  * timeout or a dropped connection fails the delivery (the worker retries).
  */
-function deliverRelp({
-  config,
-  vars,
-  timeoutMs,
-  eventType,
-}: DeliveryInput): Promise<DeliveryResult> {
+function deliverRelp(
+  { config, vars, timeoutMs, eventType }: DeliveryInput,
+  dest: LookupAddress,
+): Promise<DeliveryResult> {
   const line = formatSyslog(config, eventType, vars);
   const host = String(config.host);
   const port = Number(config.port);
   const target = `${host}:${port}`;
   return new Promise((resolve) => {
-    const socket = connect({ host, port });
+    const socket = connect({ host: dest.address, port });
     let settled = false;
     let buffer: Buffer = Buffer.alloc(0);
     let stage: 'open' | 'syslog' | 'close' = 'open';
+    const ok = () => sent(Buffer.byteLength(line), 'relp', target);
+    // The message was acknowledged; a server that never answers `close` is fine.
+    const timedOut = () =>
+      done(stage === 'close' ? ok() : failed(new Error(`Timed out waiting for ${target}`)));
+    // `setTimeout` on the socket only measures idleness: a server trickling a
+    // byte at a time would never trip it. The deadline bounds the session.
+    const deadline = setTimeout(timedOut, timeoutMs);
     const done = (result: DeliveryResult) => {
       if (settled) return;
       settled = true;
+      clearTimeout(deadline);
       socket.destroy();
       resolve(result);
     };
-    const ok = () => sent(Buffer.byteLength(line), 'relp', target);
-    socket.setTimeout(timeoutMs, () =>
-      // The message was acknowledged; a server that never answers `close` is fine.
-      done(stage === 'close' ? ok() : failed(new Error(`Timed out waiting for ${target}`))),
-    );
+    socket.setTimeout(timeoutMs, timedOut);
     socket.on('error', (err) => done(stage === 'close' ? ok() : failed(err)));
     socket.on('close', () =>
       done(stage === 'close' ? ok() : failed(new Error(`${target} closed the RELP session`))),
@@ -644,6 +717,9 @@ function deliverRelp({
     });
     socket.on('data', (chunk: Buffer) => {
       buffer = Buffer.concat([buffer, chunk]);
+      if (buffer.length > RELP_MAX_BUFFER_BYTES) {
+        return done(failed(new Error(`${target} sent an oversized RELP response`)));
+      }
       let frames: RelpResponse[];
       try {
         ({ frames, rest: buffer } = parseRelpFrames(buffer));

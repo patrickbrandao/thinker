@@ -1,5 +1,6 @@
 import type { SpecificityCategory } from 'thinker-shared';
 import { ScorerTool, extractToolName } from './types';
+import { MAX_REGEX_SCAN_CHARS } from './dimensions/structural-dimensions';
 
 /**
  * Heuristic signals that sit alongside keyword matches. These fire off
@@ -14,8 +15,10 @@ export interface SignalBoosts {
 // ── URL detection ──
 // Loose match: scheme + host. Intentionally permissive so "https://x.co" fires.
 const URL_REGEX = /\bhttps?:\/\/[^\s)"']+/i;
-// A bare host like "google.com" without scheme — weaker signal.
-const BARE_HOST_REGEX = /\b[a-z0-9][a-z0-9-]*\.(com|org|net|io|dev|app|co|gov|edu|ai)\b/i;
+// A bare host like "google.com" without scheme — weaker signal. The label is
+// bounded to 63 chars (the DNS limit): unbounded, "a-a-a-…" was quadratic
+// because every letter after a hyphen is a new word-boundary start.
+const BARE_HOST_REGEX = /\b[a-z0-9][a-z0-9-]{0,62}\.(com|org|net|io|dev|app|co|gov|edu|ai)\b/i;
 
 /**
  * URL alone is intentionally not enough to activate web_browsing — a URL
@@ -71,7 +74,9 @@ const CODING_TOOL_BOOST = 1;
  * URLs and code fences are the two cleanest disambiguators for the
  * coding-vs-web_browsing question that drove discussion #1613.
  */
-export function computeSignalBoosts(text: string, tools?: ScorerTool[]): SignalBoosts {
+export function computeSignalBoosts(rawText: string, tools?: ScorerTool[]): SignalBoosts {
+  const text =
+    rawText.length > MAX_REGEX_SCAN_CHARS ? rawText.slice(0, MAX_REGEX_SCAN_CHARS) : rawText;
   const boosts = new Map<SpecificityCategory, number>();
   const add = (cat: SpecificityCategory, v: number) => boosts.set(cat, (boosts.get(cat) ?? 0) + v);
 

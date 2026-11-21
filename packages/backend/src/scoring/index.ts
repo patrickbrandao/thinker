@@ -26,6 +26,7 @@ import {
   scoreRepetitionRequests,
   scoreToolCount,
   scoreConversationDepth,
+  MAX_REGEX_SCAN_CHARS,
 } from './dimensions';
 import { applyMomentum, MomentumInput } from './momentum';
 import { computeConfidence, scoreToTier } from './sigmoid';
@@ -88,6 +89,8 @@ function emptyDimensions(config: ScorerConfig): DimensionScore[] {
 
 interface StructuralDimContext {
   combined: string;
+  /** `combined` capped at MAX_REGEX_SCAN_CHARS, for the regex-based scorers. */
+  scanText: string;
   maxTokens?: number;
   tools?: ScorerInput['tools'];
   toolChoice?: unknown;
@@ -98,12 +101,12 @@ type StructuralScorer = (ctx: StructuralDimContext) => number;
 
 const STRUCTURAL_SCORERS = new Map<string, StructuralScorer>([
   ['tokenCount', (ctx) => scoreTokenCount(ctx.combined)],
-  ['nestedListDepth', (ctx) => scoreNestedListDepth(ctx.combined)],
-  ['conditionalLogic', (ctx) => scoreConditionalLogic(ctx.combined)],
-  ['codeToProse', (ctx) => scoreCodeToProse(ctx.combined)],
-  ['constraintDensity', (ctx) => scoreConstraintDensity(ctx.combined)],
-  ['expectedOutputLength', (ctx) => scoreExpectedOutputLength(ctx.combined, ctx.maxTokens)],
-  ['repetitionRequests', (ctx) => scoreRepetitionRequests(ctx.combined)],
+  ['nestedListDepth', (ctx) => scoreNestedListDepth(ctx.scanText)],
+  ['conditionalLogic', (ctx) => scoreConditionalLogic(ctx.scanText)],
+  ['codeToProse', (ctx) => scoreCodeToProse(ctx.scanText)],
+  ['constraintDensity', (ctx) => scoreConstraintDensity(ctx.scanText)],
+  ['expectedOutputLength', (ctx) => scoreExpectedOutputLength(ctx.scanText, ctx.maxTokens)],
+  ['repetitionRequests', (ctx) => scoreRepetitionRequests(ctx.scanText)],
   ['toolCount', (ctx) => scoreToolCount(ctx.tools, ctx.toolChoice)],
   ['conversationDepth', (ctx) => scoreConversationDepth(ctx.conversationCount)],
 ]);
@@ -215,6 +218,8 @@ export function scoreRequest(
   const conversationCount = countConversationMessages(messages);
   const ctx: StructuralDimContext = {
     combined,
+    scanText:
+      combined.length > MAX_REGEX_SCAN_CHARS ? combined.slice(0, MAX_REGEX_SCAN_CHARS) : combined,
     maxTokens: max_tokens,
     tools,
     toolChoice: tool_choice,

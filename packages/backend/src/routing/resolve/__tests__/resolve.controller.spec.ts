@@ -1,7 +1,6 @@
 import type { Request } from 'express';
-import { ResolveController, RegisterSubscriptionsDto } from '../resolve.controller';
+import { ResolveController } from '../resolve.controller';
 import type { ResolveService } from '../resolve.service';
-import type { ProviderService } from '../../routing-core/provider.service';
 import type { IngestionContext } from '../../../otlp/interfaces/ingestion-context.interface';
 import type { ResolveRequestDto } from '../../dto/resolve-request.dto';
 import type { ResolveResponse } from '../../dto/resolve-response';
@@ -33,23 +32,13 @@ const baseResponse: ResolveResponse = {
 describe('ResolveController', () => {
   let controller: ResolveController;
   let resolveService: jest.Mocked<Pick<ResolveService, 'resolve'>>;
-  let providerService: jest.Mocked<
-    Pick<ProviderService, 'upsertProvider' | 'registerSubscriptionProvider'>
-  >;
 
   beforeEach(() => {
     jest.clearAllMocks();
     resolveService = {
       resolve: jest.fn().mockResolvedValue(baseResponse),
     };
-    providerService = {
-      upsertProvider: jest.fn().mockResolvedValue({ provider: {}, isNew: true }),
-      registerSubscriptionProvider: jest.fn().mockResolvedValue({ isNew: true }),
-    };
-    controller = new ResolveController(
-      resolveService as unknown as ResolveService,
-      providerService as unknown as ProviderService,
-    );
+    controller = new ResolveController(resolveService as unknown as ResolveService);
   });
 
   describe('resolve', () => {
@@ -139,155 +128,13 @@ describe('ResolveController', () => {
     });
   });
 
-  describe('registerSubscriptions', () => {
-    it('returns 0 registered for an empty providers array', async () => {
-      const body: RegisterSubscriptionsDto = { providers: [] };
-
-      const result = await controller.registerSubscriptions(body, mockReq());
-
-      expect(result).toEqual({ registered: 0 });
-      expect(providerService.upsertProvider).not.toHaveBeenCalled();
-      expect(providerService.registerSubscriptionProvider).not.toHaveBeenCalled();
-    });
-
-    it('uses upsertProvider when an item carries a token', async () => {
-      providerService.upsertProvider.mockResolvedValueOnce({
-        provider: {} as never,
-        isNew: true,
-      });
-      const body: RegisterSubscriptionsDto = {
-        providers: [{ provider: 'minimax', token: 'sk-token-123' }],
-      };
-
-      const result = await controller.registerSubscriptions(body, mockReq());
-
-      expect(providerService.upsertProvider).toHaveBeenCalledTimes(1);
-      expect(providerService.upsertProvider).toHaveBeenCalledWith(
-        'agent-1',
-        'tenant-1',
-        'minimax',
-        'sk-token-123',
-        'subscription',
-        undefined,
-        undefined,
-        'user-1',
-      );
-      expect(providerService.registerSubscriptionProvider).not.toHaveBeenCalled();
-      expect(result).toEqual({ registered: 1 });
-    });
-
-    it('uses registerSubscriptionProvider when no token is provided', async () => {
-      providerService.registerSubscriptionProvider.mockResolvedValueOnce({ isNew: true });
-      const body: RegisterSubscriptionsDto = {
-        providers: [{ provider: 'anthropic' }],
-      };
-
-      const result = await controller.registerSubscriptions(body, mockReq());
-
-      expect(providerService.registerSubscriptionProvider).toHaveBeenCalledTimes(1);
-      expect(providerService.registerSubscriptionProvider).toHaveBeenCalledWith(
-        'agent-1',
-        'tenant-1',
-        'anthropic',
-        'user-1',
-      );
-      expect(providerService.upsertProvider).not.toHaveBeenCalled();
-      expect(result).toEqual({ registered: 1 });
-    });
-
-    it('only counts items where isNew is true', async () => {
-      providerService.upsertProvider.mockResolvedValueOnce({
-        provider: {} as never,
-        isNew: false,
-      });
-      providerService.registerSubscriptionProvider
-        .mockResolvedValueOnce({ isNew: true })
-        .mockResolvedValueOnce({ isNew: false });
-      const body: RegisterSubscriptionsDto = {
-        providers: [
-          { provider: 'minimax', token: 'tok-already-saved' },
-          { provider: 'anthropic' },
-          { provider: 'openai' },
-        ],
-      };
-
-      const result = await controller.registerSubscriptions(body, mockReq());
-
-      expect(result).toEqual({ registered: 1 });
-    });
-
-    it('treats an empty string token as tokenless and uses subscription registration', async () => {
-      // Falsy token (`''`) hits the `else` branch — verifies the truthiness
-      // check on item.token, not just an `undefined` check.
-      providerService.registerSubscriptionProvider.mockResolvedValueOnce({ isNew: true });
-      const body: RegisterSubscriptionsDto = {
-        providers: [{ provider: 'anthropic', token: '' }],
-      };
-
-      const result = await controller.registerSubscriptions(body, mockReq());
-
-      expect(providerService.upsertProvider).not.toHaveBeenCalled();
-      expect(providerService.registerSubscriptionProvider).toHaveBeenCalledWith(
-        'agent-1',
-        'tenant-1',
-        'anthropic',
-        'user-1',
-      );
-      expect(result).toEqual({ registered: 1 });
-    });
-
-    it('uses agentId and userId from the ingestionContext', async () => {
-      // Pin tenancy: the controller must use the guard-attached context, not
-      // any body field, for both agent and user scope.
-      providerService.registerSubscriptionProvider.mockResolvedValueOnce({ isNew: true });
-      const body: RegisterSubscriptionsDto = {
-        providers: [{ provider: 'anthropic' }],
-      };
-
-      await controller.registerSubscriptions(
-        body,
-        mockReq({ agentId: 'agent-X', userId: 'user-Y' }),
-      );
-
-      expect(providerService.registerSubscriptionProvider).toHaveBeenCalledWith(
-        'agent-X',
-        'tenant-1',
-        'anthropic',
-        'user-Y',
-      );
-    });
-
-    it('propagates errors from the provider service (both paths)', async () => {
-      providerService.upsertProvider.mockRejectedValueOnce(new Error('upstream fail'));
-      await expect(
-        controller.registerSubscriptions(
-          { providers: [{ provider: 'minimax', token: 'sk-tok' }] },
-          mockReq(),
-        ),
-      ).rejects.toThrow('upstream fail');
-
-      providerService.registerSubscriptionProvider.mockRejectedValueOnce(new Error('reg fail'));
-      await expect(
-        controller.registerSubscriptions({ providers: [{ provider: 'anthropic' }] }, mockReq()),
-      ).rejects.toThrow('reg fail');
-    });
-
-    it('processes providers sequentially in submission order', async () => {
-      // Order of calls matters when a duplicate label triggers a conflict —
-      // pin the dispatch order so a refactor to Promise.all (which would
-      // change error semantics) gets caught.
-      const order: string[] = [];
-      providerService.registerSubscriptionProvider.mockImplementation(async (_a, _u, prov) => {
-        order.push(prov);
-        return { isNew: true };
-      });
-      const body: RegisterSubscriptionsDto = {
-        providers: [{ provider: 'anthropic' }, { provider: 'minimax' }, { provider: 'gemini' }],
-      };
-
-      await controller.registerSubscriptions(body, mockReq());
-
-      expect(order).toEqual(['anthropic', 'minimax', 'gemini']);
-    });
+  it('exposes no endpoint that writes connections with a harness key', () => {
+    // A harness key (thk_) authenticates this controller. It used to accept
+    // POST subscription-providers, which overwrote the organization's
+    // subscription token and re-enabled connections an admin had turned off.
+    const routes = Object.getOwnPropertyNames(ResolveController.prototype).filter(
+      (name) => name !== 'constructor',
+    );
+    expect(routes).toEqual(['resolve']);
   });
 });

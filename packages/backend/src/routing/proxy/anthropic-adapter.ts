@@ -4,6 +4,7 @@
  * so Anthropic prompt caching works transparently through the proxy.
  */
 import { randomUUID } from 'crypto';
+import type { StreamUsage } from './stream-writer';
 
 import { OpenAIMessage, ThinkingBlockLookup } from './proxy-types';
 import type { ThinkingBlock, ThinkingBlockRouteContext } from './thinking-block-cache';
@@ -874,7 +875,11 @@ export type ThinkingBlocksCallback = (firstToolUseId: string, blocks: ThinkingBl
  */
 interface StreamState {
   model: string;
+  /** Set by `message_start`: from then on the provider bills the input. */
+  started: boolean;
   inputTokens: number;
+  /** Output tokens the provider reported so far (`message_start`). */
+  outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
   cacheCreation1hTokens?: number;
@@ -888,7 +893,9 @@ interface StreamState {
 function handleMessageStart(state: StreamState, data: Record<string, unknown>): string {
   const msg = data.message as Record<string, unknown> | undefined;
   const usage = msg?.usage as Record<string, number> | undefined;
+  state.started = true;
   state.inputTokens = usage?.input_tokens ?? 0;
+  state.outputTokens = usage?.output_tokens ?? 0;
   state.cacheReadTokens = usage?.cache_read_input_tokens ?? 0;
   state.cacheCreationTokens = usage?.cache_creation_input_tokens ?? 0;
   state.cacheCreation1hTokens = oneHourCacheCreation(msg?.usage);
@@ -1046,6 +1053,30 @@ function handleMessageDelta(state: StreamState, data: Record<string, unknown>): 
   return finishChunk + usageChunk;
 }
 
+/** A stream transformer that can also report the usage seen so far. */
+export type AnthropicStreamTransformer = ((chunk: string) => string | null) & {
+  /**
+   * Usage the provider reported before the stream ended: input and cache from
+   * `message_start` (Anthropic bills them as soon as the turn starts). Null
+   * before `message_start`. Read only when the stream breaks off, since the
+   * final usage arrives with `message_delta`.
+   */
+  partialUsage: () => StreamUsage | null;
+};
+
+function partialUsageOf(state: StreamState): StreamUsage | null {
+  if (!state.started) return null;
+  return {
+    prompt_tokens: state.inputTokens + state.cacheReadTokens + state.cacheCreationTokens,
+    completion_tokens: state.outputTokens,
+    cache_read_tokens: state.cacheReadTokens,
+    cache_creation_tokens: state.cacheCreationTokens,
+    ...(state.cacheCreation1hTokens
+      ? { cache_creation_1h_tokens: state.cacheCreation1hTokens }
+      : {}),
+  };
+}
+
 /**
  * Creates a stateful stream transformer that accumulates usage and thinking
  * blocks across events. Returns a transform function compatible with pipeStream.
@@ -1053,10 +1084,12 @@ function handleMessageDelta(state: StreamState, data: Record<string, unknown>): 
 export function createAnthropicStreamTransformer(
   model: string,
   onThinkingBlocks?: ThinkingBlocksCallback,
-): (chunk: string) => string | null {
+): AnthropicStreamTransformer {
   const state: StreamState = {
     model,
+    started: false,
     inputTokens: 0,
+    outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     toolCallIndex: 0,
@@ -1066,7 +1099,7 @@ export function createAnthropicStreamTransformer(
     onThinkingBlocks,
   };
 
-  return (chunk: string): string | null => {
+  const transform = (chunk: string): string | null => {
     const parsed = parseStreamEvent(chunk);
     if (!parsed) return null;
     const { eventType, data } = parsed;
@@ -1077,6 +1110,7 @@ export function createAnthropicStreamTransformer(
     if (type === 'message_delta') return handleMessageDelta(state, data);
     return null;
   };
+  return Object.assign(transform, { partialUsage: () => partialUsageOf(state) });
 }
 
 /** Stateless convenience for single-chunk tests. */

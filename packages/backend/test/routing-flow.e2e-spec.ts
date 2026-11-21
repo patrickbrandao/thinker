@@ -311,38 +311,11 @@ describe('Routing enabled → scorer routes by query complexity', () => {
   });
 });
 
-describe('Subscription providers respect supported capabilities', () => {
-  beforeAll(async () => {
-    // Start fresh: clear the pinned routes first (deactivating a provider that
-    // is still referenced by a route is a 409 now — "Update routing first"),
-    // then deactivate all and register via the subscription endpoint.
-    await auth(api().post('/api/v1/routing/test-agent/tiers/reset-all')).expect(201);
-    await auth(api().post('/api/v1/routing/test-agent/providers/deactivate-all'))
-      .expect(201);
-  });
-
-  it('registers only supported subscription providers as active', async () => {
-    const res = await bearer(api().post('/api/v1/routing/subscription-providers'))
-      .send({ providers: [{ provider: 'deepseek' }, { provider: 'anthropic' }] })
-      .expect(200);
-
-    expect(res.body.registered).toBe(1);
-
-    // Verify only supported subscription providers are active
-    const providers = await auth(api().get('/api/v1/routing/test-agent/providers'))
-      .expect(200);
-    const subs = providers.body.filter(
-      (p: { auth_type: string }) => p.auth_type === 'subscription',
-    );
-    expect(subs).toHaveLength(1);
-    expect(subs[0].provider).toBe('anthropic');
-    expect(subs.every((p: { is_active: boolean }) => p.is_active)).toBe(true);
-  });
-
-  it('removes a supported subscription provider → deactivated', async () => {
-    await auth(
-      api().delete('/api/v1/routing/test-agent/providers/anthropic?authType=subscription'),
-    ).expect(200);
+describe('Harness keys cannot write connections', () => {
+  it('has no subscription-providers route: a harness key cannot replace a subscription token', async () => {
+    await bearer(api().post('/api/v1/routing/subscription-providers'))
+      .send({ providers: [{ provider: 'anthropic', token: 'not-a-real-token' }] })
+      .expect(404);
 
     const providers = await auth(api().get('/api/v1/routing/test-agent/providers'))
       .expect(200);
@@ -350,36 +323,17 @@ describe('Subscription providers respect supported capabilities', () => {
       (p: { provider: string; auth_type: string }) =>
         p.provider === 'anthropic' && p.auth_type === 'subscription',
     );
-    expect(anthropic.is_active).toBe(false);
-  });
-
-  it('re-registering same providers does not re-activate removed or unsupported ones', async () => {
-    const res = await bearer(api().post('/api/v1/routing/subscription-providers'))
-      .send({ providers: [{ provider: 'deepseek' }, { provider: 'anthropic' }] })
-      .expect(200);
-
-    // deepseek is unsupported and anthropic already exists but was deactivated by the user
-    expect(res.body.registered).toBe(0);
-
-    // deepseek subscription should not exist in Thinker at all
-    const providers = await auth(api().get('/api/v1/routing/test-agent/providers'))
-      .expect(200);
-    const deepseek = providers.body.find(
-      (p: { provider: string; auth_type: string }) =>
-        p.provider === 'deepseek' && p.auth_type === 'subscription',
-    );
-    expect(deepseek).toBeUndefined();
-
-    // anthropic subscription should still be inactive
-    const anthropic = providers.body.find(
-      (p: { provider: string; auth_type: string }) =>
-        p.provider === 'anthropic' && p.auth_type === 'subscription',
-    );
-    expect(anthropic.is_active).toBe(false);
+    expect(anthropic).toBeUndefined();
   });
 });
 
 describe('Persisted unsupported subscriptions are cleaned up on read', () => {
+  beforeAll(async () => {
+    // Deactivating a provider that a pinned route still uses is a 409
+    // ("Update routing first"), so clear the routes before deactivate-all.
+    await auth(api().post('/api/v1/routing/test-agent/tiers/reset-all')).expect(201);
+  });
+
   it('deactivates a stale unsupported subscription when loading providers', async () => {
     await auth(api().post('/api/v1/routing/test-agent/providers/deactivate-all'))
       .expect(201);

@@ -1,5 +1,6 @@
 import { clientIpInfo, clientIpLogFields } from '../../common/utils/client-ip';
 import { ipRestrictionFor } from '../../ip-prefixes/ip-restriction-cache';
+import { proxyPreAuth } from '../../common/middleware/body-parser-limits';
 import {
   CanActivate,
   ExecutionContext,
@@ -172,6 +173,22 @@ export class AgentKeyAuthGuard implements CanActivate, OnModuleInit, OnModuleDes
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
+    // `/v1` requests with a body were already authenticated from their headers
+    // before the body was read (createProxyPreAuthMiddleware): reuse that
+    // outcome, so the key is checked, logged and recorded exactly once.
+    const pre = proxyPreAuth(request);
+    if (pre) {
+      if (pre.ok) return true;
+      throw pre.error;
+    }
+    return this.authenticate(request);
+  }
+
+  /**
+   * Authenticates an agent key from the request headers alone (never the
+   * body). Returns true or throws the error the caller gets.
+   */
+  async authenticate(request: Request): Promise<boolean> {
     // The agent key arrives on one of two transports: `Authorization: Bearer
     // <key>` (OpenAI SDKs and most harnesses; a raw `<key>` with no scheme is
     // accepted too) or `x-api-key: <key>` (the Anthropic SDK default, and

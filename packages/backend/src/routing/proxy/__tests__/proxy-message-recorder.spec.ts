@@ -257,6 +257,38 @@ describe('ProxyMessageRecorder', () => {
       );
     });
 
+    it('keeps the usage a stream had reported when it broke off on the provider side', async () => {
+      // Idle timeout, reset socket or an error event after message_start: the
+      // provider billed the input, so the failed row carries it (and its cost).
+      const attempt: ProviderAttemptRef = {
+        id: 'attempt-broken',
+        attemptNumber: 1,
+        startedAtMs: 1_000,
+        startedAt: '1970-01-01T00:00:01.000Z',
+        completedAtMs: 1_125,
+        pendingWrite: Promise.resolve(true),
+      };
+
+      await recorder.recordProviderError(ctx, 502, 'Stream idle timeout', {
+        requestId: 'request-broken',
+        attempt,
+        model: 'claude-sonnet-4-5',
+        provider: 'anthropic',
+        authType: 'api_key',
+        usage: { prompt_tokens: 1200, completion_tokens: 1, cache_read_tokens: 300 },
+      });
+
+      expect(updateMock).toHaveBeenCalledWith(
+        { id: 'attempt-broken' },
+        expect.objectContaining({
+          status: 'failed',
+          input_tokens: 1200,
+          output_tokens: 1,
+          cache_read_tokens: 300,
+        }),
+      );
+    });
+
     it('cancels only still-pending Attempts whose pending row was written', async () => {
       const written: ProviderAttemptRef = {
         id: 'attempt-left-pending',

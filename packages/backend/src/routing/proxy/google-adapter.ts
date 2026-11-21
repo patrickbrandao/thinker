@@ -808,6 +808,14 @@ function usageChunk(
  * cumulative usage seen so the request still records it. Usage only: no
  * finish chunk is invented for a stream the provider did not finish.
  */
+/**
+ * The cumulative usage Gemini reported so far, in chat-completions shape, for
+ * a stream that breaks off before its terminal event. Null before any.
+ */
+export function googleStreamUsageSoFar(state: GoogleStreamState): Record<string, unknown> | null {
+  return state.usage ? toChatUsage(state.usage) : null;
+}
+
 export function finishGoogleStream(state: GoogleStreamState, model: string): string | null {
   if (state.usageSent || !state.usage) return null;
   state.usageSent = true;
