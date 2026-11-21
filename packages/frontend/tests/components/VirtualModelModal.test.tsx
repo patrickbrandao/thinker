@@ -138,7 +138,7 @@ describe('VirtualModelModal', () => {
     pick('+ Choose primary model');
     expect(screen.getByText('DeepSeek Chat')).toBeTruthy();
     pickerModel = 'gpt-5.5';
-    pick('+ Add fallback (0/5)');
+    pick('+ Add fallback (0/9)');
     expect(screen.getByText('Fallback 1')).toBeTruthy();
     fireEvent.click(screen.getByRole('switch', { name: 'Continue on Default' }));
     fireEvent.click(screen.getByRole('switch', { name: 'Stream mode' }));
@@ -156,7 +156,7 @@ describe('VirtualModelModal', () => {
   it('removing the primary clears the fallbacks', () => {
     renderModal();
     pick('+ Choose primary model');
-    pick('+ Add fallback (0/5)');
+    pick('+ Add fallback (0/9)');
     fireEvent.click(screen.getByLabelText('Remove primary deepseek-chat'));
     expect(screen.queryByText('Fallback 1')).toBeNull();
     expect(screen.getByText('+ Choose primary model')).toBeTruthy();
@@ -194,7 +194,7 @@ describe('VirtualModelModal', () => {
     type('deepseek/flash');
     pick('+ Choose primary model');
     pickerModel = 'gpt-5.5';
-    pick('+ Add fallback (0/5)');
+    pick('+ Add fallback (0/9)');
     fireEvent.click(screen.getByText('Create virtual model', { selector: 'button' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message));
     const invalid = container.ownerDocument.querySelectorAll(

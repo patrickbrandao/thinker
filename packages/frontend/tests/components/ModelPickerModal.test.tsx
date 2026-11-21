@@ -81,6 +81,12 @@ vi.mock('../../src/services/providers.js', () => ({
 }));
 
 vi.mock('../../src/services/routing-utils.js', () => ({
+  formatPriceInOut: (i: number, o: number) =>
+    Number(i) === 0 && Number(o) === 0
+      ? 'Free'
+      : `$${(Number(i) * 1_000_000).toFixed(2)} in, ${(Number(o) * 1_000_000).toFixed(2)} out`,
+  isFreePricing: (i: unknown, o: unknown) =>
+    i != null && o != null && Number(i) === 0 && Number(o) === 0,
   resolveProviderId: (p: string) => p.toLowerCase(),
   inferProviderFromModel: (m: string) => {
     if (m.startsWith('gpt')) return 'openai';
@@ -962,7 +968,7 @@ describe('ModelPickerModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('renders Included in subscription / Runs on your machine in non-paid tabs', () => {
+  it('renders Subscribed / Runs on your machine in non-paid tabs', () => {
     const localOnly: RoutingProvider[] = [
       {
         id: 'p3',

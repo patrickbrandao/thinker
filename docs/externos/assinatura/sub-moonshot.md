@@ -94,6 +94,10 @@ Fonte: docs Kimi Code 2026-11-03; `managed-usage.ts` e `region.ts` do kimi-code.
 - O CLI antigo mostrava todo 403 como "quota exceeded" por engano (corrigido na 1.45.0); não assumir que 403 significa cota.
 - Códigos de cota excedida (429/402) não foram confirmados em fonte primária (não confirmado).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Config da assinatura: label "Kimi Coding Plan", auth por token colado, `knownModels: ['k3','k3-256k','kimi-for-coding','kimi-for-coding-highspeed']` com `knownModelsMatch: 'exact'`; janelas: padrão 262144, `k3` 1048576, `k3-256k` 262144; cache de prompt sim, batching não (`packages/shared/src/subscription/configs.ts:172-193`).

@@ -79,6 +79,10 @@ Fireworks AI é um provedor de inferência serverless (e deployments dedicados) 
 
 - Prefixo mais longo já em cache, por réplica. Afinidade: `prompt_cache_key` (tem prioridade, documentado em Chat Completions), `user` ou header `x-session-affinity`; `x-prompt-cache-isolation-key` / campo `prompt_cache_isolation_key` isola caches.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Inferência: base `https://api.fireworks.ai/inference`, `openaiHeaders` (Bearer), path `/v1/chat/completions`, formato `openai` (`packages/backend/src/routing/proxy/provider-endpoints.ts:200,344-348`, path em `:96`).

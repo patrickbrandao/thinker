@@ -52,7 +52,10 @@ describe('TierController', () => {
     controller = new TierController(
       tierService as unknown as TierService,
       resolveAgentService as unknown as ResolveAgentService,
-      { withStatus: async (_t: string, _a: string, rows: unknown[]) => rows } as never,
+      {
+        withStatus: async (_t: string, _a: string, rows: unknown[]) => rows,
+        withStatusOne: async (_t: string, _a: string, row: unknown) => row,
+      } as never,
       agentRepo as unknown as Repository<Agent>,
       recordingConfig as unknown as AgentRecordingConfigService,
     );
@@ -181,6 +184,31 @@ describe('TierController', () => {
     });
     expect(out).toEqual({ tier: 'standard', response_mode: 'buffered' });
     expect(tierService.setResponseMode).toHaveBeenCalledWith('agent-1', 'standard', 'buffered');
+  });
+
+  it('PATCH response-mode returns the row with its route status', async () => {
+    const withStatusOne = jest.fn(async (_t: string, _a: string, row: object) => ({
+      ...row,
+      route_status: { override: null, fallbacks: [] },
+    }));
+    const withStatusController = new TierController(
+      tierService as unknown as TierService,
+      resolveAgentService as unknown as ResolveAgentService,
+      { withStatusOne } as never,
+      agentRepo as unknown as Repository<Agent>,
+      recordingConfig as unknown as AgentRecordingConfigService,
+    );
+    tierService.setResponseMode = jest
+      .fn()
+      .mockResolvedValue({ tier: 'default', response_mode: 'stream' });
+    const out = await withStatusController.setResponseMode(ctx, 'demo', 'default', {
+      response_mode: 'stream',
+    });
+    expect(withStatusOne).toHaveBeenCalledWith('tenant-1', 'agent-1', {
+      tier: 'default',
+      response_mode: 'stream',
+    });
+    expect(out).toHaveProperty('route_status');
   });
 
   it('PATCH response-mode rejects a missing response_mode', async () => {

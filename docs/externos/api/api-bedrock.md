@@ -125,6 +125,10 @@ Claude via Messages: extended/adaptive thinking, structured outputs (`output_con
 - Chat Completions do Runtime nos perfis GPT (`gpt-6-luna`, `-sol`, `-astra`, `gpt-5.6-luna`) rejeita function tools junto de qualquer `reasoning_effort` diferente de `none` (400 "use /v1/responses or set reasoning_effort to 'none'"), e o GPT-6 Astra rejeita `none` (inclusive na Responses). A Responses do Runtime aceita tools + esforço, com `reasoning.summary: auto`, e envia os frames SSE sem linha `event:` (o nome só em `data.type`). Fonte: testes ao vivo do upstream (mnfst/llm-gateway#3110, us-east-1, 2026-11-03); não está na doc pública.
 - Claude Fable 5 e 5.1 exigem que o modo de retenção de dados da conta na região seja `aws_review` (ou o legado `provider_data_share`); com `default`, o Runtime responde `400 ValidationException`. O Runtime e o Mantle têm configurações separadas. Fonte: `data-retention.html` citada em mnfst/llm-gateway#3111 (não relida aqui).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Estado conferido contra o código de `onda3` (2026-11-04):

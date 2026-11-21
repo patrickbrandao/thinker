@@ -155,12 +155,12 @@ describe('virtual model DTOs', () => {
     expect(dto.fallback_routes?.[0].keyLabel).toBe('Work');
   });
 
-  it('rejects bad field types and more than 5 fallbacks', async () => {
+  it('rejects bad field types and more than 9 fallbacks', async () => {
     expect(
       await errorsOf(CreateVirtualModelDto, {
         name: 1,
         override_route: { provider: 'openai' },
-        fallback_routes: Array.from({ length: 6 }, () => ({ model: 'm' })),
+        fallback_routes: Array.from({ length: 10 }, () => ({ model: 'm' })),
         continue_on_default: 'yes',
         response_mode: 'bogus',
         output_modality: 'image',

@@ -156,7 +156,7 @@ Routing readouts and virtual models (default-route writes go through thinker age
   thinker routing virtual enable|disable <agent> <name>
   thinker routing virtual delete <agent> <name> --yes
     (a virtual model is a name the harness sends as model, listed by /v1/models after auto; its chain is
-     the primary, up to 5 fallbacks, then the Default chain with --continue-on-default; routes are checked server-side)
+     the primary, up to 9 fallbacks, then the Default chain with --continue-on-default; routes are checked server-side)
   thinker routing recording get <agent> | thinker routing recording set <agent> --enabled true|false
   thinker routing params get <agent> [--tier <t> | --virtual <v>] [--model <m>]
   thinker routing params set <agent> [--tier <t> | --virtual <v>] [--model <m>] [--set <path>=<value> ...] [--unset <path> ...]

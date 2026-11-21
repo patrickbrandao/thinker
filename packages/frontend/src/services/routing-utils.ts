@@ -2,8 +2,8 @@ import type { ChainRouteStatus } from 'thinker-shared';
 import { PROVIDERS } from './providers.js';
 import { inferProviderFromModel, SHARED_PROVIDERS } from 'thinker-shared';
 import type { AuthType, ModelRoute, RoutingProvider } from './api.js';
-import { t } from '../i18n/index.js';
-import { usd } from './formatters.js';
+import { intlLocale, t } from '../i18n/index.js';
+import { formatPerRequestCost, usd } from './formatters.js';
 
 export interface RouteSlots {
   override_route?: ModelRoute | null;
@@ -133,6 +133,69 @@ export function routeKeySelectionForModel(input: {
     };
   }
   return { keys: availableKeys, needsChoice: true, exhausted: false };
+}
+
+/** Whether a metered model costs nothing for both input and output tokens. */
+export function isFreePricing(
+  input: number | string | null | undefined,
+  output: number | string | null | undefined,
+): boolean {
+  return input != null && output != null && Number(input) === 0 && Number(output) === 0;
+}
+
+/** Digits for a per-million price: three below $1 so cents of a cent show. */
+function perMDigits(perM: number): number {
+  return perM > 0 && perM < 1 ? 3 : 2;
+}
+
+/** Per-million price as a bare number in the active locale (no currency). */
+function perMNumber(perToken: number | string): string {
+  const perM = Number(perToken) * 1_000_000;
+  const fmt = (n: number, digits: number) =>
+    new Intl.NumberFormat(intlLocale(), {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(n);
+  if (perM > 0 && perM < 0.01) return `< ${fmt(0.01, 2)}`;
+  return fmt(perM, perMDigits(perM));
+}
+
+/**
+ * Metered price per 1M tokens as one compact label, the currency shown once:
+ * `US$ 1,25 in, 4,25 out` (`$1.25 in, 4.25 out` in English). "in"/"out" stay
+ * in English in every locale. Free models read just "Free"/"Grátis".
+ */
+export function formatPriceInOut(
+  input: number | string | null | undefined,
+  output: number | string | null | undefined,
+): string {
+  if (input == null || output == null) return '';
+  if (isFreePricing(input, output)) return t('routing.free');
+  const inM = Number(input) * 1_000_000;
+  const lead = inM > 0 && inM < 0.01 ? `< ${usd(0.01, 2)}` : usd(inM, perMDigits(inM));
+  return `${lead} in, ${perMNumber(output)} out`;
+}
+
+/**
+ * Price label of a route in chain lists: the per-request quota cost or
+ * "Subscription" for a subscription, nothing for a local model, otherwise the
+ * metered price (or "Free").
+ */
+export function routePriceText(
+  authType: AuthType,
+  info:
+    | {
+        input_price_per_token?: number | string | null;
+        output_price_per_token?: number | string | null;
+        cost_per_request?: number | null;
+      }
+    | undefined,
+): string {
+  if (authType === 'subscription') {
+    return formatPerRequestCost(info?.cost_per_request) ?? t('routing.cardSubscription');
+  }
+  if (authType === 'local' || !info) return '';
+  return formatPriceInOut(info.input_price_per_token, info.output_price_per_token);
 }
 
 /** Format per-million token price: $0.15 */

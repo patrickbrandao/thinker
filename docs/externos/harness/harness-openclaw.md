@@ -73,6 +73,10 @@ Arquivos-chave lidos: `docs/gateway/config-tools/custom-providers.md`, `docs/pro
 
 Correto no formato (`openclaw config set models.providers.thinker '{...,"api":"openai-completions",...}'`, `agents.defaults.model.primary thinker/auto`, `openclaw gateway restart`), com a ressalva de ser mínimo (G2) e de `config set` sem `--merge` (acima). O comentário do código dizendo que o proxy não expõe `/v1/responses` está desatualizado: `proxy.controller.ts:254` serve `POST responses`; manter `openai-completions` continua seguro.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Superfície declarada `chat_completions`: `packages/shared/src/agent-type.ts:75`; rótulo `:101`; grupo "personal" `:129`; ícone `:136`.

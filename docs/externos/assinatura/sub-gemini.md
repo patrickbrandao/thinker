@@ -120,6 +120,10 @@ Fonte: `utils/googleQuotaErrors.ts`, v0.66.0. Corpo no padrão `google.rpc` (`er
 | Conta/tier inelegível | `ineligibleTiers[].reasonMessage` | mostra os motivos |
 | Modelo fora do plano / não existe | (não confirmado) provavelmente 404 ou 400 | n/d |
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Conferido contra o código do worktree `onda2` (commit 0c93e2a) em 2026-11-03.

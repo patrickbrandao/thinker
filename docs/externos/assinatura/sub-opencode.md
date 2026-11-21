@@ -80,6 +80,10 @@ Código do OpenCode v2.2.5, `packages/core/src/plugin/provider/opencode.ts`:
 - Config do Console: 401 `{"_tag":"Unauthorized"}` = sessão revogada; 403 `{"_tag":"SsoRequired",orgId,connectionId}` = SSO expirado; URL de retomada `{server}/auth/sso/<connectionId>/start?redirectTo=<base>/`.
 - Inferência rejeitada com 401/403: ver acima. Cota: `FreeUsageLimitError`, `GoUsageLimitError`, `BudgetLimitError` em 429 (detalhes em `sub-opencode-go`).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Revisado em 2026-11-03.

@@ -22,8 +22,8 @@ export const VIRTUAL_MODEL_NAME_PATTERN = /^[A-Za-z0-9._:-]+(?:\/[A-Za-z0-9._:-]
 export const VIRTUAL_MODEL_NAME_MESSAGE =
   'Name can only contain letters, numbers, dots, underscores, colons, hyphens and single slashes, and cannot start or end with a slash';
 
-/** Most fallbacks a virtual model can carry, as for tiers. */
-export const MAX_VIRTUAL_MODEL_FALLBACKS = 5;
+/** Most fallbacks a chain (virtual model, tier, task) can carry: 10 models with the primary. */
+export const MAX_VIRTUAL_MODEL_FALLBACKS = 9;
 
 /** `auto` routes through the agent's tiers, in any spelling. */
 export function isReservedVirtualModelName(name: string): boolean {

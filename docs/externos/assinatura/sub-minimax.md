@@ -125,6 +125,10 @@ Fonte: [errorcode](https://platform.minimax.io/docs/api-reference/errorcode.md).
 | 2022 | modelo não existe | |
 | 2064 / 2066 | carga alta / timeout | retry |
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Provedor `minimax`, rótulo "MiniMax Coding Plan", modo `device_code`: `packages/shared/src/subscription/configs.ts:103-125`.

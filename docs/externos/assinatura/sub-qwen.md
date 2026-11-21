@@ -123,6 +123,10 @@ Semântica de cobrança (ambos): um único pool de Credits para todos os modelos
 | 429 `insufficient_quota: Your token-plan quota has been exhausted.` | cota do assento esgotada até o reset ou compra de pack |
 | `data_inspection_failed` | filtro de conteúdo |
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Conferido no worktree `onda2` em 2026-11-03.

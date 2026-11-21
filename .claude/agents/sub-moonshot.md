@@ -28,4 +28,4 @@ Stay in your scope. When you find something that belongs to one of these, mentio
 
 ## Procedure
 
-Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format and the `assinatura` checklist.
+Follow `.claude/external-research.md` exactly: its hard limits, steps, issue format, the `assinatura` checklist and the "Wire format" rules: every dossier ends "Contrato" with `### Formato na rede`, each row carrying its source and its live evidence (`sonda`, `captura` or `não verificado em produção`).

@@ -100,6 +100,10 @@ Listagem: cada entrada tem `id`, `object`, `created`, `owned_by`, `max_context_l
 - Limites por modelo: tokens por minuto e requisições por segundo (áudio: segundos por minuto/mês; OCR: páginas por minuto). Painel: Admin Panel > API > Limits. Plano gratuito inclui uso mensal limitado; pay-as-you-go consome crédito pré-pago. Limite de gasto mensal da organização pode suspender o acesso. Aumento de limite sob pedido ao suporte.
 - Códigos e cabeçalhos de limite: não documentados nas páginas lidas. Comportamento típico (401 chave inválida, 422 parâmetro inválido, 429 limite) é presumido (não confirmado).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Cadastro: id `mistral`, nome `Mistral`, prefixo OpenRouter `mistralai`, chave sem prefixo fixo e mínimo de 32 caracteres (`packages/shared/src/providers.ts:309`). URL de criação de chave: `https://console.mistral.ai/api-keys/` (`packages/frontend/src/services/provider-api-key-urls.ts:16`).

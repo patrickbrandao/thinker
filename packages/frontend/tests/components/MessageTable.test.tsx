@@ -223,7 +223,7 @@ describe('MessageTable', () => {
         />,
       );
       expect(container.textContent).toContain('$0.00');
-      expect(container.querySelector('[title="Included in subscription"]')).not.toBeNull();
+      expect(container.querySelector('[title="Subscribed"]')).not.toBeNull();
     });
 
     it('renders the per-request cost for OpenCode-Go-style subscriptions', () => {

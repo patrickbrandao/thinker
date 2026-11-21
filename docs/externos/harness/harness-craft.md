@@ -80,6 +80,10 @@ Requisição Chat Completions (pi-ai 1.1.0, `openai-completions.js`):
 
 Correto para v0.15.8: preset **Custom**, protocolo OpenAI Completions, URL base `<origem>/v1`, modelo `auto`, chave `thk_...`. Faltam avisos sobre os padrões de contexto, saída e imagens (G2) e o texto não nomeia o preset "Custom" nem a alternância de protocolo (se o usuário escolher `anthropic-messages`, a URL base e a rota mudam).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Superfície: Chat Completions (`packages/shared/src/agent-type.ts:78`); plataforma `craft` (`agent-type.ts:28`), nome `Craft Agent` (`:104`), categoria `personal` (`:129`), ícone `/icons/craft.png` (`:139`).

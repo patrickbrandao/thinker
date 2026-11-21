@@ -96,6 +96,10 @@ cline auth -p openai-compatible -k thk_SUA_CHAVE -m auto -b http://localhost:209
 
 Ou na extensão: Settings > API Configuration > provedor "OpenAI Compatible", Base URL `http://localhost:2099/v1`, API Key `thk_SUA_CHAVE`, Model ID `auto` (ou o nome de um modelo virtual), e preencher a janela de contexto. Equivalente em `providers.json`: entrada `openai-compatible` com `baseUrl`, `apiKey` e `model` (formato exato do arquivo não conferido ao vivo (não confirmado)).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Plataforma `cline` listada em `AGENT_PLATFORMS` (`packages/shared/src/agent-type.ts:40`), superfície `chat_completions` (`:90`), nome `Cline` (`:116`), categoria `coding` (`:132`), ícone `/icons/providers/cline-pass.png` (`:151`).

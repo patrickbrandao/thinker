@@ -133,7 +133,7 @@ describe('RouteChainCard flow', () => {
   it('shows the per-million price, the subscription price per request or "included"', () => {
     const { container, unmount } = setup({ chain: chain({ fallback_routes: null }) });
     expect(container.querySelector('.routing-card__chip-price')!.textContent).toBe(
-      '$2.00 in, $10.00 out',
+      '$2.00 in, 10.00 out',
     );
     unmount();
     const sub = chain({

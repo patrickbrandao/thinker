@@ -119,6 +119,10 @@ USD por 1M tokens (pricing, 2026-11-04). Fora de pico é metade do pico.
 
 Campos ignorados na API Anthropic: `container`, `mcp_servers`, `service_tier`, `top_k`, `cache_control`. Não suportados: blocos document, search results, redacted thinking, code execution, MCP.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Base URL `https://api.deepseek.com`, formato `openai`, header Bearer, `openaiStreamUsage` (`packages/backend/src/routing/proxy/provider-endpoints.ts:288`). Só Chat Completions; a superfície Anthropic e a Responses API não são usadas.

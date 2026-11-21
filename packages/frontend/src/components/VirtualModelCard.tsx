@@ -57,7 +57,7 @@ export interface VirtualModelCardProps {
 
 /**
  * A virtual model (ADR 0004): the shared route-chain card (primary and up to
- * 5 fallbacks) titled "Virtual model: <name>", with the shadowing warning.
+ * 9 fallbacks) titled "Virtual model: <name>", with the shadowing warning.
  * The switches live in the edit modal.
  */
 export default function VirtualModelCard(props: VirtualModelCardProps) {

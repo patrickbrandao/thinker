@@ -208,6 +208,8 @@ export {
 } from './playground-headers';
 export {
   coerceContentToText,
+  messageKind,
+  messageKindLabel,
   extractRecordedConversationMessages,
   extractRequestMessages,
   extractRequestTools,

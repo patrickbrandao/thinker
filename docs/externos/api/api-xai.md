@@ -88,6 +88,10 @@ Tokens em cache contam no TPM mas têm tarifa reduzida. Imagem: US$0,02 a 0,04 p
 - Todos os tokens (prompt, imagem, áudio, completion, raciocínio, cache) contam no TPM.
 - 429 = limite excedido; retentável com backoff exponencial. Códigos 401/403 e cabeçalhos de limite: não documentados nas páginas lidas (não confirmado).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Provider `xai`, prefixo de chave `xai-`, tamanho mínimo 50, aliases OpenRouter `xai` e `x-ai` (`packages/shared/src/providers.ts:468-478`).

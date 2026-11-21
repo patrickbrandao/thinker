@@ -41,6 +41,7 @@ New agents may be created when useful; register them in [`docs/agentes.md`](docs
 Thinker follows rules it doesn't own: API providers, subscription backends, local runtimes and harnesses all change often. Each one has a spec in [`docs/externos/`](docs/externos/README.md), kept current by a dedicated read-only researcher agent (procedure in [`.claude/external-research.md`](.claude/external-research.md)).
 
 - Before changing code that talks to or depends on an external system, read its dossier. Treat its "Contrato" section as the source of truth over your training data.
+- For request/response shapes (fields, stream events, tool-call ids, parallel calls, tool results, errors), read `### Formato na rede` at the end of "Contrato"; it lists only differences from a base protocol and links to its canonical section ([index](docs/externos/README.md#formato-na-rede)). Its `Ao vivo` column says whether a claim was seen on the wire (`sonda`, `captura`) or only documented. `Pendente` there counts as "doesn't answer what the change needs".
 - If the dossier is a skeleton (`revisado_em: null`), older than 30 days, or doesn't answer what the change needs, run that entity's researcher first (several in parallel when the change spans entities), then implement.
 - Researchers never commit. Review their dossier diffs and ship them, alone (`docs(externos): ...`) or with the change that used them. Their gap issues carry the label `externo`.
 

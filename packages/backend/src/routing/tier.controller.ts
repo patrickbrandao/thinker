@@ -65,7 +65,7 @@ export class TierController {
     const provider = body.route?.provider ?? body.provider;
     const authType = body.route?.authType ?? body.authType;
     const providerKeyLabel = body.route?.keyLabel ?? body.providerKeyLabel;
-    return this.tierService.setOverride(
+    const row = await this.tierService.setOverride(
       agent.id,
       agent.tenant_id,
       tier,
@@ -74,6 +74,7 @@ export class TierController {
       authType,
       providerKeyLabel,
     );
+    return this.routeStatus.withStatusOne(agent.tenant_id, agent.id, row);
   }
 
   @Delete(':agentName/tiers/:tier')
@@ -99,7 +100,9 @@ export class TierController {
     const responseMode = responseModeFromDto(body);
     if (!responseMode) throw new BadRequestException('response_mode is required');
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    return this.tierService.setResponseMode(agent.id, tier, responseMode);
+    const row = await this.tierService.setResponseMode(agent.id, tier, responseMode);
+    // The dashboard swaps the row in place: keep the route status icons.
+    return this.routeStatus.withStatusOne(agent.tenant_id, agent.id, row);
   }
 
   @Post(':agentName/tiers/reset-all')

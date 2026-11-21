@@ -87,6 +87,10 @@ Nota sobre as fontes semente: o repositório está correto. A página de docs va
 
 O snippet atual (`setup-snippets.ts:102`, `N8nSetup.tsx`) manda criar uma credencial OpenAI com Base URL `<base>/v1`, API Key `thk_...` e usar o modelo `auto` no node OpenAI Chat Model. Continua correto para conexão e chamada. Faltam: o toggle "Use Responses API" (G2), o cabeçalho `x-session-key` (G1) e o aviso de Docker/SSRF.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Superfície declarada: `chat_completions` (`packages/shared/src/agent-type.ts:80`); categoria `automation` (`agent-type.ts:130`); ícone `/icons/n8n.svg` (`agent-type.ts:141`); id `n8n` (`agent-type.ts:30`); rótulo `n8n` (`agent-type.ts:106`).

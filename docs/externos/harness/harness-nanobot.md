@@ -86,6 +86,10 @@ Fonte de tudo abaixo: código e docs de `HKUDS/nanobot` na tag v0.4.0, lidos em 
 
 Correto no v0.4.0 (chaves `agents.defaults.provider`, `agents.defaults.model`, `providers.custom.apiKey`, `providers.custom.apiBase`). Ressalva: se o usuário já tem `agents.defaults.modelPreset` (a WebUI v0.4 cria presets), o preset vence e o snippet parece não ter efeito.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Superfície declarada `chat_completions`, rótulo "Nanobot", grupo `personal` (`packages/shared/src/agent-type.ts:27,77,103,129`).

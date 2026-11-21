@@ -94,6 +94,10 @@ Erros: formato OpenAI `{"error":{"code":401,"message":"Invalid API Key","type":"
 - Router: `status.value` e `POST /models/load`/`unload` para mostrar e controlar o que está carregado; `--sleep-idle-seconds` para liberar memória (G5).
 - `/v1/chat/completions/input_tokens` e `/v1/messages/count_tokens` para contagem de tokens local.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Tipos de servidor local configuráveis: `LOCAL_SERVER_TYPES = ['ollama','lmstudio','llamacpp']`, cada um vira uma linha de custom provider com `local_type` (`packages/backend/src/common/constants/local-servers.ts:130`). Defaults do `llamacpp` nesse caminho: porta 9931, saúde `/health`, listagem `/v1/models` (`local-servers.ts:198-205`), comentário citando o PR #30159 (`:173-177`). Timeouts padrão 10 min de requisição e 10 s de sonda (`:210-211`).

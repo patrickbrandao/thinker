@@ -1035,7 +1035,7 @@ describe('Overview', () => {
     mockGetOverview.mockResolvedValue(dataWithSub);
     const { container } = renderOverview();
     await vi.waitFor(() => {
-      const subCost = container.querySelector('[title="Included in subscription"]');
+      const subCost = container.querySelector('[title="Subscribed"]');
       expect(subCost).not.toBeNull();
       expect(subCost!.textContent).toBe('$0.00');
     });

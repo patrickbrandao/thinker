@@ -103,6 +103,10 @@ Fonte: página pay-as-you-go, 2026-11-04. Valores por 1M de tokens.
 - Sob carga alta a API pode atrasar ou devolver 429; sem `Retry-After` documentado; a doc recomenda retry com backoff.
 - Códigos (via `sub-xiaomi`, 2026-07-15): 400 formato/modelo inexistente/`reasoning_content` ausente; 401 chave inválida ou mistura de tipo de chave; 402 saldo insuficiente (pay-as-you-go); 403 região sem serviço ou chave restringida por risco; 404 sem suporte a imagem; 421 moderação. Retentáveis: 429 e 5xx; não retentáveis: 401, 402, 403, 421.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Provedor `xiaomi` com aliases `mimo`, `xiaomi-mimo`, `xiaomi mimo`, chave `sk-` com mínimo de 50 caracteres (`packages/shared/src/providers.ts:297`); o tamanho real das chaves `sk-` do MiMo não foi confirmado.

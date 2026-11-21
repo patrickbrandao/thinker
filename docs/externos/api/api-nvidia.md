@@ -58,6 +58,10 @@ Os endpoints hospedados são descritos como gratuitos para membros do Developer 
 
 Limites de taxa, créditos e códigos de erro não estão nas páginas lidas: (não confirmado). Padrão esperado: 401 chave inválida, 429 limite (retentável), 404 modelo inexistente. Verificar com chave real.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Base `https://integrate.api.nvidia.com`, formato `openai`, cabeçalhos Bearer, path `/v1/chat/completions` e relato de uso em stream via `openaiStreamUsage` (`packages/backend/src/routing/proxy/provider-endpoints.ts:199`, `:446-452`).

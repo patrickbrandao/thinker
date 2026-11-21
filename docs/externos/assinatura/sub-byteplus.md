@@ -81,6 +81,10 @@ Dica para a próxima revisão: as docs são SPA; um navegador real (ou o console
 
 - Não encontrados códigos de erro específicos do plano em fonte primária legível. Cota esgotada, chave inválida e modelo fora do plano precisam de verificação ao vivo. Chamar `/api/v3` com a chave do plano deve falhar ou cobrar à parte (não confirmado).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Registro: id `byteplus`, nome BytePlus, aliases `byteplus-plan`, `modelark`, `modelark-coding-plan`; chave obrigatória, sem prefixo, mínimo 10 caracteres (`packages/shared/src/providers.ts:122-132`).

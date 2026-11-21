@@ -119,6 +119,10 @@ Versão do cliente oficial que o Thinker espelha: OpenCode `v2.2.5` (2026-10-30)
 - Modelo bloqueado pelas configurações de privacidade do workspace: formato do erro não confirmado.
 - Login encerrado: refresh 400 `invalid_grant`; inferência 401/403 pode significar sessão revogada ou política da organização (SSO exigido: 403 `SsoRequired` no `/api/v2/config`).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Revisado em 2026-11-03.

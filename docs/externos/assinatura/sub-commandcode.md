@@ -118,6 +118,10 @@ Fonte: doc da Provider API.
 
 Limite de janela estourado: a requisição é recusada com mensagem que cita a janela e a hora de reinício (o código HTTP exato não está documentado; (não confirmado) se é 429 ou 403). Outras páginas de erro individuais não foram lidas.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Registro: id `commandcode`, aliases `command-code`, `command code`, `cmd`, chave `user_...`, mínimo 50 caracteres (`packages/shared/src/providers.ts:237-248`).

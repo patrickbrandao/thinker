@@ -123,6 +123,10 @@ Conferido contra o contrato acima:
 - Python (`framework-snippets.ts:146-167`): `pip install ai-sdk` / `AIClient` / `generate_text`. **Não corresponde a nenhum SDK da Vercel** (G3).
 - Guia de usuário: `docs/usuario/conectar-harnesses.md:133` diz "Chat Completions, URL base `http://localhost:2099/v1`": a URL e a chave estão certas; falta dizer qual fábrica usar (G1) e o cabeçalho de sessão (G4).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Superfície declarada: `chat_completions` (`packages/shared/src/agent-type.ts:94`). Nome de exibição `Vercel AI SDK` (`:120`), categoria `app` (`:131`), ícone `/icons/vercel-ai-sdk.svg` (`:155`). A aba do assistente de setup usa `/icons/vercel.svg` (`packages/frontend/src/services/framework-snippets.ts:37`).

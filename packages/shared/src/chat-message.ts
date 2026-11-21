@@ -14,6 +14,76 @@ export interface ChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
+  /**
+   * Protocol item type when the entry is not a plain chat message
+   * (`function_call`, `function_call_output`, `reasoning`, `tool_result`, …).
+   */
+  kind?: string;
+  /** The source JSON this entry was read from (message, input/output item or block). */
+  raw?: unknown;
+}
+
+/**
+ * Two-letter labels for the conversation outline. Roles keep their first two
+ * letters (SY, US, AS, TO); protocol items get their own.
+ */
+const KIND_LABELS: Record<string, string> = {
+  system: 'SY',
+  user: 'US',
+  assistant: 'AS',
+  tool: 'TO',
+  unknown: 'UN',
+  function_call: 'FC',
+  function_call_output: 'FO',
+  function_response: 'FO',
+  tool_result: 'TR',
+  reasoning: 'RE',
+  custom_tool_call: 'CT',
+  custom_tool_call_output: 'CO',
+  web_search_call: 'WS',
+  file_search_call: 'FS',
+  computer_call: 'CU',
+  computer_call_output: 'CR',
+  local_shell_call: 'SH',
+  local_shell_call_output: 'SO',
+  shell_call: 'SH',
+  shell_call_output: 'SO',
+  apply_patch_call: 'AP',
+  apply_patch_call_output: 'AO',
+  code_interpreter_call: 'CI',
+  image_generation_call: 'IG',
+  mcp_call: 'MC',
+  mcp_list_tools: 'ML',
+  mcp_approval_request: 'MA',
+  mcp_approval_response: 'MR',
+  item_reference: 'IR',
+  compaction: 'CP',
+};
+
+/**
+ * What an entry is: its protocol item type, `function_call` for an assistant
+ * turn that only calls tools, otherwise its role.
+ */
+export function messageKind(message: ChatMessage): string {
+  if (message.kind) return message.kind;
+  const role = normalizeRole(message.role);
+  if (
+    role === 'assistant' &&
+    (message.tool_calls?.length ?? 0) > 0 &&
+    !coerceContentToText(message.content)
+  ) {
+    return 'function_call';
+  }
+  return role === 'unknown' ? (message.role ?? 'unknown') : role;
+}
+
+/** Two-letter outline label of a kind; unknown kinds use their word initials. */
+export function messageKindLabel(kind: string): string {
+  const known = KIND_LABELS[kind];
+  if (known) return known;
+  const words = kind.split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const label = words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? kind).slice(0, 2);
+  return label.toUpperCase();
 }
 
 export interface ChatTool {
@@ -106,8 +176,10 @@ function anthropicMessage(message: JsonRecord): ChatMessage[] {
     } else if (block.type === 'tool_result') {
       toolResults.push({
         role: 'tool',
+        kind: 'tool_result',
         tool_call_id: typeof block.tool_use_id === 'string' ? block.tool_use_id : undefined,
         content: block.content,
+        raw: block,
       });
     } else {
       normalContent.push(block);
@@ -122,6 +194,7 @@ function anthropicMessage(message: JsonRecord): ChatMessage[] {
       ...(typeof message.name === 'string' ? { name: message.name } : {}),
       ...(typeof message.tool_call_id === 'string' ? { tool_call_id: message.tool_call_id } : {}),
       ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      raw: message,
     });
   }
   return [...result, ...toolResults];
@@ -132,6 +205,8 @@ function responsesItem(item: JsonRecord, defaultRole: string): ChatMessage[] {
     return [
       {
         role: 'assistant',
+        kind: 'function_call',
+        raw: item,
         content: null,
         tool_calls: [
           {
@@ -155,16 +230,36 @@ function responsesItem(item: JsonRecord, defaultRole: string): ChatMessage[] {
     return [
       {
         role: 'tool',
+        kind: 'function_call_output',
+        raw: item,
         tool_call_id: typeof item.call_id === 'string' ? item.call_id : undefined,
         content: item.output ?? '',
       },
     ];
   }
-  if (item.type && item.type !== 'message') return [];
+  if (typeof item.type === 'string' && item.type !== 'message') {
+    // Every other Responses item (reasoning, built-in tool calls and their
+    // outputs, MCP, item references…) is listed as itself with its JSON.
+    const output = item.type.endsWith('_output') || item.type.endsWith('_response');
+    const summary =
+      item.type === 'reasoning' && Array.isArray(item.summary)
+        ? coerceContentToText(item.summary)
+        : '';
+    return [
+      {
+        role: output ? 'tool' : 'assistant',
+        kind: item.type,
+        raw: item,
+        ...(typeof item.call_id === 'string' ? { tool_call_id: item.call_id } : {}),
+        content: summary || item,
+      },
+    ];
+  }
   return [
     {
       role: typeof item.role === 'string' ? item.role : defaultRole,
       content: item.content,
+      raw: item,
     },
   ];
 }
@@ -191,15 +286,20 @@ function geminiContents(contents: unknown[]): ChatMessage[] {
       });
     }
 
+    const onlyResponses =
+      parts.length > 0 && parts.every((part) => isRecord(part) && isRecord(part.functionResponse));
     return {
-      role:
-        content.role === 'model'
+      role: onlyResponses
+        ? 'tool'
+        : content.role === 'model'
           ? 'assistant'
           : typeof content.role === 'string'
             ? content.role
             : 'user',
+      ...(onlyResponses ? { kind: 'function_response' } : {}),
       content: normalContent.length > 0 ? normalContent : null,
       ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      raw: content,
     };
   });
 }
@@ -225,7 +325,7 @@ export function extractRequestMessages(
     for (const message of requestBody.messages) {
       if (!isRecord(message)) continue;
       if (Array.isArray(message.content)) messages.push(...anthropicMessage(message));
-      else messages.push(message as ChatMessage);
+      else messages.push({ ...(message as ChatMessage), raw: message });
     }
     return messages;
   }
@@ -290,7 +390,9 @@ export function extractRequestTools(
 function extractJsonResponse(body: JsonRecord): ChatMessage[] {
   if (Array.isArray(body.choices)) {
     const choice = body.choices.find(isRecord);
-    return choice && isRecord(choice.message) ? [choice.message as ChatMessage] : [];
+    return choice && isRecord(choice.message)
+      ? [{ ...(choice.message as ChatMessage), raw: choice.message }]
+      : [];
   }
   if (Array.isArray(body.output)) {
     return body.output.filter(isRecord).flatMap((item) => responsesItem(item, 'assistant'));

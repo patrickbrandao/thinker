@@ -96,6 +96,10 @@ Fonte: <https://kiro.dev/pricing/> (2026-11-03).
 - Fim de cota mensal: HTTP 429 com `__type: ThrottlingException`, `reason: MONTHLY_REQUEST_COUNT` e mensagem "Maximum Request reached for this month." (v1.19.7: `api_client/retry_classifier.rs`, `mod.rs`). Esse formato vem do cliente antigo; o Kiro com créditos pode ter mudado `(não confirmado)`.
 - Token inválido/expirado, cliente rejeitado e modelo fora do plano: formatos não documentados `(não confirmado)`. Modelo removido (EOL) falha sem fallback.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Provedor `kiro`, assinatura por código de dispositivo, sem chave (`packages/shared/src/providers.ts:261-272`, `requiresApiKey: false`) e `subscriptionAuthMode: 'device_code'` (`packages/shared/src/subscription/configs.ts:217-239`).

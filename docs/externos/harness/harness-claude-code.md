@@ -109,6 +109,10 @@ Streaming SSE completo, na ordem, até `message_delta` e `message_stop` (corpo q
 
 Esperado hoje para um gateway Anthropic-format: `ANTHROPIC_BASE_URL` sem `/v1`, `ANTHROPIC_AUTH_TOKEN`, e `model` explícito. O snippet atual do Thinker (veja abaixo) está correto nesses pontos. Opcionais úteis: `CLAUDE_CODE_GATEWAY_HINT_HEADERS=1`, `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`, `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL`.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Branch/commit lido: worktree `piloto` em `61b155e` (main), 2026-11-03.

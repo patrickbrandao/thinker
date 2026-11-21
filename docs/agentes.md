@@ -24,7 +24,7 @@ O `litellm-expert` responde tudo sobre o [LiteLLM Proxy](https://github.com/Berr
 
 ## Pesquisadores de sistemas externos
 
-Cada provedor (por forma de acesso: API ou assinatura), runtime local e harness suportado tem um agente próprio que estuda a fonte da verdade e mantém uma especificação para o Principal. O procedimento comum está em [`.claude/external-research.md`](../.claude/external-research.md); a lista completa, o formato do dossiê e como acionar estão em [`docs/externos/README.md`](externos/README.md). Uma entidade nova ganha agente, dossiê e linha no índice de `docs/externos/`, não nesta tabela.
+Cada provedor (por forma de acesso: API ou assinatura), runtime local e harness suportado tem um agente próprio que estuda a fonte da verdade e mantém uma especificação para o Principal. O procedimento comum está em [`.claude/external-research.md`](../.claude/external-research.md); a lista completa, o formato do dossiê e como acionar estão em [`docs/externos/README.md`](externos/README.md). Todo dossiê termina o contrato com `### Formato na rede`: a estrutura de pedido, resposta, stream, ferramentas e erros de cada API, com a fonte de cada linha e se ela foi vista na rede ([detalhes](externos/README.md#formato-na-rede)). Uma entidade nova ganha agente, dossiê e linha no índice de `docs/externos/`, não nesta tabela.
 
 ## Execuções agendadas
 

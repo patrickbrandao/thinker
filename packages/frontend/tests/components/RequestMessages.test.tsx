@@ -33,6 +33,26 @@ const recording = {
 describe('RequestMessages', () => {
   afterEach(cleanup);
 
+  it('labels Responses function calls FC and shows each item raw', () => {
+    const item = { type: 'function_call', call_id: 'c1', name: 'lookup', arguments: '{}' };
+    const { container, getByText } = render(
+      <RequestMessages
+        recording={{
+          request_body: { input: [{ role: 'user', content: 'Hi' }, item] },
+          response_body: { type: 'json' as const, body: { output: [] } },
+          wire_format: 'openai_responses',
+        }}
+      />,
+    );
+    expect(getByText('FC')).toBeTruthy();
+    expect(container.querySelector('.conv-outline-row__function')?.textContent).toBe('lookup');
+    expect(getByText('function_call')).toBeTruthy();
+    const toggles = container.querySelectorAll('.request-message__raw-toggle');
+    fireEvent.click(toggles[1]);
+    const raw = container.querySelector('.request-message__raw');
+    expect(raw?.textContent).toContain('"call_id": "c1"');
+  });
+
   it('renders the recorded conversation and response', () => {
     const { getAllByText } = render(<RequestMessages recording={recording} />);
     expect(getAllByText('What is the weather?')).toHaveLength(2);

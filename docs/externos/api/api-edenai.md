@@ -82,6 +82,10 @@ Gateway francês (UE) que revende mais de mil modelos de vários fornecedores co
 - Corpo de erro OpenAI `{"error":{"message","type","param","code"}}`, com a exceção do 402 acima.
 - Chaves em <https://app.edenai.run/settings/api-keys>.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Cadastro: `packages/shared/src/providers.ts:191` (id `edenai`, aliases `eden-ai` e `eden ai`; prefixo não exigido porque `sk-eden-` só aparece mascarado na doc; mínimo 20 caracteres).

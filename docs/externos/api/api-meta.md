@@ -85,6 +85,10 @@ Extras: grounding de busca US$ 2,50 por 1.000 consultas; imagem US$ 0,01 cada; t
 - 429 = limite excedido (retentável com backoff; respeitar `Retry-After`). Headers `x-ratelimit-limit-tokens`, `x-ratelimit-remaining-tokens`, `x-ratelimit-limit-requests`, `x-ratelimit-remaining-requests`.
 - 400 para parâmetros não suportados; 504 em não-streaming longo. Códigos de chave inválida/modelo não habilitado não documentados (não confirmado).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Base URL `https://api.meta.ai` (`packages/backend/src/routing/proxy/provider-endpoints.ts:203`), formato `openai`, caminho `/v1/chat/completions` (`provider-endpoints.ts:96`, `:405-411`), header Bearer, `stream_options` de uso OpenAI.

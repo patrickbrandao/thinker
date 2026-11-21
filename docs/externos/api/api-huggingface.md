@@ -90,6 +90,10 @@ Como o roteador repassa para provedores distintos, a doc avisa que a requisiçã
 - `stop` aceita até 4 sequências; `logprobs` exige `top_logprobs` entre 0 e 5.
 - Parâmetros ignorados ou específicos: `tool_prompt` é específico do TGI; `reasoning_effort` pode ser ignorado por provedor (dependente de modelo).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Estado conferido no código em 2026-11-04:

@@ -151,6 +151,10 @@ Fonte: códigos de erro, 2026-07-15.
 | 429 | Requisições frequentes **ou** cota do Token Plan esgotada | Os dois casos usam o mesmo código; sem corpo distinto documentado |
 | 500, 503 | Erro do servidor, sobrecarga | Repetível |
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Valores conferidos no código da worktree `onda2` em 2026-11-03.

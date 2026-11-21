@@ -205,9 +205,9 @@ describe('SetFallbacksDto', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('should reject more than 5 items', async () => {
+  it('should reject more than 9 items', async () => {
     const dto = toFallbacksDto({
-      models: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'],
+      models: Array.from({ length: 10 }, (_, i) => `m${i + 1}`),
     });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);

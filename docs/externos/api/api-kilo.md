@@ -92,6 +92,10 @@ O Kilo Gateway é um agregador compatível com OpenRouter (Chat Completions) que
 - Corpo de erro: `{"error":{"message":...}}`. Erro de contexto excedido é descritivo.
 - Parâmetros proibidos: nenhum encontrado além da limpeza de `id`/`item_reference` em `/responses` feita pelo cliente oficial.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Base `https://api.kilo.ai/api/gateway` (legada), constante duplicada em `packages/backend/src/routing/proxy/provider-endpoints.ts:197` e `packages/backend/src/model-discovery/provider-model-fetcher.service.ts:65`.

@@ -118,7 +118,7 @@ const ptBR: Catalog<typeof en> = {
     expandDetails: 'Expandir detalhes',
     heartbeat: 'Heartbeat',
     perRequestCost: 'Custo por requisição da assinatura: {{ amount }}',
-    includedInSubscription: 'Incluído na assinatura',
+    includedInSubscription: 'Assinado',
     virtualModel: 'Modelo virtual: {{ name }}',
     directTier: 'O chamador pediu um modelo específico. Nenhum roteamento aplicado.',
     defaultTier: 'Roteada pelo nível padrão.',
@@ -230,6 +230,8 @@ const ptBR: Catalog<typeof en> = {
     collapseBack: 'Recolher',
     filterPlaceholder: 'Filtrar…',
     toggleRole: 'Mostrar ou ocultar mensagens de {{ role }}',
+    viewRaw: 'JSON bruto deste item',
+    viewRendered: 'Visualização renderizada',
     noMatches: 'Nenhum resultado',
     noLogsTitle: 'Sem logs para esta tentativa',
     noLogsBody:

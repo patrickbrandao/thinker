@@ -43,7 +43,7 @@ thinker routing virtual delete meu-app deepseek/flash --yes
 | Comando | Flags |
 | --- | --- |
 | `routing virtual list <agente>` | Lista os virtuais com cadeia, `shadows` (IDs reais sombreados), `context_length` e `routable`. |
-| `routing virtual create <agente>` | `--name <nome>` (obrigatória); `--model <m>` (principal), com `--provider`, `--auth-type` e `--key-label` para fixar a rota; `--fallback <m>` (repetível, até 5, exige `--model`); `--continue-on-default`; `--response-mode buffered\|stream`. |
+| `routing virtual create <agente>` | `--name <nome>` (obrigatória); `--model <m>` (principal), com `--provider`, `--auth-type` e `--key-label` para fixar a rota; `--fallback <m>` (repetível, até 9, exige `--model`); `--continue-on-default`; `--response-mode buffered\|stream`. |
 | `routing virtual update <agente> <nome>` | Muda só o que você passa: `--name <novo>`, `--model <m>` (troca o principal e mantém os fallbacks), `--fallback <m>` (repetível, troca a lista) ou `--clear-fallbacks`, `--clear-model` (remove o principal e os fallbacks), `--continue-on-default` ou `--no-continue-on-default`, `--response-mode`. |
 | `routing virtual enable\|disable <agente> <nome>` | Ativa ou desativa. Desativado, o virtual some de `/v1/models` e deixa de sombrear. |
 | `routing virtual delete <agente> <nome> --yes` | Apaga o virtual e os parâmetros por modelo dele. A flag `--yes` é obrigatória. |

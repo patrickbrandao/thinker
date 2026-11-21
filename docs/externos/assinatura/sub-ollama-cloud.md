@@ -97,6 +97,10 @@ Formato `{"error": "..."}`. Códigos documentados: 400, 404 (modelo inexistente)
 
 Catálogo cloud em 2026-11-03 (20 modelos): deepseek-v4.1-flash, deepseek-v4-pro, glm-5.3, glm-5.3-flash, glm-5.2, beam, minimax-m3.1-flash, minimax-m3, minimax-m2.7, muse-spark-open, mistral-large-4, clef, kimi-k2.7-code, kimi-k3, nemotron-3-ultra, nemotron-3-super, nemotron-3-nano, mimo-v2.6-flash, mimo-v2.6-pro, gemma4. Nome de API sem sufixo `:cloud` (ex.: `gemma4:31b`); `:cloud` só na CLI/app. Janelas chegam a 1M (Nemotron 3.5 Super, release v0.40.5).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Autenticação: chave de API colada, modo `token`, sem prefixo (`packages/shared/src/subscription/configs.ts:205`); só assinatura na UI (`packages/frontend/src/services/providers.ts:482`); link de criação da chave `packages/frontend/src/services/provider-api-key-urls.ts:20`.

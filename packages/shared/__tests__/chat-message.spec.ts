@@ -1,14 +1,59 @@
 import {
   coerceContentToText,
-  extractRecordedConversationMessages,
-  extractRequestMessages,
+  extractRecordedConversationMessages as extractRecordedWithRaw,
+  extractRequestMessages as extractRequestWithRaw,
   extractRequestTools,
-  extractResponseMessages,
+  extractResponseMessages as extractResponseWithRaw,
   extractResponseToolCalls,
+  messageKind,
+  messageKindLabel,
   normalizeRole,
+  type ChatMessage,
 } from '../src/chat-message';
 
+/** Messages without their source JSON, which the shape assertions below ignore. */
+const withoutRaw = (messages: ChatMessage[]) =>
+  messages.map(({ raw: _raw, ...message }) => message);
+const extractRequestMessages = (...args: Parameters<typeof extractRequestWithRaw>) =>
+  withoutRaw(extractRequestWithRaw(...args));
+const extractResponseMessages = (...args: Parameters<typeof extractResponseWithRaw>) =>
+  withoutRaw(extractResponseWithRaw(...args));
+const extractRecordedConversationMessages = (...args: Parameters<typeof extractRecordedWithRaw>) =>
+  withoutRaw(extractRecordedWithRaw(...args));
+
 describe('recorded chat message helpers', () => {
+  it('names entries by protocol item and labels them with two letters', () => {
+    const [call, output, reasoning] = extractRequestWithRaw({
+      input: [
+        { type: 'function_call', call_id: 'c1', name: 'lookup', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'c1', output: 'ok' },
+        { type: 'reasoning', summary: [{ type: 'summary_text', text: 'Thinking' }] },
+      ],
+    });
+    expect(call.raw).toEqual({
+      type: 'function_call',
+      call_id: 'c1',
+      name: 'lookup',
+      arguments: '{}',
+    });
+    expect([call, output, reasoning].map(messageKind)).toEqual([
+      'function_call',
+      'function_call_output',
+      'reasoning',
+    ]);
+    expect(reasoning.content).toBe('Thinking');
+    expect(messageKind({ role: 'assistant', content: null, tool_calls: [{ id: 'x' }] })).toBe(
+      'function_call',
+    );
+    expect(messageKind({ role: 'assistant', content: 'Hi' })).toBe('assistant');
+    expect(
+      ['function_call', 'function_call_output', 'assistant', 'user', 'tool_result'].map(
+        messageKindLabel,
+      ),
+    ).toEqual(['FC', 'FO', 'AS', 'US', 'TR']);
+    expect(messageKindLabel('brand_new_call')).toBe('BN');
+  });
+
   it('normalizes provider roles without inventing known roles', () => {
     expect(['system', 'user', 'assistant', 'tool'].map(normalizeRole)).toEqual([
       'system',
@@ -77,7 +122,7 @@ describe('recorded chat message helpers', () => {
           },
         ],
       },
-      { role: 'tool', tool_call_id: 'tool-1', content: 'Sunny' },
+      { role: 'tool', kind: 'tool_result', tool_call_id: 'tool-1', content: 'Sunny' },
     ]);
   });
 
@@ -120,7 +165,7 @@ describe('recorded chat message helpers', () => {
           },
         ],
       },
-      { role: 'tool', tool_call_id: undefined, content: 'No id' },
+      { role: 'tool', kind: 'tool_result', tool_call_id: undefined, content: 'No id' },
     ]);
   });
 
@@ -144,6 +189,7 @@ describe('recorded chat message helpers', () => {
       { role: 'user', content: 'Hello' },
       {
         role: 'assistant',
+        kind: 'function_call',
         content: null,
         tool_calls: [
           {
@@ -153,10 +199,11 @@ describe('recorded chat message helpers', () => {
           },
         ],
       },
-      { role: 'tool', tool_call_id: undefined, content: '' },
+      { role: 'tool', kind: 'function_call_output', tool_call_id: undefined, content: '' },
       { role: 'user', content: 'Continue' },
       {
         role: 'assistant',
+        kind: 'function_call',
         content: null,
         tool_calls: [
           {
@@ -166,8 +213,14 @@ describe('recorded chat message helpers', () => {
           },
         ],
       },
-      { role: 'tool', tool_call_id: 'call-output', content: 'Done' },
+      { role: 'tool', kind: 'function_call_output', tool_call_id: 'call-output', content: 'Done' },
       { role: 'assistant', content: 'Finished' },
+      // Other Responses items are listed as themselves, with their JSON.
+      {
+        role: 'assistant',
+        kind: 'computer_call',
+        content: { type: 'computer_call', id: 'ignored' },
+      },
     ]);
     expect(extractRequestMessages({ input: 'A plain prompt' })).toEqual([
       { role: 'user', content: 'A plain prompt' },
@@ -307,6 +360,7 @@ describe('recorded chat message helpers', () => {
     ).toEqual([
       {
         role: 'assistant',
+        kind: 'function_call',
         content: null,
         tool_calls: [
           {

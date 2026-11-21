@@ -363,15 +363,15 @@ describe('VirtualModelService', () => {
       expect(err.message).toContain('"nope"');
     });
 
-    it('rejects more than 5 fallbacks', async () => {
+    it('rejects more than 9 fallbacks', async () => {
       const err = await svc
         .create('agent-1', 'tenant-1', {
           name: 'x',
-          fallback_routes: Array.from({ length: 6 }, () => ({ model: 'gpt-4o' })),
+          fallback_routes: Array.from({ length: 10 }, () => ({ model: 'gpt-4o' })),
         })
         .catch((e) => e);
       expect(err).toBeInstanceOf(BadRequestException);
-      expect(err.message).toContain('at most 5 fallbacks');
+      expect(err.message).toContain('at most 9 fallbacks');
     });
 
     it('stores a sent key label with the key spelling', async () => {
@@ -609,10 +609,10 @@ describe('VirtualModelService', () => {
       expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ fallback_routes: null }));
     });
 
-    it('rejects more than 5 fallbacks', async () => {
+    it('rejects more than 9 fallbacks', async () => {
       await expect(
-        svc.setFallbacks('agent-1', 'tenant-1', 'vm-1', Array(6).fill('gpt-4o')),
-      ).rejects.toThrow('at most 5 fallbacks');
+        svc.setFallbacks('agent-1', 'tenant-1', 'vm-1', Array(10).fill('gpt-4o')),
+      ).rejects.toThrow('at most 9 fallbacks');
     });
 
     it('clears fallbacks', async () => {

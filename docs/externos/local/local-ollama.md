@@ -70,6 +70,10 @@ Campos suportados em `/v1/chat/completions`: `model`, `messages`, `temperature`,
 - `reasoning_effort` e `/v1/messages` com `output_config.effort` para controlar thinking (G1).
 - `keep_alive` nativo para manter modelos aquecidos (só via `/api/chat`; Thinker usa a rota OpenAI).
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Tile `ollama` built-in: `requiresApiKey: false`, `localOnly: true` (`packages/shared/src/providers.ts:383`); setup `ollama pull llama3.1:8b` (`providers.ts:587`).

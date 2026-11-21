@@ -53,7 +53,7 @@ export class SpecificityController {
     const provider = body.route?.provider ?? body.provider;
     const authType = body.route?.authType ?? body.authType;
     const providerKeyLabel = body.route?.keyLabel ?? body.providerKeyLabel;
-    return this.specificityService.setOverride(
+    const row = await this.specificityService.setOverride(
       agent.id,
       agent.tenant_id,
       category,
@@ -62,6 +62,7 @@ export class SpecificityController {
       authType,
       providerKeyLabel,
     );
+    return this.routeStatus.withStatusOne(agent.tenant_id, agent.id, row);
   }
 
   @Post(':agentName/specificity/:category/toggle')
@@ -73,7 +74,8 @@ export class SpecificityController {
   ) {
     this.validateCategory(category);
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    return this.specificityService.toggleCategory(agent.id, category, body.active);
+    const row = await this.specificityService.toggleCategory(agent.id, category, body.active);
+    return this.routeStatus.withStatusOne(agent.tenant_id, agent.id, row);
   }
 
   @Delete(':agentName/specificity/:category')
@@ -99,7 +101,9 @@ export class SpecificityController {
     const responseMode = responseModeFromDto(body);
     if (!responseMode) throw new BadRequestException('response_mode is required');
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    return this.specificityService.setResponseMode(agent.id, category, responseMode);
+    const row = await this.specificityService.setResponseMode(agent.id, category, responseMode);
+    // The dashboard swaps the row in place: keep the route status icons.
+    return this.routeStatus.withStatusOne(agent.tenant_id, agent.id, row);
   }
 
   @Put(':agentName/specificity/:category/fallbacks')

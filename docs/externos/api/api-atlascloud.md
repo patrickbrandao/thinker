@@ -92,6 +92,10 @@ Agregador com chave `apikey-...` que serve modelos abertos (DeepSeek, Qwen, GLM,
 - Corpo de erro: `{"code":401,"msg":"unauthorized","request_id":"...","data":null}` (não é o formato OpenAI).
 - Chaves criadas em <https://www.atlascloud.ai/console/api-keys>; a chave aparece uma vez só.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 - Cadastro: `packages/shared/src/providers.ts:106` (id `atlascloud`, aliases `atlas-cloud` e `atlas cloud`, prefixo `apikey-` exigido pelo dashboard, mínimo 20 caracteres).

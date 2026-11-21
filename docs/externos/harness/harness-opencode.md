@@ -106,6 +106,10 @@ Fonte: `services/site/src/docs/content/claude-agent.mdx` e `packages/core/src/pl
 
 Correto para a v2.2.5 e para o `dev`. `aisdk:@ai-sdk/openai-compatible` com `settings.baseURL` e `settings.apiKey` é aceito. O exemplo dos docs v2 usa o pacote nativo e `env` em vez de chave literal (G3). Quem ainda usa o OpenCode 1 precisa do formato `provider`/`npm`/`options` (G2). O caminho alternativo pelo provedor Claude Agent está em `conectar-harnesses.md` (G5), ainda sem teste ao vivo.
 
+### Formato na rede
+
+Pendente: estrutura de pedido e resposta ainda não pesquisada (regras em [`.claude/external-research.md`](../../../.claude/external-research.md#wire-format)). Até a revisão, use a seção canônica do protocolo base listada no [índice](../README.md#formato-na-rede) e trate qualquer diferença desta entidade como não verificada.
+
 ## Como o Thinker implementa hoje
 
 Superfície: Chat Completions (`packages/shared/src/agent-type.ts:88`). Plataforma `opencode` em `AGENT_PLATFORMS` (`agent-type.ts:36`), nome `OpenCode` (`:116`), categoria `coding` (`:136`), ícone (`:151`).
