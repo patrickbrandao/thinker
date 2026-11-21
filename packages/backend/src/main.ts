@@ -26,7 +26,10 @@ import {
   PROXY_BODY_LIMIT,
   bodyParserErrorHandler,
   createProxyBodyBudgetMiddleware,
+  createProxyPreAuthMiddleware,
+  skipRefusedProxyBodies,
 } from './common/middleware/body-parser-limits';
+import { AgentKeyAuthGuard } from './otlp/guards/agent-key-auth.guard';
 import {
   applyPrivateNetworkAllow,
   buildCorsOptions,
@@ -234,12 +237,24 @@ export async function bootstrap() {
 
   // Re-add body parsing for NestJS routes. The OpenAI-compatible proxy has a
   // separate parser because clients may legitimately send large inline image
-  // payloads. Regular Thinker API/auth routes stay small.
+  // payloads. Regular Thinker API/auth routes stay small. The agent key is
+  // checked from the headers first: a caller without a valid key reserves no
+  // body budget and its body is never read (the guard answers it as before).
+  const agentKeyGuard = app.get(AgentKeyAuthGuard, { strict: false });
+  expressApp.use(
+    '/v1',
+    createProxyPreAuthMiddleware((req) => agentKeyGuard.authenticate(req)),
+  );
   expressApp.use('/v1', createProxyBodyBudgetMiddleware());
-  expressApp.use('/v1', express.json({ limit: PROXY_BODY_LIMIT }));
-  expressApp.use('/v1', express.urlencoded({ extended: true, limit: PROXY_BODY_LIMIT }));
-  expressApp.use(express.json({ limit: API_BODY_LIMIT }));
-  expressApp.use(express.urlencoded({ extended: true, limit: API_BODY_LIMIT }));
+  expressApp.use('/v1', skipRefusedProxyBodies(express.json({ limit: PROXY_BODY_LIMIT })));
+  expressApp.use(
+    '/v1',
+    skipRefusedProxyBodies(express.urlencoded({ extended: true, limit: PROXY_BODY_LIMIT })),
+  );
+  expressApp.use(skipRefusedProxyBodies(express.json({ limit: API_BODY_LIMIT })));
+  expressApp.use(
+    skipRefusedProxyBodies(express.urlencoded({ extended: true, limit: API_BODY_LIMIT })),
+  );
   expressApp.use(bodyParserErrorHandler);
 
   // Both the OAuth discovery documents and the MCP module go together: with the

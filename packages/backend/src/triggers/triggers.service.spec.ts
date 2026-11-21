@@ -198,6 +198,46 @@ describe('TriggersService', () => {
       expect(find('INSERT INTO triggers')).toHaveLength(0);
     });
 
+    it('refuses private log destinations when the caller may not use them', async () => {
+      for (const input of [
+        { name: 'Syslog', type: 'syslog', config: { host: '10.0.0.5', port: 514 } },
+        { name: 'Relp', type: 'relp', config: { host: '127.0.0.1', port: 20514 } },
+        { name: 'Gelf', type: 'gelf', config: { host: '192.168.1.9', port: 12201 } },
+        {
+          name: 'GelfHttp',
+          type: 'gelf',
+          config: { transport: 'http', url: 'http://10.0.0.5:12201/gelf' },
+        },
+      ]) {
+        const { service, find } = setup();
+        const messages = await badRequest(service.create(ownerCtx, input, false));
+        expect(messages[0]).toMatch(/^config\.(host|url):/);
+        expect(find('INSERT INTO triggers')).toHaveLength(0);
+      }
+    });
+
+    it('refuses a cloud metadata log destination even for callers allowed to use private ones', async () => {
+      const { service } = setup();
+      const messages = await badRequest(
+        service.create(
+          ownerCtx,
+          { name: 'Syslog', type: 'syslog', config: { host: '169.254.169.254', port: 514 } },
+          true,
+        ),
+      );
+      expect(messages[0]).toMatch(/config\.host: .*metadata/);
+    });
+
+    it('stores what the private-URL policy allowed whoever saved the trigger', async () => {
+      for (const allowPrivate of [true, false]) {
+        const { service, find } = setup({ triggers: [webhookRow()] });
+        await service.create(ownerCtx, webhookInput, allowPrivate);
+        const insert = find('INSERT INTO triggers')[0];
+        expect(insert.sql).toContain('allow_private_destination');
+        expect(insert.params[12]).toBe(allowPrivate);
+      }
+    });
+
     it('refuses private webhook destinations when the caller may not use them', async () => {
       const { service, find } = setup();
       const messages = await badRequest(

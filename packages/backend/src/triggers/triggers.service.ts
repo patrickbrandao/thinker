@@ -10,6 +10,7 @@ import {
 } from 'thinker-shared';
 import { encrypt, getEncryptionSecret } from '../common/utils/crypto.util';
 import { validatePublicUrl } from '../common/utils/url-validation';
+import { assertConnectableHost } from '../common/utils/ssrf-safe-fetch';
 import type { TenantContext } from '../common/decorators/tenant-context.decorator';
 import { TenantCacheService } from '../common/services/tenant-cache.service';
 import {
@@ -189,16 +190,34 @@ export class TriggersService {
   }
 
   /**
-   * Webhook destinations follow the provider private-URL policy: without it
-   * the URL must be an https address on the public internet. Metadata
-   * endpoints are refused again at delivery time (ssrfSafeFetch).
+   * Every destination follows the provider private-URL policy (ADR 0006 item
+   * 7): without it, a webhook or GELF HTTP URL must be an https address on the
+   * public internet, and a syslog, RELP or GELF host must resolve to public
+   * addresses. A cloud metadata host is refused for everyone. The trigger
+   * stores what the policy allowed (`allow_private_destination`), and every
+   * delivery applies it again, so a later DNS change cannot reach the LAN.
    */
-  private async assertWebhookDestination(t: NormalizedTrigger, allowPrivate: boolean) {
-    if (t.type !== 'webhook' || allowPrivate) return;
+  private async assertDestination(t: NormalizedTrigger, allowPrivate: boolean) {
+    const field =
+      t.type === 'webhook' || (t.type === 'gelf' && t.config.transport === 'http')
+        ? 'url'
+        : t.type === 'syslog' || t.type === 'relp' || t.type === 'gelf'
+          ? 'host'
+          : null;
+    if (!field) return;
+    const value = String(t.config[field] ?? '');
     try {
-      await validatePublicUrl(String(t.config.url ?? ''));
+      if (field === 'host') {
+        assertConnectableHost(value);
+        if (!allowPrivate) {
+          const literal = value.includes(':') && !value.startsWith('[') ? `[${value}]` : value;
+          await validatePublicUrl(`https://${literal}/`);
+        }
+      } else if (!allowPrivate) {
+        await validatePublicUrl(value);
+      }
     } catch (err) {
-      throw new BadRequestException([`config.url: ${(err as Error).message}`]);
+      throw new BadRequestException([`config.${field}: ${(err as Error).message}`]);
     }
   }
 
@@ -211,14 +230,15 @@ export class TriggersService {
     const result = normalizeTrigger(input);
     if ('errors' in result) throw new BadRequestException(result.errors);
     const t = result.value;
-    await this.assertWebhookDestination(t, allowPrivate);
+    await this.assertDestination(t, allowPrivate);
     await this.assertUniqueName(tenantId, t.name);
     const id = randomUUID();
     await this.ds.query(
       `INSERT INTO triggers
          (id, tenant_id, name, type, enabled, config, secrets_encrypted, max_retries,
-          retry_delay_seconds, timeout_seconds, workspace_events, created_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11::jsonb, $12)`,
+          retry_delay_seconds, timeout_seconds, workspace_events, created_by_user_id,
+          allow_private_destination)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11::jsonb, $12, $13)`,
       [
         id,
         tenantId,
@@ -232,6 +252,7 @@ export class TriggersService {
         t.timeout_seconds,
         JSON.stringify(t.workspace_events),
         ctx.userId,
+        allowPrivate,
       ],
     );
     return view(await this.row(tenantId, id));
@@ -245,13 +266,13 @@ export class TriggersService {
     const result = normalizeTrigger(input, toNormalized(existing));
     if ('errors' in result) throw new BadRequestException(result.errors);
     const t = result.value;
-    await this.assertWebhookDestination(t, allowPrivate);
+    await this.assertDestination(t, allowPrivate);
     await this.assertUniqueName(tenantId!, t.name, id);
     await this.ds.query(
       `UPDATE triggers
           SET name = $3, enabled = $4, config = $5::jsonb, secrets_encrypted = $6,
               max_retries = $7, retry_delay_seconds = $8, timeout_seconds = $9,
-              workspace_events = $10::jsonb, updated_at = NOW()
+              workspace_events = $10::jsonb, allow_private_destination = $11, updated_at = NOW()
         WHERE id = $1 AND tenant_id = $2`,
       [
         id,
@@ -264,6 +285,7 @@ export class TriggersService {
         t.retry_delay_seconds,
         t.timeout_seconds,
         JSON.stringify(t.workspace_events),
+        allowPrivate,
       ],
     );
     this.dispatch.invalidateBindings();

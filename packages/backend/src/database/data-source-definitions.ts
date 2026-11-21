@@ -102,6 +102,7 @@ import { AddTenantProviderUrlOverrides1806000000000 } from './migrations/1806000
 import { HarnessKeysAndIpPrefixes1806100000000 } from './migrations/1806100000000-HarnessKeysAndIpPrefixes';
 import { AddProviderAttemptRecordings1806200000000 } from './migrations/1806200000000-AddProviderAttemptRecordings';
 import { KeyIpRestriction1806300000000 } from './migrations/1806300000000-KeyIpRestriction';
+import { TriggerAllowPrivateDestination1806400000000 } from './migrations/1806400000000-TriggerAllowPrivateDestination';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -452,4 +453,5 @@ export const migrations = [
   HarnessKeysAndIpPrefixes1806100000000,
   AddProviderAttemptRecordings1806200000000,
   KeyIpRestriction1806300000000,
+  TriggerAllowPrivateDestination1806400000000,
 ];

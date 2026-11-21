@@ -18,6 +18,8 @@ import {
 import { ProxyEgressService } from '../proxy-servers/proxy-egress.service';
 import { SystemEventsService } from '../common/services/system-events.service';
 import { deliver, type DeliveryResult } from './trigger-senders';
+import { DELIVERY_GRACE_MS, withDeliveryDeadline } from './delivery-deadline';
+import { allowsPrivateDestination } from '../common/utils/private-url-policy';
 import { TriggerDispatchService } from './trigger-dispatch.service';
 import { isHttpTrigger, type TriggerConfig, type TriggerSecrets } from './trigger-config';
 import type { TemplateVars } from './trigger-template';
@@ -47,6 +49,7 @@ interface TriggerRow {
   max_retries: number;
   retry_delay_seconds: number;
   timeout_seconds: number;
+  allow_private_destination: boolean | null;
 }
 
 export function decryptSecrets(stored: string | null): TriggerSecrets {
@@ -155,7 +158,7 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
       ? (
           (await this.ds.query(
             `SELECT id, name, type, enabled, config, secrets_encrypted, max_retries,
-                  retry_delay_seconds, timeout_seconds
+                  retry_delay_seconds, timeout_seconds, allow_private_destination
              FROM triggers WHERE id = $1 AND tenant_id = $2`,
             [row.trigger_id, row.tenant_id],
           )) as TriggerRow[]
@@ -183,17 +186,22 @@ export class TriggerWorkerService implements OnApplicationBootstrap, OnModuleDes
         scope = !isHttpTrigger(trigger.type, parseJson<TriggerConfig>(trigger.config))
           ? undefined
           : await this.egress?.scopeForTarget(row.tenant_id, 'trigger', trigger.id, trigger.name);
-        result = await runWithOutboundScope(scope, () =>
-          deliver({
-            type: trigger.type,
-            config: parseJson<TriggerConfig>(trigger.config),
-            secrets: decryptSecrets(trigger.secrets_encrypted),
-            eventType: row.event_type,
-            vars,
-            timeoutMs: trigger.timeout_seconds * 1000,
-            defaultFrom: this.defaultFrom,
-            fallbackRecipient: () => this.ownerEmail(row.tenant_id),
-          }),
+        const timeoutMs = trigger.timeout_seconds * 1000;
+        result = await withDeliveryDeadline(
+          runWithOutboundScope(scope, () =>
+            deliver({
+              type: trigger.type,
+              config: parseJson<TriggerConfig>(trigger.config),
+              secrets: decryptSecrets(trigger.secrets_encrypted),
+              eventType: row.event_type,
+              vars,
+              timeoutMs,
+              allowPrivate: allowsPrivateDestination(trigger.allow_private_destination),
+              defaultFrom: this.defaultFrom,
+              fallbackRecipient: () => this.ownerEmail(row.tenant_id),
+            }),
+          ),
+          timeoutMs + DELIVERY_GRACE_MS,
         );
       } catch (err) {
         result = {

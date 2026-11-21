@@ -1465,6 +1465,22 @@ describe('Anthropic Adapter', () => {
   });
 
   describe('createAnthropicStreamTransformer (stateful)', () => {
+    it('reports the usage billed by message_start before the stream finishes', () => {
+      const transform = createAnthropicStreamTransformer('claude-sonnet-4-20250514');
+      expect(transform.partialUsage()).toBeNull();
+
+      transform(
+        'event: message_start\n{"type":"message_start","message":{"usage":{"input_tokens":40,"output_tokens":1,"cache_read_input_tokens":90000,"cache_creation_input_tokens":2000}}}',
+      );
+
+      expect(transform.partialUsage()).toEqual({
+        prompt_tokens: 92040,
+        completion_tokens: 1,
+        cache_read_tokens: 90000,
+        cache_creation_tokens: 2000,
+      });
+    });
+
     it('emits tool call delta for tool_use content_block_start', () => {
       const transform = createAnthropicStreamTransformer('claude-sonnet-4-20250514');
 

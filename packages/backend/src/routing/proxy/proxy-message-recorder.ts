@@ -90,6 +90,12 @@ export interface ProviderErrorOpts extends VirtualModelRef {
   requestParams?: RequestParamDefaults | null;
   /** API surface to retain when this terminal write creates the Request. */
   apiMode?: ProxyApiMode;
+  /**
+   * Usage the provider reported before the stream broke off (idle timeout,
+   * reset socket, error event mid-stream). It was billed, so it is recorded
+   * and priced like a cancelled request's.
+   */
+  usage?: StreamUsage;
 }
 
 export type { ThinkerBlockedRequestReason };
@@ -889,10 +895,33 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       virtualModelId,
       virtualModelName,
       apiMode,
+      usage,
     } = opts ?? {};
     if (httpStatus === 429 && !attempt && !skipAttempt && this.shouldSkipRateLimitRecord(ctx)) {
       return;
     }
+    const costUsd =
+      usage && model
+        ? await this.computeCost(
+            ctx,
+            model,
+            provider,
+            authType,
+            usage,
+            tenantProviderId,
+            undefined,
+            attempt ? new Date(attempt.startedAt) : undefined,
+          ).catch(() => null)
+        : null;
+    const usageFields = usage
+      ? {
+          input_tokens: usage.prompt_tokens,
+          output_tokens: usage.completion_tokens,
+          cache_read_tokens: usage.cache_read_tokens ?? 0,
+          cache_creation_tokens: usage.cache_creation_tokens ?? 0,
+          cost_usd: costUsd,
+        }
+      : {};
 
     const messageStatus = httpStatus === 429 ? 'rate_limited' : 'error';
 
@@ -903,6 +932,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
     );
 
     const row = buildMessageRow(ctx, {
+      ...usageFields,
       request_id: requestId,
       ...attemptIdentity(attempt, attemptNumber),
       trace_id: traceId ?? null,

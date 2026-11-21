@@ -12,8 +12,20 @@ export function scoreTokenCount(text: string): number {
   return 0.5;
 }
 
+/**
+ * The structural scorers run regular expressions over user text on the proxy
+ * hot path, in the shared event loop. Every pattern here must stay linear in
+ * the input: no unbounded quantifier that can also match what follows it
+ * (`\s+` before `^` in multiline mode spans lines; `.*?` with no line or
+ * length bound rescans to the end of the text for every start). Callers also
+ * cap the text at MAX_REGEX_SCAN_CHARS.
+ */
+export const MAX_REGEX_SCAN_CHARS = 100_000;
+
 export function scoreNestedListDepth(text: string): number {
-  const listPattern = /^(\s+)(?:[-*+]\s|\d+[.)]\s)/gm;
+  // `[ \t]+`, not `\s+`: indentation never crosses a newline, and `\s+`
+  // made a run of blank lines quadratic.
+  const listPattern = /^([ \t]+)(?:[-*+]\s|\d+[.)]\s)/gm;
   const indentLevels = new Set<number>();
   let match: RegExpExecArray | null;
 
@@ -29,11 +41,13 @@ export function scoreNestedListDepth(text: string): number {
 }
 
 const CONDITIONAL_PATTERNS = [
-  /\bif\b.*?\bthen\b/gi,
+  // Bounded to one line and 200 chars so a long run of "if" without "then"
+  // stays linear.
+  /\bif\b[^\n]{0,200}?\bthen\b/gi,
   /\botherwise\b/gi,
   /\bunless\b/gi,
   /\bdepending on\b/gi,
-  /\bwhen\b.*?\bhappens?\b/gi,
+  /\bwhen\b[^\n]{0,200}?\bhappens?\b/gi,
   /\bin case\b/gi,
   /\bprovided that\b/gi,
   /\bassuming\b/gi,

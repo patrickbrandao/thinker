@@ -1151,6 +1151,8 @@ export class ProxyController {
           requestHeaders,
           requestDurationMs: startTime == null ? undefined : Date.now() - startTime,
           apiMode,
+          // A stream that broke off after the provider reported usage was billed.
+          usage: partialUsageOf(err),
         })
         .catch((e) => this.logger.warn(`Failed to record provider error: ${e}`));
     }

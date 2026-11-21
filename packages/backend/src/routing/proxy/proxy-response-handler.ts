@@ -43,6 +43,7 @@ import type { ReasoningContentCache } from './reasoning-content-cache';
 import {
   createGoogleStreamState,
   finishGoogleStream,
+  googleStreamUsageSoFar,
   type ExtractedSignature,
 } from './google-adapter';
 import {
@@ -571,6 +572,10 @@ export async function handleStreamResponse(
 
   if (forward.isGoogle) {
     const googleState = createGoogleStreamState();
+    const googleRelay = {
+      ...relayOptions,
+      partialUsage: () => parseUsageObject(googleStreamUsageSoFar(googleState)),
+    };
     return pipeStream(
       forward.response.body!,
       res,
@@ -597,7 +602,7 @@ export async function handleStreamResponse(
         return (tailOut ?? '') + (end ?? '') || null;
       },
       onClient,
-      relayOptions,
+      googleRelay,
     );
   }
   if (forward.isAnthropic) {
@@ -611,6 +616,7 @@ export async function handleStreamResponse(
       meta.model,
       onThinkingBlocks,
     );
+    const anthropicRelay = { ...relayOptions, partialUsage: anthropicTransformer.partialUsage };
     // Anthropic Messages inbound + Anthropic upstream: forward the upstream
     // SSE bytes byte-for-byte so Anthropic SSE framing (`event:` headers,
     // multi-line `data:` payloads, blank-line separators) reaches the
@@ -624,7 +630,7 @@ export async function handleStreamResponse(
         res,
         anthropicTransformer,
         onClient,
-        relayOptions,
+        anthropicRelay,
       );
     }
     return pipeStream(
@@ -636,7 +642,7 @@ export async function handleStreamResponse(
       },
       finalize,
       onClient,
-      relayOptions,
+      anthropicRelay,
     );
   }
   // A native Responses upstream speaks the same Responses SSE the ChatGPT
