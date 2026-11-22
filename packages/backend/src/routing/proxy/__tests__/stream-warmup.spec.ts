@@ -248,6 +248,21 @@ describe('streamWarmupMsFor (#128)', () => {
   it('uses the given fallback for an unset value', () => {
     expect(parseStreamWarmupMs(undefined, 60_000)).toBe(60_000);
   });
+
+  it('keeps 60s for local runners when only STREAM_WARMUP_MS is set', () => {
+    const saved = { ...process.env };
+    process.env.STREAM_WARMUP_MS = '15000';
+    delete process.env.THINKER_LOCAL_STREAM_WARMUP_MS;
+    try {
+      jest.isolateModules(() => {
+        const fresh = jest.requireActual<typeof import('../stream-warmup')>('../stream-warmup');
+        expect(fresh.STREAM_WARMUP_MS).toBe(15_000);
+        expect(fresh.LOCAL_STREAM_WARMUP_MS).toBe(60_000);
+      });
+    } finally {
+      process.env = saved;
+    }
+  });
 });
 
 describe('streamWarmupMsFor overrides (#244)', () => {

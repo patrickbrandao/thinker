@@ -249,7 +249,7 @@ jobs:
 
           agent=$(curl -sSf -b "$cookie_jar" -X POST "$base_url/api/v1/agents" \
             -H 'Content-Type: application/json' \
-            --data '{"name":"Volume Smoke Agent"}')
+            --data '{"name":"volume-smoke-agent"}')
           agent_key=$(jq -er '.apiKey | select(startswith("thk_"))' <<<"$agent")
           echo "::add-mask::$agent_key"
           # Kept for the routed-response gateway contract in a later step.
@@ -310,13 +310,19 @@ jobs:
           test -n "$recording_row"
           IFS='|' read -r request_id attempt_id storage_key <<<"$recording_row"
 
-          docker run --rm --user 65532:65532 \
-            -e RECORDING_KEY="$storage_key" \
-            -e RECORDING_PROMPT="$prompt" \
-            -v thinker_request_recordings:/recordings:ro \
-            --entrypoint /nodejs/bin/node \
-            tmsoftbrasil/thinker:ci \
-            -e "const fs=require('fs');const b=fs.readFileSync('/recordings/'+process.env.RECORDING_KEY);if(b.subarray(0,4).toString('ascii')!=='MRE1')process.exit(1);if(b.includes(process.env.RECORDING_PROMPT))process.exit(2)"
+          # Recordings live in PostgreSQL by default (ADR 0013), keyed by the
+          # same recording_key the message row points at.
+          stored=""
+          for i in $(seq 1 100); do
+            stored=$(docker compose exec -T postgres \
+              psql -U thinker -d thinker -At -v key="$storage_key" \
+              <<<"SELECT count(*) FROM provider_attempt_recordings WHERE storage_key = :'key'")
+            if [[ "$stored" == "1" ]]; then
+              break
+            fi
+            sleep 0.1
+          done
+          test "$stored" = "1"
 
           docker compose up -d --force-recreate --no-deps thinker
           for i in $(seq 1 60); do
