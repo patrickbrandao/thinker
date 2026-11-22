@@ -14,8 +14,13 @@ export const DEFAULT_STREAM_WARMUP_MS = 15_000;
 /** Cold local models (Ollama, LM Studio, llama.cpp) can take 30-60s to load (#128). */
 export const DEFAULT_LOCAL_STREAM_WARMUP_MS = 60_000;
 
+/**
+ * Reads a warm-up value. `rawValue` has no default on purpose: an unset
+ * variable passed in as `undefined` must give `fallback`, never fall through to
+ * STREAM_WARMUP_MS.
+ */
 export function parseStreamWarmupMs(
-  rawValue = process.env.STREAM_WARMUP_MS,
+  rawValue: string | undefined,
   fallback = DEFAULT_STREAM_WARMUP_MS,
 ): number {
   const value = rawValue ?? '';
@@ -27,7 +32,7 @@ export function parseStreamWarmupMs(
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export const STREAM_WARMUP_MS = parseStreamWarmupMs();
+export const STREAM_WARMUP_MS = parseStreamWarmupMs(process.env.STREAM_WARMUP_MS);
 
 /**
  * Warm-up for local providers: THINKER_LOCAL_STREAM_WARMUP_MS, else 60s, and

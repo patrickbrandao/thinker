@@ -56,6 +56,12 @@ export function useResource<T>(
       return;
     }
     void run();
+    // Moving the generation on drops the response of a request still in
+    // flight when the inputs change or the component unmounts, so it never
+    // sets state on a component that is gone.
+    return () => {
+      generation.current++;
+    };
     // `deps` are the caller's inputs, like useEffect's.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, run, ...deps]);
