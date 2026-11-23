@@ -70,7 +70,7 @@ jobs:
           tags: tmsoftbrasil/thinker:ci
           platforms: linux/amd64
           cache-from: type=gha,scope=image-amd64
-          cache-to: type=gha,mode=max,scope=image-amd64
+          cache-to: type=gha,mode=max,scope=image-amd64,ignore-error=true
 
       - name: Point Compose at the local image tag
         run: echo "THINKER_VERSION=ci" >> "$GITHUB_ENV"
@@ -409,7 +409,7 @@ jobs:
           tags: tmsoftbrasil/thinker:ci
           platforms: linux/amd64
           cache-from: type=gha,scope=image-amd64
-          cache-to: type=gha,mode=max,scope=image-amd64
+          cache-to: type=gha,mode=max,scope=image-amd64,ignore-error=true
 
       - name: Point Compose at the local image tag
         run: echo "THINKER_VERSION=ci" >> "$GITHUB_ENV"
@@ -496,7 +496,7 @@ jobs:
 
           curl -sSf http://127.0.0.1:2099/api/v1/health | grep -q '"status":"healthy"'
           (cd "$install_dir" && docker compose logs thinker) |
-            grep -q 'Request recording storage: filesystem'
+            grep -q 'Request recording storage: postgres'
 
       - name: Dump backend logs on failure
         if: failure()

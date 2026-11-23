@@ -69,7 +69,7 @@ jobs:
           load: true
           tags: thinker:ci
           cache-from: type=gha,scope=${{ matrix.cache-scope }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.cache-scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache-scope }},ignore-error=true
 
       - name: Verify architecture, user and contents
         env:
