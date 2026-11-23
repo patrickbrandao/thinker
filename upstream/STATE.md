@@ -8,9 +8,9 @@ Os cortes são timestamps ISO-8601 em UTC. A seleção usa `updated_at >= corte`
 
 | Campo | Valor |
 |---|---|
-| Commits | `6e4b2f476964e52d2be4061063e0d1f4f0bb9e05` |
-| Releases | `manifest@6.29.1` |
-| Issues e PRs | `2026-11-16T12:12:20Z` |
+| Commits | `34bb5b5cc8e2ca2d327c85409d17fdcdcf3f915b` |
+| Releases | `manifest@6.29.3` |
+| Issues e PRs | `2026-11-23T12:10:13Z` |
 | Discussions | `2026-11-12T17:18:55Z` |
 | Backlog de itens abertos anteriores ao baseline | **triado** em 2026-10-12 (57 issues/PRs abertos revisados) |
 
@@ -24,3 +24,4 @@ Os cortes são timestamps ISO-8601 em UTC. A seleção usa `updated_at >= corte`
 | 2026-11-09 | 11 (`b0c81b0`..`e48ea50`) | 2 (6.29.0, 6.29.1) | 3 (#495 e #496: adotar; #497: adaptar). Comentário na #302 (PR #3122 mesclado) | Version Packages (#3104, #3117), remoção de recordings no Cloud (#3116), modelparams 0.0.72 (#3109, Thinker já em ^0.0.72), Dependabot (#3112, #3100, #3011, #3015), #3113/#3114/#3115 (GPT-6.1 Sol e Fable, abertos; citados na #497) | Commits: git local; Releases: `gh api`; Issues e PRs: `gh api` (REST); Discussions: GraphQL não tentado nesta sessão | Corte de Discussions **não avançado** (mantido em 2026-10-09T14:32:18Z). A branch de revisão não tinha histórico comum com `main`; merge feito com `--allow-unrelated-histories -X theirs`. |
 | 2026-11-12 | 5 desde 2026-11-09 (`e48ea50`..`6e4b2f4`); HEAD `6e4b2f4` | `manifest@6.29.1` (6.29.0 já coberta por #497) | 2 (#510 adotar, #511 adaptar) | Re-ficha #495-#497 (já abertos), retenção de gravações (#e10162d, só Cloud), Manifest Cloud Pro only (6.29.0), bump modelparams 0.0.72 (Thinker já usa), issue #3126 (Bedrock Fable 5.1 retention mode, mesma causa de #497), Dependabot, #3044, #3123 (version packages) | Commits: `gh api`; Releases: `gh api`; Issues e PRs: `gh api` (REST); Discussions: `gh api graphql` (nada novo desde 17/09/2026) | Os cortes de 2026-10-12 a 2026-11-09 não foram registrados neste arquivo; o corte real anterior foi inferido pelas issues #495-#497 (09/11) e a deduplicação cobre a sobreposição. |
 | 2026-11-16 | 0 novos (HEAD `6e4b2f4`) | 0 novas (último: `manifest@6.29.1`) | 2 (#538, #539: adotar) | #3128 (issue aberta: completion vazia vira 502/fallback pago no Cloud; Thinker não tem fallback por conteúdo vazio) | Commits: git local; Releases: `gh api`; Issues e PRs: `gh api` (REST); Discussions: GraphQL bloqueado nesta sessão | Corte de Discussions **não avançado** (mantido). Merge de `origin/main` na branch teve conflito em STATE.md, resolvido mantendo as duas linhas. PRs #3127 e #3129 ainda abertos no upstream. |
+| 2026-11-23 | 9 novos (`6e4b2f4`..`34bb5b5`) | 2 novas (6.29.2, 6.29.3) | 4 (#556 adotar, #557 adotar, #558 adotar, #559 adotar) | #3130 (completion vazia passa a 200; Thinker não adotou o fallback por vazio, ver #129), #3128, #3126/#3114 (Fable 5.1, já na #497), #3085 (dist vazio da imagem upstream), #3103 (aberta, Fable/Terra, coberta pela #497), Dependabot (#3011, #3015, #3100, #3124), Version Packages (#3123, #3134, #3135) | Commits: git local; Releases: `gh api`; Issues e PRs: `gh api` (REST); Discussions: GraphQL não tentado | Corte de Discussions **não avançado** (mantido). PR #3136 (tool_use input) ainda aberto no upstream. |
